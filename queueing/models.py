@@ -11,6 +11,7 @@ class TaxiQueue(models.Model):
     Represents a queue for a specific BufferZone-PickupZone pair.
     Manages the flow of taxis from buffer zone(s) to pickup zone(s).
     """
+
     uuid = models.UUIDField(default=uuid.uuid4, null=False, blank=False, editable=False)
     buffer_zone = models.ForeignKey(
         BufferZone,
@@ -75,6 +76,7 @@ class QueueEntry(models.Model):
     Represents a chauffeur's entry in a specific taxi queue.
     Tracks their status throughout the queuing process.
     """
+
     class Status(models.TextChoices):
         WAITING = "waiting", "Waiting in Queue"
         NOTIFIED = "notified", "Notified to Leave"
