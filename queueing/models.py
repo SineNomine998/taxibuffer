@@ -37,25 +37,29 @@ class TaxiQueue(models.Model):
         super().save(*args, **kwargs)
 
     def get_waiting_entries(self):
+        print("RUNNING GET_WAITING_ENTRIES")
         """Get all queue entries that are waiting, ordered by sign-up time."""
-        return self.entries.filter(status=QueueEntry.Status.WAITING).order_by(
+        return self.queueentry_set.filter(status=QueueEntry.Status.WAITING).order_by(
             "created_at"
         )
 
     def get_next_in_queue(self, count=1):
+        print("RUNNING GET_NEXT_IN_QUEUE")
         """Get the next N chauffeurs in queue."""
         return self.get_waiting_entries()[:count]
 
     def get_recently_dequeued(self, limit=7):
+        print("RUNNING GET_RECENTLY_DEQUEUED")
         """Get the most recently dequeued entries (for officer visibility)."""
-        return self.entries.filter(status=QueueEntry.Status.DEQUEUED).order_by(
+        return self.queueentry_set.filter(status=QueueEntry.Status.DEQUEUED).order_by(
             "-dequeued_at"
         )[:limit]
 
     def get_queue_position(self, chauffeur):
+        print("RUNNING GET_QUEUE_POSITION")
         """Get the position of a chauffeur in the queue (1-indexed)."""
         try:
-            entry = self.entries.get(
+            entry = self.queueentry_set.get(
                 chauffeur=chauffeur, status=QueueEntry.Status.WAITING
             )
             waiting_entries = list(self.get_waiting_entries())

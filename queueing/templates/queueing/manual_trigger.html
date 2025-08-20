@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Queue Trigger - {{ queue.name }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .queue-info {
+            background: #e9ecef;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+
+        .btn {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .btn-secondary:hover {
+            background-color: #545b62;
+        }
+
+        .alert {
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .alert-danger {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .alert-info {
+            background-color: #cce7ff;
+            border: 1px solid #b3d9ff;
+            color: #004085;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔧 Manual Queue Trigger</h1>
+        <p style="text-align: center; color: #666;">Testing interface - Simulate available pickup slots</p>
+
+        <!-- Display messages -->
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <div class="queue-info">
+            <h3>Queue Information</h3>
+            <p><strong>Name:</strong> {{ queue.name }}</p>
+            <p><strong>Buffer Zone:</strong> {{ queue.buffer_zone.name }}</p>
+            <p><strong>Pickup Zone:</strong> {{ queue.pickup_zone.name }}</p>
+            <p><strong>Notification Timeout:</strong> {{ queue.notification_timeout_minutes }} minutes</p>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number">{{ waiting_count }}</div>
+                <div>Waiting in Queue</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="notified-count">-</div>
+                <div>Currently Notified</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="dequeued-count">-</div>
+                <div>Recently Dequeued</div>
+            </div>
+        </div>
+
+        {% if waiting_count == 0 %}
+        <div class="alert alert-info">
+            No chauffeurs are currently waiting in the queue.
+            <a href="{% url 'queueing:signup' %}">Add some chauffeurs</a> to test the notification system.
+        </div>
+        {% endif %}
+
+        <div class="warning">
+            <strong>⚠️ Testing Mode:</strong> This interface simulates sensor detection of available pickup slots.
+            In production, this would be triggered automatically by actual sensors.
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="slots_available">Number of Available Pickup Slots:</label>
+                <input type="number" id="slots_available" name="slots_available" min="1" max="7" value="1" required>
+                <small style="color: #666;">Enter how many taxi slots became available in the pickup zone (1-7)</small>
+            </div>
+
+            <button type="submit" class="btn" {% if waiting_count == 0 %}disabled{% endif %}>
+                🚨 Trigger Notifications
+            </button>
+        </form>
+
+        <div style="text-align: center;">
+            <a href="{% url 'queueing:signup' %}" class="btn btn-secondary">
+                ← Back to Signup
+            </a>
+        </div>
+
+        <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+            <h4>How to Test:</h4>
+            <ol>
+                <li><strong>Add chauffeurs:</strong> Use the signup form to add multiple chauffeurs to the queue</li>
+                <li><strong>Simulate available slots:</strong> Use this form to simulate sensors detecting available
+                    pickup spots</li>
+                <li><strong>Check notifications:</strong> Go to the queue status page to see live notifications</li>
+                <li><strong>Respond to notifications:</strong> Accept or decline notifications to see queue progression
+                </li>
+            </ol>
+        </div>
+
+        <script>
+            var waitingCount = parseInt("{{ waiting_count }}", 10);
+            // Update stats periodically
+            setInterval(updateStats, 5000);
+
+            async function updateStats() {
+                try {
+                    // You could add an API endpoint to get current queue stats
+                    // For now, we'll just refresh the counts manually or add this later
+                } catch (error) {
+                    console.error('Error updating stats:', error);
+                }
+            }
+
+            // Form validation
+            document.querySelector('form').addEventListener('submit', function (e) {
+                const slotsInput = document.getElementById('slots_available');
+                const slots = parseInt(slotsInput.value);
+
+                if (slots < 1 || slots > 7) {
+                    e.preventDefault();
+                    alert('Please enter a number between 1 and 7 for available slots.');
+                    return false;
+                }
+                if (waitingCount === 0) {
+                    e.preventDefault();
+                    alert('No chauffeurs in queue to notify. Please add some chauffeurs first.');
+                    return false;
+                }
+
+                // Confirm action
+                if (!confirm(`This will notify the next ${Math.min(slots, waitingCount)} chauffeur(s) in the queue. Continue?`)) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+        </script>
+    </div>
+</body>
+
+</html>

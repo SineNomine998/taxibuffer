@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Queue Status - {{ queue.name }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .queue-info {
+            background: #e9ecef;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .status-card {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .status-waiting {
+            border-left-color: #ffc107;
+        }
+        
+        .status-notified {
+            border-left-color: #28a745;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dequeued {
+            border-left-color: #17a2b8;
+        }
+        
+        @keyframes pulse {
+            0% { background-color: #f8f9fa; }
+            50% { background-color: #e8f5e8; }
+            100% { background-color: #f8f9fa; }
+        }
+        
+        .position {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+            text-align: center;
+        }
+        
+        .notification-panel {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .notification-panel.show {
+            display: block;
+            animation: slideIn 0.5s ease-in-out;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .btn:hover {
+            opacity: 0.8;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+        }
+        
+        .last-updated {
+            font-size: 0.9em;
+            color: #666;
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .alert {
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .alert-danger {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .countdown {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #dc3545;
+            text-align: center;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚕 Queue Status</h1>
+            <h2>{{ queue.name }}</h2>
+        </div>
+        
+        <div id="alert-container"></div>
+        
+        <div class="queue-info">
+            <h3>Chauffeur Information</h3>
+            <p><strong>License Plate:</strong> {{ chauffeur.license_plate }}</p>
+            <p><strong>Taxi License:</strong> {{ chauffeur.taxi_license_number }}</p>
+            <p><strong>Queue:</strong> {{ queue.buffer_zone.name }} → {{ queue.pickup_zone.name }}</p>
+        </div>
+        
+        <div class="status-card" id="status-card">
+            <h3>Current Status</h3>
+            <div id="status-display" class="loading">Loading...</div>
+        </div>
+        
+        <div class="notification-panel" id="notification-panel">
+            <h3>🔔 Notification Received!</h3>
+            <p>You are being called to proceed to the pickup zone. Please respond within <span id="timeout-minutes">{{ queue.notification_timeout_minutes }}</span> minutes.</p>
+            <div id="countdown-display" class="countdown"></div>
+            <div style="text-align: center;">
+                <button class="btn btn-success" id="btn-accept" onclick="respondToNotification('accepted')">
+                    ✅ Accept - I'll go to pickup zone
+                </button>
+                <button class="btn btn-danger" id="btn-decline" onclick="respondToNotification('declined')">
+                    ❌ Decline - I want to stay in queue
+                </button>
+            </div>
+        </div>
+        
+        <div class="stats-grid" id="queue-stats">
+            <div class="stat-item">
+                <div class="stat-number" id="position-display">-</div>
+                <div>Your Position</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="total-waiting">-</div>
+                <div>Total Waiting</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="status-text">-</div>
+                <div>Status</div>
+            </div>
+        </div>
+        
+        <div class="last-updated" id="last-updated">
+            Last updated: Loading...
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="{% url 'queueing:signup' %}" class="btn" style="background-color: #6c757d; color: white; text-decoration: none; display: inline-block;">
+                ← Back to Signup
+            </a>
+        </div>
+    </div>
+
+    <script>
+        const queueId = "{{ queue.id }}";
+        const chauffeurId = "{{ chauffeur.id }}";
+        const notificationTimeoutMinutes = Number("{{ queue.notification_timeout_minutes }}");
+        let currentNotificationId = null;
+        let countdownInterval = null;
+        
+        // Update queue status every 3 seconds
+        setInterval(updateQueueStatus, 3000);
+        
+        // Initial load
+        updateQueueStatus();
+        
+        async function updateQueueStatus() {
+            try {
+                const response = await fetch(`/queueing/api/queue/${queueId}/chauffeur/${chauffeurId}/status/`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateStatusDisplay(data);
+                    updateStats(data);
+                    handleNotification(data);
+                    
+                    document.getElementById('last-updated').textContent = 
+                        `Last updated: ${new Date(data.last_updated).toLocaleTimeString()}`;
+                } else {
+                    showAlert('error', 'Failed to load queue status: ' + data.error);
+                }
+            } catch (error) {
+                showAlert('error', 'Connection error. Retrying...');
+                console.error('Error fetching queue status:', error);
+            }
+        }
+        
+        function updateStatusDisplay(data) {
+            const statusCard = document.getElementById('status-card');
+            const statusDisplay = document.getElementById('status-display');
+            
+            // Remove all status classes
+            statusCard.classList.remove('status-waiting', 'status-notified', 'status-dequeued');
+            
+            // Add appropriate class based on status
+            if (data.status_code === 'waiting') {
+                statusCard.classList.add('status-waiting');
+            } else if (data.status_code === 'notified') {
+                statusCard.classList.add('status-notified');
+            } else if (data.status_code === 'dequeued') {
+                statusCard.classList.add('status-dequeued');
+            }
+            
+            statusDisplay.innerHTML = `<h4>${data.status}</h4>`;
+        }
+        
+        function updateStats(data) {
+            document.getElementById('position-display').textContent = data.position || 'N/A';
+            document.getElementById('total-waiting').textContent = data.total_waiting || '0';
+            document.getElementById('status-text').textContent = data.status_code?.toUpperCase() || 'UNKNOWN';
+        }
+        
+        function handleNotification(data) {
+            const notificationPanel = document.getElementById('notification-panel');
+            
+            if (data.has_notification && data.notification && !data.notification.is_expired) {
+                currentNotificationId = data.notification.id;
+                showNotificationPanel(data.notification);
+            } else {
+                hideNotificationPanel();
+            }
+        }
+        
+        function showNotificationPanel(notification) {
+            const panel = document.getElementById('notification-panel');
+            panel.classList.add('show');
+            
+            // Start countdown
+            startCountdown(new Date(notification.notification_time));
+        }
+        
+        function hideNotificationPanel() {
+            const panel = document.getElementById('notification-panel');
+            panel.classList.remove('show');
+            
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+        }
+        
+        function startCountdown(notificationTime) {
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+            }
+            
+            countdownInterval = setInterval(() => {
+                const now = new Date();
+                const elapsed = Math.floor((now - notificationTime) / 1000); // seconds elapsed
+                const totalSeconds = notificationTimeoutMinutes * 60;
+                const remaining = totalSeconds - elapsed;
+                
+                if (remaining <= 0) {
+                    document.getElementById('countdown-display').textContent = 'Time expired!';
+                    clearInterval(countdownInterval);
+                    hideNotificationPanel();
+                } else {
+                    const minutes = Math.floor(remaining / 60);
+                    const seconds = remaining % 60;
+                    document.getElementById('countdown-display').textContent = 
+                        `Time remaining: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+        
+        async function respondToNotification(response) {
+            if (!currentNotificationId) {
+                showAlert('error', 'No active notification to respond to.');
+                return;
+            }
+            
+            // Disable buttons
+            document.getElementById('btn-accept').disabled = true;
+            document.getElementById('btn-decline').disabled = true;
+            
+            try {
+                const response_data = await fetch('/queueing/api/notification/respond/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        notification_id: currentNotificationId,
+                        response: response
+                    })
+                });
+                
+                const result = await response_data.json();
+                
+                if (result.success) {
+                    showAlert('success', result.message);
+                    hideNotificationPanel();
+                    currentNotificationId = null;
+                    // Force immediate status update
+                    setTimeout(updateQueueStatus, 1000);
+                } else {
+                    showAlert('error', result.error);
+                    // Re-enable buttons if there was an error
+                    document.getElementById('btn-accept').disabled = false;
+                    document.getElementById('btn-decline').disabled = false;
+                }
+            } catch (error) {
+                showAlert('error', 'Failed to send response. Please try again.');
+                document.getElementById('btn-accept').disabled = false;
+                document.getElementById('btn-decline').disabled = false;
+                console.error('Error responding to notification:', error);
+            }
+        }
+        
+        function showAlert(type, message) {
+            const container = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type === 'error' ? 'danger' : type}`;
+            alert.textContent = message;
+            
+            container.innerHTML = '';
+            container.appendChild(alert);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.parentNode.removeChild(alert);
+                }
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

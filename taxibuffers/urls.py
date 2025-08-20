@@ -16,8 +16,14 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from django.shortcuts import redirect
+
+def redirect_to_signup(request):
+    return redirect('queueing:signup')
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path('queueing/', include('queueing.urls')),
+    path('', redirect_to_signup, name='home'),
 ]
