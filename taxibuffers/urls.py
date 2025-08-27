@@ -20,7 +20,7 @@ from django.urls import path, include
 from django.shortcuts import redirect
 
 def redirect_to_signup(request):
-    return redirect('queueing:signup')
+    return redirect('queueing:chauffeur_login')
 
 urlpatterns = [
     path("admin/", admin.site.urls),

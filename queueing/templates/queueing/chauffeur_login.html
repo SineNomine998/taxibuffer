@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TAXIBUFFER</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(92.18deg, #E0BD22 -4.05%, #FEF508 116.02%);
+            overflow: hidden;
+        }
+
+        .login-container {
+            position: relative;
+            width: 375px;
+            height: 812px;
+            background: linear-gradient(92.18deg, #E0BD22 -4.05%, #FEF508 116.02%);
+            box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.05);
+            padding: 40px 25px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .header {
+            position: relative;
+        }
+
+        .info-icon {
+            position: absolute;
+            top: -20px;
+            right: -5px;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: #595959;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .info-icon:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .logo-section {
+            text-align: center;
+            margin-top: 180px;
+        }
+
+        .loading-icon {
+            font-size: 24px;
+            margin-bottom: 20px;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .logo {
+            font-size: 30px;
+            font-weight: 700;
+            letter-spacing: 5px;
+            color: #595959;
+            margin-bottom: 60px;
+        }
+
+        .form-section {
+            flex-grow: 1;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 700;
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: #161616;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 15px 12px;
+            border: 1px solid #9C9FB7;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: 'DM Sans', Arial, sans-serif;
+            background: rgba(255, 255, 255, 0.9);
+            transition: border-color 0.3s ease, background 0.3s ease;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #595959;
+            background: rgba(255, 255, 255, 1);
+        }
+
+        input::placeholder {
+            color: rgba(22, 22, 22, 0.6);
+            font-style: italic;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 15px;
+            margin-top: 30px;
+            font-size: 19px;
+            font-weight: 700;
+            border: none;
+            border-radius: 50px;
+            background: linear-gradient(92.2deg, #E0BD22 11.07%, #FEF508 100.13%);
+            color: #595959;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.25);
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            font-family: 'DM Sans', Arial, sans-serif;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0px 6px 15px rgba(0,0,0,0.3);
+        }
+
+        .btn-login:active {
+            transform: translateY(0px);
+        }
+
+        .btn-login:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .alert {
+            margin-bottom: 20px;
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .alert-danger {
+            background: rgba(220, 53, 69, 0.1);
+            border: 1px solid rgba(220, 53, 69, 0.3);
+            color: #721c24;
+        }
+
+        .alert-success {
+            background: rgba(40, 167, 69, 0.1);
+            border: 1px solid rgba(40, 167, 69, 0.3);
+            color: #155724;
+        }
+
+        .access-denied {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(220, 53, 69, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(220, 53, 69, 0.3);
+        }
+
+        .access-denied-title {
+            font-weight: 700;
+            font-size: 16px;
+            color: #721c24;
+            margin-bottom: 8px;
+        }
+
+        .access-denied-text {
+            font-size: 13px;
+            color: #721c24;
+            line-height: 1.4;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            font-style: italic;
+            font-weight: 300;
+            color: #595959;
+            margin-top: 20px;
+        }
+
+        /* Help modal */
+        .help-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .help-modal.show {
+            display: flex;
+        }
+
+        .help-content {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 320px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .help-close {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #9C9FB7;
+        }
+
+        .help-title {
+            font-weight: 700;
+            font-size: 18px;
+            color: #161616;
+            margin-bottom: 15px;
+        }
+
+        .help-text {
+            font-size: 14px;
+            color: #595959;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+
+        /* Loading state */
+        .loading .btn-login {
+            position: relative;
+            color: transparent;
+        }
+
+        .loading .btn-login::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            margin: -10px 0 0 -10px;
+            border: 2px solid #595959;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 400px) {
+            .login-container {
+                width: 100vw;
+                height: 100vh;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="header">
+            <div class="info-icon" onclick="showHelp()">ℹ️</div>
+        </div>
+
+        <div class="logo-section">
+            <div class="loading-icon">⚡</div>
+            <div class="logo">TAXIBUFFER</div>
+        </div>
+
+        <div class="form-section">
+            <!-- Display messages -->
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- Access denied state (show when validation fails) -->
+            {% if show_access_denied %}
+            <div class="access-denied">
+                <div class="access-denied-title">Access Denied</div>
+                <div class="access-denied-text">
+                    Your taxi is not recognized as part of an<br>
+                    authorized TTO. Please contact your TTO for<br>
+                    access to the queue.
+                </div>
+            </div>
+            {% endif %}
+            
+            <form method="post" id="loginForm">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label for="license_plate">License Plate</label>
+                    <input type="text" 
+                           id="license_plate" 
+                           name="license_plate" 
+                           required 
+                           placeholder="1-ABC-23"
+                           value="{{ form_data.license_plate|default:'' }}"
+                           maxlength="10">
+                </div>
+                
+                <div class="form-group">
+                    <label for="taxi_license_number">Taxi License Number</label>
+                    <input type="text" 
+                           id="taxi_license_number" 
+                           name="taxi_license_number" 
+                           required 
+                           placeholder="P12345"
+                           value="{{ form_data.taxi_license_number|default:'' }}"
+                           maxlength="20">
+                </div>
+                
+                <button type="submit" class="btn-login" id="loginBtn">
+                    Login
+                </button>
+            </form>
+        </div>
+
+        <div class="footer">
+            Taxibuffer is a Coding the Curbs® product
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="help-modal" id="helpModal" onclick="hideHelp(event)">
+        <div class="help-content" onclick="event.stopPropagation()">
+            <div class="help-close" onclick="hideHelp()">&times;</div>
+            <div class="help-title">How to use Taxibuffer</div>
+            <div class="help-text">
+                <strong>Step 1:</strong> Enter your license plate number and taxi license number to authenticate.
+            </div>
+            <div class="help-text">
+                <strong>Step 2:</strong> Select a pickup location from the available queues.
+            </div>
+            <div class="help-text">
+                <strong>Step 3:</strong> Wait for your turn in the queue. You'll receive notifications when it's time to proceed to the pickup zone.
+            </div>
+            <div class="help-text">
+                <strong>Need help?</strong> Contact your TTO for support with registration and access.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Form handling
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            const btn = document.getElementById('loginBtn');
+            const form = this;
+            
+            // Add loading state
+            form.classList.add('loading');
+            btn.disabled = true;
+            
+            // Basic validation
+            const licensePlate = document.getElementById('license_plate').value.trim();
+            const taxiLicense = document.getElementById('taxi_license_number').value.trim();
+            
+            if (!licensePlate || !taxiLicense) {
+                e.preventDefault();
+                form.classList.remove('loading');
+                btn.disabled = false;
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            // Format license plate
+            document.getElementById('license_plate').value = licensePlate.toUpperCase();
+        });
+
+        // Auto-format license plate
+        document.getElementById('license_plate').addEventListener('input', function(e) {
+            let value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+            e.target.value = value;
+        });
+
+        // Format taxi license number
+        document.getElementById('taxi_license_number').addEventListener('input', function(e) {
+            let value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            e.target.value = value;
+        });
+
+        // Help modal functions
+        function showHelp() {
+            document.getElementById('helpModal').classList.add('show');
+        }
+
+        function hideHelp(event) {
+            if (!event || event.target === document.getElementById('helpModal')) {
+                document.getElementById('helpModal').classList.remove('show');
+            }
+        }
+
+        // Handle escape key for modal
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                hideHelp();
+            }
+        });
+    </script>
+</body>
+</html>

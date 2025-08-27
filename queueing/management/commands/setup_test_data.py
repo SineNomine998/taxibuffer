@@ -36,7 +36,7 @@ class Command(BaseCommand):
         
         # Create pickup zone
         pickup_zone, created = PickupZone.objects.get_or_create(
-            name='Airport Pickup Zone',
+            name='Cruise Terminal Rotterdam',
             defaults={
                 'total_sensors': 7,
                 'num_of_occupied_sensors': 0,
@@ -48,6 +48,59 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f'Created pickup zone: {pickup_zone.name}'))
         else:
             self.stdout.write(f'Pickup zone already exists: {pickup_zone.name}')
+        
+        # Create additional pickup zones for variety
+        additional_zones = [
+            ('Amsterdam Airport Schiphol', 5),
+            ('Central Station Amsterdam', 4),
+            ('RAI Convention Center', 6),
+        ]
+        
+        for zone_name, sensor_count in additional_zones:
+            zone, created = PickupZone.objects.get_or_create(
+                name=zone_name,
+                defaults={
+                    'total_sensors': sensor_count,
+                    'num_of_occupied_sensors': 0,
+                    'active': True
+                }
+            )
+            if created:
+                self.stdout.write(f'Created additional pickup zone: {zone.name}')
+                
+                # Create additional buffer zones and queues
+                additional_buffer, buffer_created = BufferZone.objects.get_or_create(
+                    name=f'{zone_name} Buffer Zone',
+                    defaults={
+                        'zone': buffer_polygon,  # Using same polygon for simplicity
+                        'active': True
+                    }
+                )
+                
+                if buffer_created:
+                    # Create queue for this buffer-pickup pair
+                    additional_queue, queue_created = TaxiQueue.objects.get_or_create(
+                        buffer_zone=additional_buffer,
+                        pickup_zone=zone,
+                        defaults={
+                            'notification_timeout_minutes': 2,
+                            'active': True
+                        }
+                    )
+                    if queue_created:
+                        self.stdout.write(f'Created queue: {additional_queue.name}')
+                
+                # Create sensors for additional zones
+                for i in range(1, sensor_count + 1):
+                    sensor, sensor_created = Sensor.objects.get_or_create(
+                        sensor_id=f'{zone_name.replace(" ", "_").upper()}_SENSOR_{i:02d}',
+                        pickup_zone=zone,
+                        defaults={
+                            'active': True
+                        }
+                    )
+                    if sensor_created:
+                        self.stdout.write(f'Created sensor: {sensor.sensor_id}')
         
         # Create sensors for pickup zone
         for i in range(1, 8):  # 7 sensors

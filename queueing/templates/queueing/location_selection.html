@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  {% load static %}
+  <title>TAXIBUFFER - Locatie Selecteren</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --gold-1: #E0BD22;
+      --gold-2: #FEF508;
+      --bg: #F6F6FC;
+      --muted: #666666;
+      --device-w: 375px;
+      --device-h: 812px;
+      --content-max: 420px;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html,
+    body {
+      height: 100%
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #eceff4;
+    }
+
+    /* FIXED DEVICE FRAME — won't change size if there's 1 queue */
+    .app {
+      width: var(--device-w);
+      height: var(--device-h);
+      background: var(--bg);
+      border-radius: 12px;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.12);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Header (fixed height) */
+    .header {
+      background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      min-height: 110px;
+      /* large enough to match visual */
+      flex: 0 0 110px;
+    }
+
+    .info-icon {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      border: 1px solid rgba(255, 255, 255, 0.38);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    /* Logo area: yellow background behind the image + text label ensures title visible */
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-wrap {
+      background: transparent;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-wrap img {
+      display: block;
+      width: auto;
+      max-height: 28px;
+      /* choose desired size */
+    }
+
+    /* brand text ensures title visible even when image fails */
+    .brand-text {
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: #333;
+      font-size: 20px;
+      white-space: nowrap;
+    }
+
+    /* Content area is scrollable — fixed app size means content scrolls within */
+    .content {
+      padding: 18px;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      flex: 1 1 auto;
+      overflow-y: auto;
+      /* scroll cards if they don't fit */
+      overscroll-behavior: contain;
+      padding-bottom: 84px;
+      /* room for footer so content doesn't hide behind it */
+    }
+
+    .welcome-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 2px;
+    }
+
+    .welcome-sub {
+      font-size: 14px;
+      color: #6b7280;
+      margin-bottom: 6px;
+    }
+
+    /* center the cards column and constrain width for mobile-like look */
+    .cards-wrapper {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+
+    .cards {
+      width: 100%;
+      max-width: var(--content-max);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* fixed image column to prevent overlap */
+    .location-card {
+      display: grid;
+      grid-template-columns: 96px 1fr;
+      gap: 0;
+      align-items: stretch;
+      background: #fff;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 6px 20px rgba(2, 6, 23, 0.06);
+      cursor: pointer;
+      transition: transform .18s ease, box-shadow .18s ease;
+      width: 100%;
+    }
+
+    .location-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
+    }
+
+    .location-image {
+      width: 100%;
+      min-height: 96px;
+      max-height: 120px;
+      background: #e9ecef;
+      display: block;
+      position: relative;
+    }
+
+    .location-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .location-info {
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+      min-height: 96px;
+    }
+
+    .location-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: #111827;
+      line-height: 1.15;
+      word-break: break-word;
+    }
+
+    .location-address {
+      font-size: 13px;
+      color: #9CA3AF;
+    }
+
+    .register-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      margin-top: 6px;
+    }
+
+    .register-button {
+      border: 0;
+      padding: 8px 18px;
+      border-radius: 22px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      background: linear-gradient(92.2deg, var(--gold-1) 11.07%, var(--gold-2) 100.13%);
+      color: #222;
+      box-shadow: 0 4px 10px rgba(224, 189, 34, 0.15), inset 0 -2px 0 rgba(0, 0, 0, 0.06);
+    }
+
+    .register-button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Footer fixed at bottom of device */
+    .footer {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 54px;
+      background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+      padding: 12px 16px;
+      text-align: center;
+      font-size: 12px;
+      color: #4b4b4b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 54px;
+    }
+
+    /* small screens - scale the device down so it fits viewports narrower than 375px */
+    @media (max-width: 380px) {
+      :root {
+        --device-w: 360px;
+        --device-h: 780px;
+      }
+
+      .app {
+        transform: scale(0.98);
+        transform-origin: center top;
+      }
+    }
+
+    .no-locations {
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .no-locations h3 {
+      margin: 12px 0 8px 0;
+      color: #111827;
+    }
+
+    .no-locations p {
+      margin: 0 0 20px 0;
+      color: #6b7280;
+    }
+
+    .back-button {
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      background: #fff;
+      color: #444;
+      padding: 9px 16px;
+      border-radius: 18px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app" role="main" aria-label="Taxibuffer app (fixed device)">
+
+    <header class="header" role="banner">
+      <div class="info-icon" id="helpBtn" aria-label="Help">i</div>
+
+      <div class="brand" aria-hidden="false">
+        <!-- Yellow block behind the image -->
+        <div class="logo-wrap" aria-hidden="true">
+          <!-- Prefer a transparent PNG or SVG so black background isn't visible.
+               If you replace the PNG with a transparent asset, it will display perfectly on yellow. -->
+          <img src="{% static 'queueing/images/logo.svg' %}" alt="Taxibuffer logo" onerror="this.style.display='none'">
+        </div>
+
+        <!-- Keep brand text visible at all times so title is never clipped -->
+        <div class="brand-text">TAXIBUFFER</div>
+      </div>
+    </header>
+
+    <main class="content" role="main">
+      <section>
+        <div class="welcome-title">Welkom terug!</div>
+        <div class="welcome-sub">Meld u hier aan voor de wachtrij</div>
+      </section>
+
+      <div class="cards-wrapper">
+        <div class="cards" aria-live="polite">
+          {% if queues %}
+          <form method="post" id="locationForm">{% csrf_token %}
+            {% for queue in queues %}
+            <div class="location-card" data-queue-id="{{ queue.id }}">
+              <div class="location-image" aria-hidden="true">
+                {% if queue.pickup_zone.image %}
+                <img src="{{ queue.pickup_zone.image.url }}" alt="{{ queue.pickup_zone.name }}">
+                {% else %}
+                <img src="{% static 'queueing/images/cruise-terminal.png' %}" alt="Default location">
+                {% endif %}
+              </div>
+
+              <div class="location-info">
+                <div class="location-name">{{ queue.pickup_zone.name }}</div>
+                <div class="location-address">{{ queue.pickup_zone.address|default:"Statendam, 3072 AR Rotterdam" }}
+                </div>
+                <div class="register-wrap">
+                  <button type="button" class="register-button" data-queue-id="{{ queue.id }}">Aanmelden</button>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+            <input type="hidden" name="selected_queue_id" id="selectedQueueId">
+          </form>
+          {% else %}
+          <div class="no-locations">
+            <div style="font-size:44px;">📍</div>
+            <h3>Geen locaties beschikbaar</h3>
+            <p>Er zijn momenteel geen actieve ophaallocaties. Probeer het later opnieuw.</p>
+            <div>
+              <button class="register-button back-button" id="backBtn">← Terug naar Inloggen</button>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer" role="contentinfo">Taxibuffer is een Coding the Curbs® product</footer>
+  </div>
+
+  <!-- Move JavaScript to the end and use event listeners instead of onclick -->
+  <script>
+    // Wait for DOM to be fully loaded
+    document.addEventListener('DOMContentLoaded', function () {
+
+      // Handle register button clicks
+      const registerButtons = document.querySelectorAll('.register-button[data-queue-id]');
+      registerButtons.forEach(button => {
+        button.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const queueId = this.getAttribute('data-queue-id');
+          selectAndSubmit(queueId, e);
+        });
+      });
+
+      // Handle location card clicks (for potential future use)
+      const locationCards = document.querySelectorAll('.location-card[data-queue-id]');
+      locationCards.forEach(card => {
+        card.addEventListener('click', function () {
+          const queueId = this.getAttribute('data-queue-id');
+          selectLocation(queueId);
+        });
+      });
+
+      // Handle help button
+      const helpBtn = document.getElementById('helpBtn');
+      if (helpBtn) {
+        helpBtn.addEventListener('click', showHelp);
+      }
+
+      // Handle back button
+      const backBtn = document.getElementById('backBtn');
+      if (backBtn) {
+        backBtn.addEventListener('click', goBack);
+      }
+
+      // Handle escape key for help modal
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          hideHelp();
+        }
+      });
+    });
+
+    // Function definitions
+    function selectAndSubmit(queueId, evt) {
+      if (evt && evt.stopPropagation) {
+        evt.stopPropagation();
+      }
+
+      const form = document.getElementById('locationForm');
+      const input = document.getElementById('selectedQueueId');
+
+      if (input) {
+        input.value = queueId;
+      }
+
+      // Disable the clicked button to prevent double-clicks
+      if (evt && evt.currentTarget) {
+        evt.currentTarget.disabled = true;
+        evt.currentTarget.textContent = 'Bezig...';
+      }
+
+      if (form) {
+        form.submit();
+      }
+    }
+
+    function selectLocation(queueId) {
+      const input = document.getElementById('selectedQueueId');
+      if (input) {
+        input.value = queueId;
+      }
+    }
+
+    function goBack() {
+      if (confirm('Weet u zeker dat u terug wilt? U moet uw gegevens opnieuw invoeren.')) {
+        window.location.href = "{% url 'queueing:chauffeur_login' %}";
+      }
+    }
+
+    function showHelp() {
+      const helpModal = document.getElementById('helpModal');
+      if (helpModal) {
+        helpModal.style.display = 'flex';
+      }
+    }
+
+    function hideHelp() {
+      const helpModal = document.getElementById('helpModal');
+      if (helpModal) {
+        helpModal.style.display = 'none';
+      }
+    }
+  </script>
+</body>
+
+</html>

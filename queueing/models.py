@@ -105,7 +105,6 @@ class QueueEntry(models.Model):
     signup_location = models.PointField(null=True, blank=True, srid=4326)
 
     class Meta:
-        unique_together = ("queue", "chauffeur")
         indexes = [
             models.Index(fields=["queue", "status"]),
             models.Index(fields=["chauffeur", "status"]),
@@ -188,6 +187,10 @@ class QueueEntry(models.Model):
     def get_queue_position(self):
         """Get current position in queue (1-indexed)."""
         return self.queue.get_queue_position(self.chauffeur)
+
+    def get_status_display(self):
+        """Get a human-readable status display."""
+        return self.status
 
     def __str__(self):
         return f"{self.chauffeur} in {self.queue.name} ({self.get_status_display()})"

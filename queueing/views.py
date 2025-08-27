@@ -15,40 +15,41 @@ from .models import TaxiQueue, QueueEntry, QueueNotification
 from .services import QueueService
 
 
-class ChauffeurSignupView(View):
-    """Handle chauffeur signup and queue joining."""
+class ChauffeurLoginView(View):
+    """Handle chauffeur authentication - Step 1."""
     
     def get(self, request):
-        """Display signup form."""
-        # Get available queues for selection
-        active_queues = TaxiQueue.objects.filter(active=True).select_related(
-            'buffer_zone', 'pickup_zone'
-        )
-        
+        """Display login form."""
         context = {
-            'queues': active_queues,
+            'show_access_denied': request.GET.get('access_denied') == 'true',
+            'form_data': request.session.get('form_data', {})
         }
-        return render(request, 'queueing/signup.html', context)
+        return render(request, 'queueing/chauffeur_login.html', context)
     
     def post(self, request):
-        """Process signup form."""
+        """Process login form."""
         license_plate = request.POST.get('license_plate', '').strip().upper()
-        taxi_license_number = request.POST.get('taxi_license_number', '').strip()
-        queue_id = request.POST.get('queue_id')
+        taxi_license_number = request.POST.get('taxi_license_number', '').strip().upper()
+        
+        # Store form data in session for redisplay
+        request.session['form_data'] = {
+            'license_plate': license_plate,
+            'taxi_license_number': taxi_license_number
+        }
         
         # Basic validation
-        if not all([license_plate, taxi_license_number, queue_id]):
+        if not all([license_plate, taxi_license_number]):
             messages.error(request, 'All fields are required.')
-            return redirect('queueing:signup')
+            return redirect('queueing:chauffeur_login')
         
-        try:
-            queue = TaxiQueue.objects.get(id=queue_id, active=True)
-        except TaxiQueue.DoesNotExist:
-            messages.error(request, 'Invalid queue selected.')
-            return redirect('queueing:signup')
+        # Basic format validation
+        if not self.validate_license_plate_format(license_plate):
+            messages.error(request, 'Invalid license plate format.')
+            return redirect('queueing:chauffeur_login')
         
-        # Mock location (you can replace this with actual location later)
-        mock_location = Point(-74.0059, 40.7128)  # NYC coordinates as example
+        if not self.validate_taxi_license_format(taxi_license_number):
+            messages.error(request, 'Invalid taxi license number format.')
+            return redirect('queueing:chauffeur_login')
         
         try:
             with transaction.atomic():
@@ -58,55 +59,59 @@ class ChauffeurSignupView(View):
                     # Verify taxi license matches
                     if chauffeur.taxi_license_number != taxi_license_number:
                         messages.error(request, 'License plate and taxi license number do not match.')
-                        return redirect('queueing:signup')
+                        return redirect('queueing:chauffeur_login')
                 except Chauffeur.DoesNotExist:
                     # Create new user and chauffeur
                     user = User.objects.create_user(
-                        username=f"chauffeur_{license_plate.lower()}",
+                        username=f"chauffeur_{license_plate.lower().replace('-', '_')}",
                         is_chauffeur=True
                     )
                     chauffeur = Chauffeur.objects.create(
                         user=user,
                         license_plate=license_plate,
                         taxi_license_number=taxi_license_number,
-                        location=mock_location
+                        location=None  # Will be set when joining queue
                     )
                 
-                # Use QueueService to add chauffeur to queue
-                queue_service = QueueService()
-                success, message = queue_service.add_chauffeur_to_queue(
-                    chauffeur=chauffeur,
-                    queue=queue,
-                    signup_location=mock_location
-                )
+                # Store chauffeur info in session for step 2
+                request.session['authenticated_chauffeur_id'] = chauffeur.id
+                request.session.pop('form_data', None)  # Clear form data
                 
-                if success:
-                    messages.success(request, message)
-                    return redirect('queueing:queue_status', queue_id=queue.id, chauffeur_id=chauffeur.id)
-                else:
-                    messages.error(request, message)
-                    return redirect('queueing:signup')
-                    
+                return redirect('queueing:location_selection')
+                
         except Exception as e:
-            messages.error(request, f'An error occurred: {str(e)}')
-            return redirect('queueing:signup')
+            messages.error(request, f'Authentication failed: {str(e)}')
+            return redirect('queueing:chauffeur_login')
+    
+    def validate_license_plate_format(self, license_plate):
+        """Validate license plate format (basic validation)."""
+        import re
+        # Dutch license plate formats: 1-ABC-23, AB-123-C, etc.
+        patterns = [
+            r'^\d{1,2}-[A-Z]{2,3}-\d{1,2}$',  # 1-ABC-23
+            r'^[A-Z]{2}-\d{3}-[A-Z]$',        # AB-123-C
+            r'^\d{3}-[A-Z]{2}-\d{1,2}$',      # 123-AB-1
+            r'^[A-Z]{3}-\d{2}-\d{1,2}$',      # ABC-12-3
+        ]
+        return any(re.match(pattern, license_plate) for pattern in patterns)
+
+    def validate_taxi_license_format(self, taxi_license):
+        """Validate taxi license format (basic validation)."""
+        import re
+        # Basic format: letters and numbers, 3-20 characters
+        return re.match(r'^[A-Z0-9]{3,20}$', taxi_license) is not None
 
 
 class QueueStatusView(View):
     """Display queue status for a specific chauffeur."""
     
-    def get(self, request, queue_id, chauffeur_id):
+    def get(self, request, entry_uuid):
         """Display queue status page."""
         try:
-            queue = TaxiQueue.objects.get(id=queue_id, active=True)
-            chauffeur = Chauffeur.objects.get(id=chauffeur_id)
-            
-            # Get chauffeur's queue entry
-            try:
-                entry = QueueEntry.objects.get(queue=queue, chauffeur=chauffeur)
-            except QueueEntry.DoesNotExist:
-                messages.error(request, 'You are not in this queue.')
-                return redirect('queueing:signup')
+            # Get the specific queue entry by UUID
+            entry = get_object_or_404(QueueEntry, uuid=entry_uuid)
+            queue = entry.queue
+            chauffeur = entry.chauffeur
             
             context = {
                 'queue': queue,
@@ -115,20 +120,19 @@ class QueueStatusView(View):
             }
             return render(request, 'queueing/queue_status.html', context)
             
-        except (TaxiQueue.DoesNotExist, Chauffeur.DoesNotExist):
-            messages.error(request, 'Invalid queue or chauffeur.')
-            return redirect('queueing:signup')
+        except Exception as e:
+            messages.error(request, f'Invalid queue entry: {str(e)}')
+            return redirect('queueing:chauffeur_login')
 
 
 class QueueStatusAPIView(View):
     """API endpoint for live queue status updates."""
     
-    def get(self, request, queue_id, chauffeur_id):
+    def get(self, request, entry_uuid):
         """Return JSON with current queue status."""
         try:
-            queue = TaxiQueue.objects.get(id=queue_id, active=True)
-            chauffeur = Chauffeur.objects.get(id=chauffeur_id)
-            entry = QueueEntry.objects.get(queue=queue, chauffeur=chauffeur)
+            entry = QueueEntry.objects.get(uuid=entry_uuid)
+            queue = entry.queue
             
             # Get queue position and waiting count
             position = entry.get_queue_position()
@@ -168,6 +172,97 @@ class QueueStatusAPIView(View):
                 'success': False,
                 'error': str(e)
             }, status=400)
+
+
+class LocationSelectionView(View):
+    """Handle location selection - Step 2."""
+    
+    def get(self, request):
+        """Display location selection."""
+        # Check if user is authenticated from step 1
+        chauffeur_uuid = request.session.get('authenticated_chauffeur_id')
+        if not chauffeur_uuid:
+            messages.error(request, 'Please authenticate first.')
+            return redirect('queueing:chauffeur_login')
+        
+        try:
+            chauffeur = Chauffeur.objects.get(id=chauffeur_uuid)
+        except Chauffeur.DoesNotExist:
+            messages.error(request, 'Invalid session. Please authenticate again.')
+            return redirect('queueing:chauffeur_login')
+        
+        # Get available queues with queue counts
+        active_queues = TaxiQueue.objects.filter(active=True).select_related(
+            'buffer_zone', 'pickup_zone'
+        )
+        
+        # Add waiting count to each queue
+        for queue in active_queues:
+            queue.waiting_count = queue.get_waiting_entries().count()
+        
+        context = {
+            'chauffeur': chauffeur,
+            'queues': active_queues,
+        }
+        return render(request, 'queueing/location_selection.html', context)
+    
+    def post(self, request):
+        """Process location selection and join queue."""
+        # Check authentication
+        chauffeur_id = request.session.get('authenticated_chauffeur_id')
+        if not chauffeur_id:
+            messages.error(request, 'Please authenticate first.')
+            return redirect('queueing:chauffeur_login')
+        
+        selected_queue_id = request.POST.get('selected_queue_id')
+        
+        if not selected_queue_id:
+            messages.error(request, 'Please select a pickup location.')
+            return redirect('queueing:location_selection')
+        
+        try:
+            chauffeur = Chauffeur.objects.get(id=chauffeur_id)
+            queue = TaxiQueue.objects.get(id=selected_queue_id, active=True)
+        except (Chauffeur.DoesNotExist, TaxiQueue.DoesNotExist):
+            messages.error(request, 'Invalid selection. Please try again.')
+            return redirect('queueing:location_selection')
+        
+        # Mock location for geofencing check
+        mock_location = Point(4.9036, 52.3676)  # Amsterdam coordinates
+        
+        try:
+            # Use QueueService to add chauffeur to queue
+            queue_service = QueueService()
+            success, message, entry_uuid = queue_service.add_chauffeur_to_queue(
+                chauffeur=chauffeur,
+                queue=queue,
+                signup_location=mock_location
+            )
+            
+            if success:
+                # Get the newly created queue entry
+                entry = QueueEntry.objects.filter(
+                    queue=queue,
+                    chauffeur=chauffeur,
+                    status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED]
+                ).order_by('-created_at').first()
+                
+                if entry:
+                    # Clear session data
+                    request.session.pop('authenticated_chauffeur_id', None)
+                    messages.success(request, message)
+                    
+                    return redirect('queueing:queue_status', entry_uuid=entry.uuid)
+                else:
+                    messages.error(request, 'Failed to retrieve queue entry.')
+                    return redirect('queueing:location_selection')
+            else:
+                messages.error(request, message)
+                return redirect('queueing:queue_status', entry_uuid=entry_uuid)
+
+        except Exception as e:
+            messages.error(request, f'Failed to join queue: {str(e)}')
+            return redirect('queueing:location_selection')
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -264,3 +359,9 @@ class ManualTriggerView(View):
             messages.error(request, f'Error: {str(e)}')
         
         return redirect('queueing:manual_trigger', queue_id=queue_id)
+
+    def validate_taxi_license_format(self, taxi_license):
+        """Validate taxi license format (basic validation)."""
+        import re
+        # Basic format: letters and numbers, 3-20 characters
+        return re.match(r'^[A-Z0-9]{3,20}$', taxi_license) is not None

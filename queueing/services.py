@@ -38,16 +38,18 @@ class QueueService:
                     chauffeur=chauffeur,
                     status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
                 ).first()
+                print("\nDEBUG Existing entry:", existing_entry, "\n")
 
                 if existing_entry:
                     return (
                         False,
                         f"You are already in queue: {existing_entry.queue.name}",
+                        existing_entry.uuid
                     )
 
                 # Mock geofencing check
                 if not self.mock_geofencing_check(signup_location, queue.buffer_zone):
-                    return False, "You must be in the buffer zone to join the queue."
+                    return False, "You must be in the buffer zone to join the queue.", None
 
                 # Create queue entry
                 entry = QueueEntry.objects.create(
@@ -58,11 +60,34 @@ class QueueService:
                 )
 
                 position = entry.get_queue_position()
-                return True, f"Successfully joined queue! Your position: {position}"
+                return True, f"Successfully joined queue! Your position: {position}", entry.uuid
 
         except Exception as e:
             logger.error(f"Error adding chauffeur to queue: {e}")
             return False, f"Failed to join queue: {str(e)}"
+        
+    
+    def delete_dequeued_chauffeur(
+            self, chauffeur: Chauffeur, queue: TaxiQueue, signup_location: Point
+        ) -> Tuple[bool, str]:
+        try:
+            with transaction.atomic():
+                entry = QueueEntry.objects.filter(
+                    chauffeur=chauffeur,
+                    queue=queue,
+                    status__in=[QueueEntry.Status.LEFT_ZONE, QueueEntry.Status.DECLINED, QueueEntry.Status.DEQUEUED, QueueEntry.Status.TIMEOUT]
+                ).first()
+
+                if not entry:
+                    return False, "You are still in a queue."
+
+                entry.delete()
+
+                return True, "Successfully dequeued from the queue and deleted from the system."
+
+        except Exception as e:
+            logger.error(f"Error deleting chauffeur: {e}")
+            return False, f"Failed to delete the chauffeur: {str(e)}"
 
     def notify_next_chauffeurs(self, queue: TaxiQueue, slots_available: int) -> int:
         """

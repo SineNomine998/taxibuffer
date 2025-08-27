@@ -164,11 +164,11 @@
                 <div>Waiting in Queue</div>
             </div>
             <div class="stat-item">
-                <div class="stat-number" id="notified-count">-</div>
+                <div class="stat-number" id="notified-count">{{ notified_count }}</div>
                 <div>Currently Notified</div>
             </div>
             <div class="stat-item">
-                <div class="stat-number" id="dequeued-count">-</div>
+                <div class="stat-number" id="dequeued-count">{{ dequeued_count }}</div>
                 <div>Recently Dequeued</div>
             </div>
         </div>
@@ -219,6 +219,7 @@
 
         <script>
             var waitingCount = parseInt("{{ waiting_count }}", 10);
+            var dequeuedCount = parseInt("{{ dequeued_count }}", 10);
             // Update stats periodically
             setInterval(updateStats, 5000);
 
