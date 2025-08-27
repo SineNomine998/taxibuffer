@@ -13,45 +13,40 @@
       --gold-2: #FEF508;
       --bg: #F6F6FC;
       --muted: #666666;
-      --device-w: 375px;
-      --device-h: 812px;
-      --content-max: 420px;
+      --max-width: 420px;
     }
 
     * {
-      box-sizing: border-box
+      box-sizing: border-box;
     }
 
     html,
     body {
-      height: 100%
+      height: 100%;
+      margin: 0;
+      padding: 0;
     }
 
     body {
-      margin: 0;
-      min-height: 100vh;
       font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
       -webkit-font-smoothing: antialiased;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       background: #eceff4;
+      min-height: 100vh;
     }
 
-    /* FIXED DEVICE FRAME — won't change size if there's 1 queue */
+    /* Responsive container that adapts to screen size */
     .app {
-      width: var(--device-w);
-      height: var(--device-h);
+      width: 100%;
+      max-width: var(--max-width);
+      min-height: 100vh;
       background: var(--bg);
-      border-radius: 12px;
-      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.12);
-      overflow: hidden;
+      margin: 0 auto;
       display: flex;
       flex-direction: column;
       position: relative;
     }
 
-    /* Header (fixed height) */
+    /* Header with flexible sizing */
     .header {
       background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
       padding: 14px 16px;
@@ -60,8 +55,7 @@
       justify-content: center;
       position: relative;
       min-height: 110px;
-      /* large enough to match visual */
-      flex: 0 0 110px;
+      flex-shrink: 0;
     }
 
     .info-icon {
@@ -81,7 +75,6 @@
       font-weight: 700;
     }
 
-    /* Logo area: yellow background behind the image + text label ensures title visible */
     .brand {
       display: flex;
       align-items: center;
@@ -100,47 +93,40 @@
       display: block;
       width: auto;
       max-height: 28px;
-      /* choose desired size */
     }
 
-    /* brand text ensures title visible even when image fails */
     .brand-text {
       font-weight: 700;
       letter-spacing: 3px;
       color: #333;
-      font-size: 20px;
+      font-size: clamp(18px, 4vw, 20px);
       white-space: nowrap;
     }
 
-    /* Content area is scrollable — fixed app size means content scrolls within */
+    /* Flexible content area */
     .content {
       padding: 18px;
       background: var(--bg);
       display: flex;
       flex-direction: column;
       gap: 14px;
-      flex: 1 1 auto;
-      overflow-y: auto;
-      /* scroll cards if they don't fit */
-      overscroll-behavior: contain;
-      padding-bottom: 84px;
-      /* room for footer so content doesn't hide behind it */
+      flex: 1;
+      padding-bottom: 84px; /* Space for footer */
     }
 
     .welcome-title {
-      font-size: 22px;
+      font-size: clamp(20px, 5vw, 22px);
       font-weight: 700;
       color: #111827;
       margin-bottom: 2px;
     }
 
     .welcome-sub {
-      font-size: 14px;
+      font-size: clamp(13px, 3.5vw, 14px);
       color: #6b7280;
       margin-bottom: 6px;
     }
 
-    /* center the cards column and constrain width for mobile-like look */
     .cards-wrapper {
       width: 100%;
       display: flex;
@@ -149,13 +135,13 @@
 
     .cards {
       width: 100%;
-      max-width: var(--content-max);
+      max-width: 100%;
       display: flex;
       flex-direction: column;
       gap: 12px;
     }
 
-    /* fixed image column to prevent overlap */
+    /* Responsive card layout */
     .location-card {
       display: grid;
       grid-template-columns: 96px 1fr;
@@ -201,7 +187,7 @@
     }
 
     .location-name {
-      font-size: 16px;
+      font-size: clamp(15px, 4vw, 16px);
       font-weight: 700;
       color: #111827;
       line-height: 1.15;
@@ -209,7 +195,7 @@
     }
 
     .location-address {
-      font-size: 13px;
+      font-size: clamp(12px, 3vw, 13px);
       color: #9CA3AF;
     }
 
@@ -225,11 +211,12 @@
       padding: 8px 18px;
       border-radius: 22px;
       font-weight: 700;
-      font-size: 14px;
+      font-size: clamp(13px, 3.5vw, 14px);
       cursor: pointer;
       background: linear-gradient(92.2deg, var(--gold-1) 11.07%, var(--gold-2) 100.13%);
       color: #222;
       box-shadow: 0 4px 10px rgba(224, 189, 34, 0.15), inset 0 -2px 0 rgba(0, 0, 0, 0.06);
+      white-space: nowrap;
     }
 
     .register-button:disabled {
@@ -237,7 +224,7 @@
       cursor: not-allowed;
     }
 
-    /* Footer fixed at bottom of device */
+    /* Fixed footer */
     .footer {
       position: absolute;
       left: 0;
@@ -247,25 +234,12 @@
       background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
       padding: 12px 16px;
       text-align: center;
-      font-size: 12px;
+      font-size: clamp(11px, 2.5vw, 12px);
       color: #4b4b4b;
       display: flex;
       align-items: center;
       justify-content: center;
-      flex: 0 0 54px;
-    }
-
-    /* small screens - scale the device down so it fits viewports narrower than 375px */
-    @media (max-width: 380px) {
-      :root {
-        --device-w: 360px;
-        --device-h: 780px;
-      }
-
-      .app {
-        transform: scale(0.98);
-        transform-origin: center top;
-      }
+      flex-shrink: 0;
     }
 
     .no-locations {
@@ -276,11 +250,13 @@
     .no-locations h3 {
       margin: 12px 0 8px 0;
       color: #111827;
+      font-size: clamp(18px, 4.5vw, 20px);
     }
 
     .no-locations p {
       margin: 0 0 20px 0;
       color: #6b7280;
+      font-size: clamp(14px, 3.5vw, 16px);
     }
 
     .back-button {
@@ -290,24 +266,137 @@
       padding: 9px 16px;
       border-radius: 18px;
     }
+
+    /* Desktop/Tablet styles */
+    @media (min-width: 421px) {
+      body {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 20px;
+        min-height: 100vh;
+      }
+
+      .app {
+        border-radius: 12px;
+        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.12);
+        min-height: auto;
+        max-height: 90vh;
+        overflow: hidden;
+      }
+
+      .header {
+        border-radius: 12px 12px 0 0;
+      }
+
+      .content {
+        overflow-y: auto;
+        max-height: calc(90vh - 164px); /* Subtract header and footer heights */
+      }
+    }
+
+    /* Large desktop adjustments */
+    @media (min-width: 768px) {
+      :root {
+        --max-width: 500px;
+      }
+
+      .location-card {
+        grid-template-columns: 120px 1fr;
+      }
+
+      .location-image {
+        min-height: 120px;
+      }
+
+      .location-info {
+        padding: 16px 18px;
+        min-height: 120px;
+      }
+    }
+
+    /* Very large screens */
+    @media (min-width: 1200px) {
+      :root {
+        --max-width: 600px;
+      }
+    }
+
+    /* Small mobile devices */
+    @media (max-width: 360px) {
+      .header {
+        padding: 12px 14px;
+        min-height: 100px;
+      }
+
+      .content {
+        padding: 14px;
+        padding-bottom: 74px;
+      }
+
+      .location-card {
+        grid-template-columns: 80px 1fr;
+      }
+
+      .location-image {
+        min-height: 80px;
+        max-height: 96px;
+      }
+
+      .location-info {
+        padding: 10px 12px;
+        min-height: 80px;
+      }
+
+      .register-button {
+        padding: 6px 14px;
+      }
+    }
+
+    /* Very small screens */
+    @media (max-width: 320px) {
+      .brand-text {
+        font-size: 16px;
+        letter-spacing: 2px;
+      }
+
+      .info-icon {
+        width: 30px;
+        height: 30px;
+        right: 10px;
+        top: 10px;
+      }
+    }
+
+    /* Landscape orientation adjustments */
+    @media (orientation: landscape) and (max-height: 500px) {
+      .header {
+        min-height: 80px;
+        padding: 10px 16px;
+      }
+
+      .content {
+        padding: 12px 18px 64px;
+      }
+
+      .footer {
+        height: 44px;
+        padding: 8px 16px;
+      }
+    }
   </style>
 </head>
 
 <body>
-  <div class="app" role="main" aria-label="Taxibuffer app (fixed device)">
+  <div class="app" role="main" aria-label="Taxibuffer app">
 
     <header class="header" role="banner">
       <div class="info-icon" id="helpBtn" aria-label="Help">i</div>
 
-      <div class="brand" aria-hidden="false">
-        <!-- Yellow block behind the image -->
+      <div class="brand">
         <div class="logo-wrap" aria-hidden="true">
-          <!-- Prefer a transparent PNG or SVG so black background isn't visible.
-               If you replace the PNG with a transparent asset, it will display perfectly on yellow. -->
           <img src="{% static 'queueing/images/logo.svg' %}" alt="Taxibuffer logo" onerror="this.style.display='none'">
         </div>
-
-        <!-- Keep brand text visible at all times so title is never clipped -->
         <div class="brand-text">TAXIBUFFER</div>
       </div>
     </header>
@@ -334,8 +423,7 @@
 
               <div class="location-info">
                 <div class="location-name">{{ queue.pickup_zone.name }}</div>
-                <div class="location-address">{{ queue.pickup_zone.address|default:"Statendam, 3072 AR Rotterdam" }}
-                </div>
+                <div class="location-address">{{ queue.pickup_zone.address|default:"Statendam, 3072 AR Rotterdam" }}</div>
                 <div class="register-wrap">
                   <button type="button" class="register-button" data-queue-id="{{ queue.id }}">Aanmelden</button>
                 </div>
@@ -361,12 +449,8 @@
     <footer class="footer" role="contentinfo">Taxibuffer is een Coding the Curbs® product</footer>
   </div>
 
-  <!-- Move JavaScript to the end and use event listeners instead of onclick -->
   <script>
-    // Wait for DOM to be fully loaded
     document.addEventListener('DOMContentLoaded', function () {
-
-      // Handle register button clicks
       const registerButtons = document.querySelectorAll('.register-button[data-queue-id]');
       registerButtons.forEach(button => {
         button.addEventListener('click', function (e) {
@@ -376,7 +460,6 @@
         });
       });
 
-      // Handle location card clicks (for potential future use)
       const locationCards = document.querySelectorAll('.location-card[data-queue-id]');
       locationCards.forEach(card => {
         card.addEventListener('click', function () {
@@ -385,19 +468,16 @@
         });
       });
 
-      // Handle help button
       const helpBtn = document.getElementById('helpBtn');
       if (helpBtn) {
         helpBtn.addEventListener('click', showHelp);
       }
 
-      // Handle back button
       const backBtn = document.getElementById('backBtn');
       if (backBtn) {
         backBtn.addEventListener('click', goBack);
       }
 
-      // Handle escape key for help modal
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
           hideHelp();
@@ -405,7 +485,6 @@
       });
     });
 
-    // Function definitions
     function selectAndSubmit(queueId, evt) {
       if (evt && evt.stopPropagation) {
         evt.stopPropagation();
@@ -418,7 +497,6 @@
         input.value = queueId;
       }
 
-      // Disable the clicked button to prevent double-clicks
       if (evt && evt.currentTarget) {
         evt.currentTarget.disabled = true;
         evt.currentTarget.textContent = 'Bezig...';
