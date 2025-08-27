@@ -1,309 +1,566 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Queue Status - {{ queue.name }}</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     {% load static %}
+    <title>TAXIBUFFER - Queue Status - {{ queue.name }}</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+
     <style>
+        :root {
+            --gold-1: #E0BD22;
+            --gold-2: #FEF508;
+            --bg: #F6F6FC;
+            --muted: #666666;
+            --max-width: 420px;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        html,
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 50px auto;
-            padding: 20px;
-            background-color: #f5f5f5;
+            height: 100%;
+            margin: 0;
+            padding: 0
         }
 
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        body {
+            font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+            -webkit-font-smoothing: antialiased;
+            background: #eceff4;
+            min-height: 100vh;
         }
 
+        /* Responsive container that adapts to screen size */
+        .app {
+            width: 100%;
+            max-width: var(--max-width);
+            min-height: 100vh;
+            background: var(--bg);
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* header */
         .header {
-            text-align: center;
-            margin-bottom: 30px;
+            background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            min-height: 110px;
+            flex-shrink: 0;
         }
 
-        .queue-info {
-            background: #e9ecef;
-            padding: 20px;
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px
+        }
+
+        .logo-wrap {
+            background: transparent;
             border-radius: 8px;
-            margin-bottom: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-wrap img {
+            display: block;
+            width: auto;
+            max-height: 28px;
+        }
+
+        .brand-text {
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: #595959;
+            font-size: clamp(24px, 4vw, 24px);
+            white-space: nowrap;
+        }
+
+        .info-icon {
+            position: absolute;
+            right: 12px;
+            top: 12px;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted);
+            border: 1px solid rgba(255, 255, 255, 0.38);
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        /* connection status */
+        .connection-status {
+            position: absolute;
+            right: 12px;
+            top: 12px;
+            padding: 6px 10px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 5;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .connection-status.connected {
+            color: #0b6623
+        }
+
+        .connection-status.disconnected {
+            color: #8b1c1c
+        }
+
+        /* Flexible content area */
+        .content {
+            padding: 18px;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            flex: 1;
+            padding-bottom: 84px;
+            /* Space for footer */
+        }
+
+        .title-big {
+            font-size: 22px;
+            font-weight: 800;
+            color: #111827;
+            margin: 4px 0
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #6b7280
+        }
+
+        /* status card: grid with left image full-height and right content */
+        .status-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            margin-top: 8px
         }
 
         .status-card {
-            background: #f8f9fa;
-            border-left: 4px solid #007bff;
-            padding: 20px;
-            margin-bottom: 20px;
+            width: 100%;
+            max-width: 720px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(2, 6, 23, 0.06);
+            overflow: hidden;
+            padding: 0;
+            position: relative;
+            display: grid;
+            grid-template-columns: 160px 1fr;
+            align-items: stretch;
         }
 
-        .status-waiting {
-            border-left-color: #ffc107;
-        }
-
-        .status-notified {
-            border-left-color: #28a745;
-            animation: pulse 2s infinite;
-        }
-
-        .status-dequeued {
-            border-left-color: #17a2b8;
-        }
-
-        @keyframes pulse {
-            0% {
-                background-color: #f8f9fa;
-            }
-
-            50% {
-                background-color: #e8f5e8;
-            }
-
-            100% {
-                background-color: #f8f9fa;
-            }
-        }
-
-        .position {
-            font-size: 2em;
-            font-weight: bold;
-            color: #007bff;
-            text-align: center;
-        }
-
-        .notification-panel {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-            display: none;
-        }
-
-        .notification-panel.show {
+        .left-image {
+            width: 100%;
+            height: 100%;
             display: block;
-            animation: slideIn 0.5s ease-in-out;
+            background: #e9ecef;
         }
 
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .left-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
         }
 
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 5px;
+        .card-content {
+            padding: 26px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .location-title {
+            display: flex;
+            align-items: center;
+            font-weight: 800;
+            font-size: 28px;
+            line-height: 1.02;
+            color: #0b0b0b;
+            margin-bottom: 6px;
+            gap: 8px;
+        }
+
+        .check-badge {
+            width: 18px;
+            height: 18px;
+            margin-left: 4px;
+        }
+
+        .location-address {
+            color: #9CA3AF;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        /* Label left aligned, number centered below */
+        .position-box {
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+        }
+
+        .position-label {
+            color: #111827;
+            font-size: 16px;
+            font-weight: 500;
+            text-align: left;
+        }
+
+        .position-number {
+            font-weight: 800;
+            color: #111827;
+            font-size: 44px;
+            text-align: center;
+            margin-top: 4px;
+            /* no background pill - matches mock */
+            line-height: 1;
+        }
+
+        /* Leave button (rounded outline) */
+        .leave-button {
+            margin-top: 16px;
+            width: 100%;
+            border: 3px solid rgba(0, 0, 0, 0.12);
+            background: #fff;
+            color: #4b4b4b;
+            padding: 12px 18px;
+            border-radius: 28px;
+            font-weight: 700;
             font-size: 16px;
             cursor: pointer;
-            margin: 5px;
+            box-shadow: 0 6px 12px rgba(2, 6, 23, 0.04) inset;
+            align-self: center;
+            max-width: 70%;
         }
 
-        .btn-success {
-            background-color: #28a745;
-            color: white;
-        }
-
-        .btn-danger {
-            background-color: #dc3545;
-            color: white;
-        }
-
-        .btn:hover {
-            opacity: 0.8;
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .loading {
+        .footer {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 48px;
+            background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+            padding: 10px 16px;
             text-align: center;
-            color: #666;
+            font-size: 12px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #alert-container {
+            min-height: 0
         }
 
         .last-updated {
-            font-size: 0.9em;
-            color: #666;
-            text-align: center;
-            margin-top: 20px;
-        }
-
-        .alert {
-            padding: 12px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-        }
-
-        .alert-success {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-        }
-
-        .alert-danger {
-            background-color: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
-        }
-
-        .stat-item {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }
-
-        .stat-number {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #007bff;
-        }
-
-        .countdown {
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #dc3545;
-            text-align: center;
-            margin: 10px 0;
-        }
-
-        .connection-status {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            padding: 5px 10px;
-            border-radius: 15px;
             font-size: 12px;
-            font-weight: bold;
-        }
-
-        .connected {
-            background-color: #d4edda;
-            color: #155724;
-        }
-
-        .disconnected {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-
-        .back-button {
-            background-color: #6c757d;
-            color: white;
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .button-container {
+            color: #6b7280;
             text-align: center;
-            margin-top: 30px;
+            margin-top: 6px
         }
 
-        .notification-buttons {
-            text-align: center;
-        }
+        @media(max-width:520px) {
+            .status-card {
+                grid-template-columns: 120px 1fr
+            }
 
-        .back-link-container {
-            text-align: center;
-            margin-top: 30px;
+            .left-image {
+                min-height: 140px
+            }
+
+            .location-title {
+                font-size: 20px
+            }
+
+            .position-number {
+                font-size: 36px
+            }
         }
     </style>
+
+    <!-- HEAD: include SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- Optional: tiny CSS to more closely match your styling -->
+    <style>
+        /* Make confirm button yellow gradient and larger, cancel button white pill */
+        .swal2-popup {
+            border-radius: 16px;
+            font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+        }
+
+        .swal2-title {
+            font-weight: 800;
+            font-size: 28px;
+            margin-bottom: 6px;
+        }
+
+        .swal2-html-container {
+            color: #4b4b4b;
+            font-size: 16px;
+            line-height: 1.35;
+        }
+
+        /* Confirm button = yellow gradient */
+        .swal2-confirm {
+            background: linear-gradient(92deg, #E0BD22 10%, #FEF508 100%) !important;
+            color: #222 !important;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 28px;
+            font-weight: 800;
+            box-shadow: 0 8px 20px rgba(2, 6, 23, 0.06);
+            min-width: 150px;
+        }
+
+        /* Cancel button = white pill with subtle border */
+        .swal2-cancel {
+            background: #fff !important;
+            color: #5b5b5b !important;
+            border: 3px solid rgba(0, 0, 0, 0.08);
+            padding: 12px 28px;
+            border-radius: 28px;
+            font-weight: 700;
+            min-width: 150px;
+            box-shadow: 0 6px 12px rgba(2, 6, 23, 0.04) inset;
+        }
+
+        /* Make the icon bigger and centered like your mock */
+        .swal2-icon {
+            width: 96px !important;
+            height: 96px !important;
+            border-radius: 999px;
+            margin: 0 auto 6px;
+            box-shadow: none;
+        }
+    </style>
+
+    <script>
+        function showLeaveDialog(opts = {}) {
+            const title = opts.title || 'Wachtrij verlaten';
+            const message = opts.message || 'U staat op het punt de wachtrij te verlaten. Weet u het zeker?';
+            const confirmText = opts.confirmText || 'Verlaten';
+            const cancelText = opts.cancelText || 'Blijven';
+            const type = (opts.type || 'success').toLowerCase(); // success | error | warning | info
+
+            // choose icon markup per type (success uses a big green check)
+            let iconHtml = '';
+            if (type === 'success') {
+                iconHtml = `<div>
+                    <img src="{% static 'queueing/assets/pop-up-confirmed.svg' %}" 
+                        alt="Confirmed" 
+                        style="max-width:80px;max-height:80px;width:100%;height:auto;">
+                    </div>`;
+            } else if (type === 'error') {
+                iconHtml = `<div style="background:linear-gradient(180deg,#f05a4b,#d83a27); width:96px;height:96px;border-radius:999px;display:flex;align-items:center;justify-content:center;">
+                  <svg width="48" height="48" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>`;
+            } else {
+                iconHtml = `<div style="background:linear-gradient(180deg,#5aa6f0,#2b80d9); width:96px;height:96px;border-radius:999px;display:flex;align-items:center;justify-content:center;">
+                  <svg width="48" height="48" viewBox="0 0 24 24"><path d="M12 5v7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 16h.01" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>`;
+            }
+
+            // SweetAlert2 call
+            return Swal.fire({
+                title: title,
+                html: iconHtml + `<div style="margin-top:8px">${message}</div>`,
+                showCancelButton: true,
+                confirmButtonText: confirmText,
+                cancelButtonText: cancelText,
+                focusConfirm: false,
+                allowOutsideClick: false,
+                backdrop: true,
+                // prevent default small icon so our custom iconHtml is used
+                didOpen: () => {
+                    const swalIcon = document.querySelector('.swal2-icon');
+                    if (swalIcon) swalIcon.style.display = 'none';
+                }
+            }).then(result => {
+                return { confirmed: result.isConfirmed };
+            });
+        }
+
+        // CSRF helper
+        function getCSRF() {
+            const cookies = document.cookie.split(';').map(c => c.trim());
+            for (let c of cookies) {
+                if (c.startsWith('csrftoken=')) return decodeURIComponent(c.split('=')[1]);
+            }
+            return '';
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const leaveBtn = document.getElementById('leaveBtn');
+            if (!leaveBtn) return;
+            leaveBtn.addEventListener('click', async function () {
+                const res = await showLeaveDialog({
+                    title: 'Wachtrij verlaten',
+                    message: 'U staat op het punt de wachtrij te verlaten. Weet u het zeker?',
+                    confirmText: 'Verlaten',
+                    cancelText: 'Blijven',
+                    type: 'success'
+                });
+                if (res.confirmed) {
+                    // perform the leave action (example: POST to leave endpoint)
+                    // Replace the fetch code in your leave button handler
+                    fetch('/queueing/api/queue/{{ entry.uuid|escapejs }}/leave/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCSRF()
+                        },
+                        body: JSON.stringify({ entry_uuid: "{{ entry.uuid|escapejs }}" })
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                window.location.href = '/queueing/login/';
+                            } else {
+                                throw new Error(data.error || 'Unknown error');
+                            }
+                        })
+                        .catch(e => {
+                            console.error(e);
+                            // Show error dialog
+                            showLeaveDialog({
+                                title: 'Fout',
+                                message: 'Kon niet verlaten. Probeer opnieuw.',
+                                type: 'error',
+                                confirmText: 'Sluiten',
+                                cancelText: ''
+                            });
+                        });
+                }
+            });
+        });
+    </script>
 </head>
 
 <body>
-    <div class="connection-status" id="connection-status">🔄 Connecting...</div>
-
-    <div class="container">
-        <div class="header">
-            <h1>🚕 Queue Status</h1>
-            <h2>{{ queue.name }}</h2>
-        </div>
-
-        <div id="alert-container"></div>
-
-        <div class="queue-info">
-            <h3>Chauffeur Information</h3>
-            <p><strong>License Plate:</strong> {{ chauffeur.license_plate }}</p>
-            <p><strong>Taxi License:</strong> {{ chauffeur.taxi_license_number }}</p>
-            <p><strong>Queue:</strong> {{ queue.buffer_zone.name }} → {{ queue.pickup_zone.name }}</p>
-        </div>
-
-        <div class="notification-panel" id="notification-panel">
-            <div id="countdown-display" class="countdown"></div>
-            <div class="notification-buttons">
-                <button class="btn btn-success" id="btn-accept"
-                    onclick="queueManager.respondToNotification('accepted')">
-                    ✅ Accept - I'll go to pickup zone
-                </button>
-                <button class="btn btn-danger" id="btn-decline"
-                    onclick="queueManager.respondToNotification('declined')">
-                    ❌ Decline - I want to stay in queue
-                </button>
+    <div class="app" role="application" aria-label="Taxibuffer queue status">
+        <header class="header" role="banner" aria-hidden="false">
+            <div class="brand" aria-hidden="true">
+                <div class="logo-wrap">
+                    <img src="{% static 'queueing/assets/logo.svg' %}" alt="Taxibuffer logo"
+                        onerror="this.style.display='none'">
+                </div>
+                <div class="brand-text">TAXIBUFFER</div>
             </div>
-        </div>
 
-        <div class="stats-grid">
-            <div class="stat-item">
-                <div class="stat-number" id="total-waiting">-</div>
-                <div>Total Waiting</div>
+            <!-- connection status (kept) -->
+            <div id="connection-status" class="connection-status disconnected" aria-live="polite">
+                🔴 Disconnected
             </div>
-        </div>
 
-        <div class="last-updated" id="last-updated">
-            Last updated: Loading...
-        </div>
+            <div class="info-icon" id="helpBtn" aria-label="Help">i</div>
+        </header>
 
-        <div class="back-link-container">
-            <a href="{% url 'queueing:signup' %}" class="btn back-button">
-                ← Back to Signup
-            </a>
-        </div>
+        <main class="content" role="main">
+            <div>
+                <div class="title-big">Aangemeld!</div>
+                <div class="subtitle">U krijgt een seintje als u door mag rijden.</div>
+            </div>
+
+            <div class="status-wrapper" aria-live="polite">
+                <div class="status-card" id="status-card" role="region" aria-label="Queue status card">
+                    <!-- Left image column (full height of card) -->
+                    <div class="left-image" aria-hidden="true">
+                        {% if queue.pickup_zone.image %}
+                        <img src="{{ queue.pickup_zone.image.url }}" alt="{{ queue.pickup_zone.name }}">
+                        {% else %}
+                        <img src="{% static 'queueing/assets/cruise-terminal.png' %}" alt="Location image">
+                        {% endif %}
+                    </div>
+
+                    <!-- Right content column -->
+                    <div class="card-content">
+                        <div>
+                            <div class="location-title">
+                                {{ queue.pickup_zone.name }}
+                                <img src="{% static 'queueing/assets/check-badge.svg' %}" alt="Verified"
+                                    class="check-badge">
+                            </div>
+                            <div class="location-address">
+                                {% if queue.pickup_zone.address %}
+                                {{ queue.pickup_zone.address }}
+                                {% else %}
+                                Statendam, 3072 AR Rotterdam
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="position-box" aria-hidden="false">
+                            <!-- exact label text as requested -->
+                            <div class="position-label">U staat momenteel op plek:</div>
+                            <!-- large centered number directly under label -->
+                            <div id="position-display" class="position-number">-</div>
+                        </div>
+
+                        <button id="leaveBtn" class="leave-button" type="button">Verlaten</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="alert-container"></div>
+            <div class="last-updated" id="last-updated">Last updated: --:--:--</div>
+        </main>
+
+        <footer class="footer" role="contentinfo">Taxibuffer is a Coding the Curbs® product</footer>
     </div>
 
     <script src="{% static 'queueing/js/queue_status.js' %}"></script>
     <script>
         // Wait for DOM to be fully loaded before initializing
         document.addEventListener('DOMContentLoaded', function () {
-            // Check if QueueManager class is available
             if (typeof QueueManager === 'undefined') {
                 console.error('QueueManager class not found. Make sure queue_status.js is loaded.');
                 return;
             }
 
-            // Initialize the queue manager with data from Django
             try {
                 window.queueManager = new QueueManager({
                     entryUuid: "{{ entry.uuid|escapejs }}",
                     notificationTimeoutMinutes: parseInt("{{ queue.notification_timeout_minutes|default:5 }}")
                 });
-
                 console.log('Queue Manager initialized successfully');
             } catch (error) {
                 console.error('Failed to initialize Queue Manager:', error);
             }
         });
 
-        // Cleanup on page unload
         window.addEventListener('beforeunload', function () {
             if (window.queueManager && typeof window.queueManager.destroy === 'function') {
                 window.queueManager.destroy();

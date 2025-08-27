@@ -111,7 +111,8 @@
       flex-direction: column;
       gap: 14px;
       flex: 1;
-      padding-bottom: 84px; /* Space for footer */
+      padding-bottom: 84px;
+      /* Space for footer */
     }
 
     .welcome-title {
@@ -267,123 +268,6 @@
       border-radius: 18px;
     }
 
-    /* Desktop/Tablet styles */
-    @media (min-width: 421px) {
-      body {
-        display: flex;
-        align-items: flex-start;
-        justify-content: center;
-        padding: 20px;
-        min-height: 100vh;
-      }
-
-      .app {
-        border-radius: 12px;
-        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.12);
-        min-height: auto;
-        max-height: 90vh;
-        overflow: hidden;
-      }
-
-      .header {
-        border-radius: 12px 12px 0 0;
-      }
-
-      .content {
-        overflow-y: auto;
-        max-height: calc(90vh - 164px); /* Subtract header and footer heights */
-      }
-    }
-
-    /* Large desktop adjustments */
-    @media (min-width: 768px) {
-      :root {
-        --max-width: 500px;
-      }
-
-      .location-card {
-        grid-template-columns: 120px 1fr;
-      }
-
-      .location-image {
-        min-height: 120px;
-      }
-
-      .location-info {
-        padding: 16px 18px;
-        min-height: 120px;
-      }
-    }
-
-    /* Very large screens */
-    @media (min-width: 1200px) {
-      :root {
-        --max-width: 600px;
-      }
-    }
-
-    /* Small mobile devices */
-    @media (max-width: 360px) {
-      .header {
-        padding: 12px 14px;
-        min-height: 100px;
-      }
-
-      .content {
-        padding: 14px;
-        padding-bottom: 74px;
-      }
-
-      .location-card {
-        grid-template-columns: 80px 1fr;
-      }
-
-      .location-image {
-        min-height: 80px;
-        max-height: 96px;
-      }
-
-      .location-info {
-        padding: 10px 12px;
-        min-height: 80px;
-      }
-
-      .register-button {
-        padding: 6px 14px;
-      }
-    }
-
-    /* Very small screens */
-    @media (max-width: 320px) {
-      .brand-text {
-        font-size: 16px;
-        letter-spacing: 2px;
-      }
-
-      .info-icon {
-        width: 30px;
-        height: 30px;
-        right: 10px;
-        top: 10px;
-      }
-    }
-
-    /* Landscape orientation adjustments */
-    @media (orientation: landscape) and (max-height: 500px) {
-      .header {
-        min-height: 80px;
-        padding: 10px 16px;
-      }
-
-      .content {
-        padding: 12px 18px 64px;
-      }
-
-      .footer {
-        height: 44px;
-        padding: 8px 16px;
-      }
-    }
   </style>
 </head>
 
@@ -395,7 +279,7 @@
 
       <div class="brand">
         <div class="logo-wrap" aria-hidden="true">
-          <img src="{% static 'queueing/images/logo.svg' %}" alt="Taxibuffer logo" onerror="this.style.display='none'">
+          <img src="{% static 'queueing/assets/logo.svg' %}" alt="Taxibuffer logo" onerror="this.style.display='none'">
         </div>
         <div class="brand-text">TAXIBUFFER</div>
       </div>
@@ -417,13 +301,14 @@
                 {% if queue.pickup_zone.image %}
                 <img src="{{ queue.pickup_zone.image.url }}" alt="{{ queue.pickup_zone.name }}">
                 {% else %}
-                <img src="{% static 'queueing/images/cruise-terminal.png' %}" alt="Default location">
+                <img src="{% static 'queueing/assets/cruise-terminal.png' %}" alt="Default location">
                 {% endif %}
               </div>
 
               <div class="location-info">
                 <div class="location-name">{{ queue.pickup_zone.name }}</div>
-                <div class="location-address">{{ queue.pickup_zone.address|default:"Statendam, 3072 AR Rotterdam" }}</div>
+                <div class="location-address">{{ queue.pickup_zone.address|default:"Statendam, 3072 AR Rotterdam" }}
+                </div>
                 <div class="register-wrap">
                   <button type="button" class="register-button" data-queue-id="{{ queue.id }}">Aanmelden</button>
                 </div>
