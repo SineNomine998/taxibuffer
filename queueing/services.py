@@ -34,6 +34,8 @@ class QueueService:
         try:
             with transaction.atomic():
                 # Check if chauffeur is already in any active queue
+                queue = TaxiQueue.objects.select_for_update().get(id=queue.id)
+
                 existing_entry = QueueEntry.objects.filter(
                     chauffeur=chauffeur,
                     status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
