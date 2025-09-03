@@ -1,11 +1,14 @@
+from django.db.utils import ProgrammingError
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.gis.geos import Point
-from typing import Tuple, List
+from typing import Tuple
+from django.db.models import Avg, F
 import logging
 
-from .models import TaxiQueue, QueueEntry, QueueNotification
+from .models import TaxiQueue, QueueEntry, QueueNotification, PushSubscription
 from accounts.models import Chauffeur
+from .push_views import send_web_push
 
 
 logger = logging.getLogger(__name__)
@@ -46,12 +49,16 @@ class QueueService:
                     return (
                         False,
                         f"You are already in queue: {existing_entry.queue.name}",
-                        existing_entry.uuid
+                        existing_entry.uuid,
                     )
 
                 # Mock geofencing check
                 if not self.mock_geofencing_check(signup_location, queue.buffer_zone):
-                    return False, "You must be in the buffer zone to join the queue.", None
+                    return (
+                        False,
+                        "You must be in the buffer zone to join the queue.",
+                        None,
+                    )
 
                 # Create queue entry
                 entry = QueueEntry.objects.create(
@@ -62,22 +69,30 @@ class QueueService:
                 )
 
                 position = entry.get_queue_position()
-                return True, f"Successfully joined queue! Your position: {position}", entry.uuid
+                return (
+                    True,
+                    f"Successfully joined queue! Your position: {position}",
+                    entry.uuid,
+                )
 
         except Exception as e:
             logger.error(f"Error adding chauffeur to queue: {e}")
             return False, f"Failed to join queue: {str(e)}"
-        
-    
+
     def delete_dequeued_chauffeur(
-            self, chauffeur: Chauffeur, queue: TaxiQueue, signup_location: Point
-        ) -> Tuple[bool, str]:
+        self, chauffeur: Chauffeur, queue: TaxiQueue, signup_location: Point
+    ) -> Tuple[bool, str]:
         try:
             with transaction.atomic():
                 entry = QueueEntry.objects.filter(
                     chauffeur=chauffeur,
                     queue=queue,
-                    status__in=[QueueEntry.Status.LEFT_ZONE, QueueEntry.Status.DECLINED, QueueEntry.Status.DEQUEUED, QueueEntry.Status.TIMEOUT]
+                    status__in=[
+                        QueueEntry.Status.LEFT_ZONE,
+                        QueueEntry.Status.DECLINED,
+                        QueueEntry.Status.DEQUEUED,
+                        QueueEntry.Status.TIMEOUT,
+                    ],
                 ).first()
 
                 if not entry:
@@ -85,34 +100,42 @@ class QueueService:
 
                 entry.delete()
 
-                return True, "Successfully dequeued from the queue and deleted from the system."
+                return (
+                    True,
+                    "Successfully dequeued from the queue and deleted from the system.",
+                )
 
         except Exception as e:
             logger.error(f"Error deleting chauffeur: {e}")
             return False, f"Failed to delete the chauffeur: {str(e)}"
 
-    def notify_next_chauffeurs(self, queue: TaxiQueue, slots_available: int) -> int:
+    def notify_next_chauffeurs(self, queue: TaxiQueue, slots_available: int, options=None) -> int:
         """
         Notify the next N chauffeurs in queue that slots are available.
 
         Args:
             queue: The taxi queue
             slots_available: Number of available slots
+            options: Dict with notification options like send_push, force_refresh
 
         Returns:
             int: Number of chauffeurs notified
         """
         if slots_available <= 0:
             return 0
+            
+        # Default options
+        if options is None:
+            options = {'send_push': True}
 
         try:
-            with transaction.atomic():
-                # Get next chauffeurs in queue
-                next_entries = queue.get_next_in_queue(count=slots_available)
-                notified_count = 0
+            # Get next chauffeurs in queue
+            next_entries = queue.get_next_in_queue(count=slots_available)
+            notified_count = 0
 
-                for entry in next_entries:
-                    try:
+            for entry in next_entries:
+                try:
+                    with transaction.atomic():
                         # Check if chauffeur is still in waiting status
                         if entry.status == QueueEntry.Status.WAITING:
                             notification = entry.notify()
@@ -120,11 +143,47 @@ class QueueService:
                                 f"Notified chauffeur {entry.chauffeur.license_plate}"
                             )
                             notified_count += 1
-                    except Exception as e:
-                        logger.error(
-                            f"Failed to notify chauffeur {entry.chauffeur.license_plate}: {e}"
-                        )
-                        continue
+
+                            # Only send web push if option is enabled
+                            if options.get('send_push', True):
+                                try:                                    
+                                    try:
+                                        subs = PushSubscription.objects.filter(
+                                            chauffeur=entry.chauffeur
+                                        )
+                                        
+                                        if subs.exists():
+                                            payload = {
+                                                "title": "U bent aan de beurt",
+                                                "body": f"Ga naar ophaalzone: {entry.queue.pickup_zone.name}",
+                                                "url": f"/queueing/queue/{entry.uuid}/",
+                                                "tag": f"queue-{entry.queue.id}",
+                                                "vibrate": [300, 100, 300],
+                                                "data": {
+                                                    "url": f"/queueing/queue/{entry.uuid}/",
+                                                    "force_refresh": options.get('force_refresh', False)
+                                                },
+                                            }
+                                            
+                                            for s in subs:
+                                                send_web_push(s.subscription_info, payload)
+                                                logger.info(f"Push notification sent to {entry.chauffeur.license_plate}")
+                                        else:
+                                            logger.warning(f"No push subscriptions found for chauffeur {entry.chauffeur.license_plate}")
+                                            
+                                    except ProgrammingError:
+                                        logger.warning("PushSubscription table does not exist yet")
+                                        
+                                except Exception as push_exc:
+                                    logger.exception(
+                                        f"Failed to send web-push for entry {entry.id}: {push_exc}"
+                                    )
+
+                except Exception as e:
+                    logger.error(
+                        f"Failed to notify chauffeur {entry.chauffeur.license_plate}: {e}"
+                    )
+                    continue
 
                 return notified_count
 
@@ -204,16 +263,31 @@ class QueueService:
                 if notification.is_expired():
                     try:
                         with transaction.atomic():
+                            # Mark the notification as timed out - this will also
+                            # update the queue entry status back to WAITING
                             notification.respond(QueueNotification.ResponseType.TIMEOUT)
                             logger.info(
                                 f"Timed out notification for {notification.queue_entry.chauffeur.license_plate}"
                             )
                             timeout_count += 1
-
-                            # Process queue to notify next chauffeur
-                            self.process_queue_notifications(
-                                notification.queue_entry.queue
-                            )
+                            
+                            # This slot is now available again, so we can notify the next person in line
+                            # But we only notify if there are other people in the queue
+                            # (this avoids notifying the same person who just timed out)
+                            queue = notification.queue_entry.queue
+                            waiting_entries = queue.get_waiting_entries()
+                            
+                            # Find the next entry that's not the one that just timed out
+                            next_entries = [entry for entry in waiting_entries 
+                                        if entry.chauffeur.id != notification.queue_entry.chauffeur.id]
+                            
+                            if next_entries:
+                                # There's someone else in the queue, so we notify them
+                                self.notify_next_chauffeurs(
+                                    queue,
+                                    1,  # One slot available
+                                    {"send_push": True, "force_refresh": True}
+                                )
 
                     except Exception as e:
                         logger.error(f"Error handling timeout: {e}")
@@ -238,9 +312,6 @@ class QueueService:
                 status=QueueEntry.Status.NOTIFIED
             ).count()
             dequeued_count = queue.get_recently_dequeued().count()
-
-            # Get average wait time (for completed entries)
-            from django.db.models import Avg, F
 
             avg_wait_time = queue.entries.filter(
                 status__in=[

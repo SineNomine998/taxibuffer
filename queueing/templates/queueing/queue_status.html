@@ -36,7 +36,6 @@
             min-height: 100vh;
         }
 
-        /* Responsive container that adapts to screen size */
         .app {
             width: 100%;
             max-width: var(--max-width);
@@ -48,7 +47,6 @@
             position: relative;
         }
 
-        /* header */
         .header {
             background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
             padding: 14px 16px;
@@ -105,11 +103,10 @@
             cursor: pointer;
         }
 
-        /* connection status */
         .connection-status {
             position: absolute;
             right: 12px;
-            top: 12px;
+            bottom: 56px;
             padding: 6px 10px;
             border-radius: 16px;
             font-size: 12px;
@@ -130,7 +127,6 @@
             color: #8b1c1c
         }
 
-        /* Flexible content area */
         .content {
             padding: 18px;
             background: var(--bg);
@@ -139,7 +135,6 @@
             gap: 14px;
             flex: 1;
             padding-bottom: 84px;
-            /* Space for footer */
         }
 
         .title-big {
@@ -154,7 +149,6 @@
             color: #6b7280
         }
 
-        /* status card: grid with left image full-height and right content */
         .status-wrapper {
             display: flex;
             justify-content: center;
@@ -221,7 +215,6 @@
             margin-bottom: 10px;
         }
 
-        /* Label left aligned, number centered below */
         .position-box {
             margin-top: 8px;
             display: flex;
@@ -243,11 +236,9 @@
             font-size: 44px;
             text-align: center;
             margin-top: 4px;
-            /* no background pill - matches mock */
             line-height: 1;
         }
 
-        /* Leave button (rounded outline) */
         .leave-button {
             margin-top: 16px;
             width: 100%;
@@ -310,12 +301,9 @@
         }
     </style>
 
-    <!-- HEAD: include SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-    <!-- Optional: tiny CSS to more closely match your styling -->
     <style>
-        /* Make confirm button yellow gradient and larger, cancel button white pill */
         .swal2-popup {
             border-radius: 16px;
             font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
@@ -333,7 +321,6 @@
             line-height: 1.35;
         }
 
-        /* Confirm button = yellow gradient */
         .swal2-confirm {
             background: linear-gradient(92deg, #E0BD22 10%, #FEF508 100%) !important;
             color: #222 !important;
@@ -345,7 +332,6 @@
             min-width: 150px;
         }
 
-        /* Cancel button = white pill with subtle border */
         .swal2-cancel {
             background: #fff !important;
             color: #5b5b5b !important;
@@ -357,13 +343,55 @@
             box-shadow: 0 6px 12px rgba(2, 6, 23, 0.04) inset;
         }
 
-        /* Make the icon bigger and centered like your mock */
         .swal2-icon {
             width: 96px !important;
             height: 96px !important;
             border-radius: 999px;
             margin: 0 auto 6px;
             box-shadow: none;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .notification-pulse {
+            animation: pulse 1s infinite;
+            box-shadow: 0 0 0 rgba(204, 169, 44, 0.4);
         }
     </style>
 
@@ -375,7 +403,6 @@
             const cancelText = opts.cancelText || 'Blijven';
             const type = (opts.type || 'success').toLowerCase(); // success | error | warning | info
 
-            // choose icon markup per type (success uses a big green check)
             let iconHtml = '';
             if (type === 'success') {
                 iconHtml = `<div>
@@ -393,7 +420,7 @@
                 </div>`;
             }
 
-            // SweetAlert2 call
+            // SweetAlert2 call for the pop-up notification
             return Swal.fire({
                 title: title,
                 html: iconHtml + `<div style="margin-top:8px">${message}</div>`,
@@ -403,7 +430,7 @@
                 focusConfirm: false,
                 allowOutsideClick: false,
                 backdrop: true,
-                // prevent default small icon so our custom iconHtml is used
+                // prevent default small icon so our custom iconHtml is used, because SweetAlert2 uses a defualt icon
                 didOpen: () => {
                     const swalIcon = document.querySelector('.swal2-icon');
                     if (swalIcon) swalIcon.style.display = 'none';
@@ -434,8 +461,6 @@
                     type: 'success'
                 });
                 if (res.confirmed) {
-                    // perform the leave action (example: POST to leave endpoint)
-                    // Replace the fetch code in your leave button handler
                     fetch('/queueing/api/queue/{{ entry.uuid|escapejs }}/leave/', {
                         method: 'POST',
                         headers: {
@@ -447,14 +472,14 @@
                         .then(response => response.json())
                         .then(data => {
                             if (data.success) {
-                                window.location.href = '/queueing/login/';
+                                window.location.href = '/queueing/locations/';
                             } else {
                                 throw new Error(data.error || 'Unknown error');
                             }
                         })
                         .catch(e => {
                             console.error(e);
-                            // Show error dialog
+                            // error dialog
                             showLeaveDialog({
                                 title: 'Fout',
                                 message: 'Kon niet verlaten. Probeer opnieuw.',
@@ -480,11 +505,6 @@
                 <div class="brand-text">TAXIBUFFER</div>
             </div>
 
-            <!-- connection status (kept) -->
-            <div id="connection-status" class="connection-status disconnected" aria-live="polite">
-                🔴 Disconnected
-            </div>
-
             <div class="info-icon" id="helpBtn" aria-label="Help">i</div>
         </header>
 
@@ -496,7 +516,7 @@
 
             <div class="status-wrapper" aria-live="polite">
                 <div class="status-card" id="status-card" role="region" aria-label="Queue status card">
-                    <!-- Left image column (full height of card) -->
+                    <!-- Left image column -->
                     <div class="left-image" aria-hidden="true">
                         {% if queue.pickup_zone.image %}
                         <img src="{{ queue.pickup_zone.image.url }}" alt="{{ queue.pickup_zone.name }}">
@@ -523,9 +543,7 @@
                         </div>
 
                         <div class="position-box" aria-hidden="false">
-                            <!-- exact label text as requested -->
                             <div class="position-label">U staat momenteel op plek:</div>
-                            <!-- large centered number directly under label -->
                             <div id="position-display" class="position-number">-</div>
                         </div>
 
@@ -538,12 +556,15 @@
             <div class="last-updated" id="last-updated">Last updated: --:--:--</div>
         </main>
 
+        <div id="connection-status" class="connection-status disconnected" aria-live="polite">
+            🔴 Disconnected
+        </div>
+
         <footer class="footer" role="contentinfo">Taxibuffer is a Coding the Curbs® product</footer>
     </div>
 
     <script src="{% static 'queueing/js/queue_status.js' %}"></script>
     <script>
-        // Wait for DOM to be fully loaded before initializing
         document.addEventListener('DOMContentLoaded', function () {
             if (typeof QueueManager === 'undefined') {
                 console.error('QueueManager class not found. Make sure queue_status.js is loaded.');
@@ -559,6 +580,20 @@
             } catch (error) {
                 console.error('Failed to initialize Queue Manager:', error);
             }
+
+            (async () => {
+                try {
+                    const vapidKey = "{{ vapid_public_key|default:''|escapejs }}";
+                    const entryUuid = "{{ entry.uuid|escapejs }}";
+                    if (vapidKey) {
+                        await registerSWAndSubscribe(vapidKey, entryUuid);
+                    } else {
+                        console.warn('No VAPID public key provided in template context; skipping push subscription.');
+                    }
+                } catch (e) {
+                    console.warn('Push subscription failed (non-fatal):', e);
+                }
+            })();
         });
 
         window.addEventListener('beforeunload', function () {

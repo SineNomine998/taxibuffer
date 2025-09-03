@@ -51,9 +51,9 @@ class Command(BaseCommand):
         
         # Create additional pickup zones for variety
         additional_zones = [
-            ('Amsterdam Airport Schiphol', 5),
-            ('Central Station Amsterdam', 4),
-            ('RAI Convention Center', 6),
+            # ('Amsterdam Airport Schiphol', 5),
+            # ('Central Station Amsterdam', 4),
+            # ('RAI Convention Center', 6),
         ]
         
         for zone_name, sensor_count in additional_zones:

@@ -171,3 +171,10 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "accounts.User"
+
+
+WEBPUSH_SETTINGS = {
+    "VAPID_PUBLIC_KEY": config("VAPID_PUBLIC_KEY"),
+    "VAPID_PRIVATE_KEY": config("VAPID_PRIVATE_KEY"),
+    "VAPID_CLAIMS": {"sub": "mailto:sinenomine998@gmail.com"},
+}

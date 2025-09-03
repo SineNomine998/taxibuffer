@@ -18,6 +18,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect
+from queueing.views import service_worker
 
 def redirect_to_signup(request):
     return redirect('queueing:chauffeur_login')
@@ -26,4 +27,5 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path('queueing/', include('queueing.urls')),
     path('', redirect_to_signup, name='home'),
+    path('sw.js', service_worker, name='service_worker'),
 ]

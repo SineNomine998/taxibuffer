@@ -1,3 +1,4 @@
+from venv import logger
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import JsonResponse
@@ -8,15 +9,19 @@ from django.contrib.gis.geos import Point
 from django.utils import timezone
 from django.db import transaction
 import json
+from django.conf import settings
+from django.http import FileResponse
+import os
 
 from accounts.models import Chauffeur, User
 from geofence.models import BufferZone, PickupZone
-from .models import TaxiQueue, QueueEntry, QueueNotification
+from .models import TaxiQueue, QueueEntry, QueueNotification, PushSubscription
 from .services import QueueService
+from .push_views import send_web_push
 
 
 class ChauffeurLoginView(View):
-    """Handle chauffeur authentication - Step 1."""
+    """Handle chauffeur authentication (Step 1)"""
 
     def get(self, request):
         """Display login form."""
@@ -124,6 +129,7 @@ class QueueStatusView(View):
                 "queue": queue,
                 "chauffeur": chauffeur,
                 "entry": entry,
+                "vapid_public_key": settings.WEBPUSH_SETTINGS["VAPID_PUBLIC_KEY"],
             }
             return render(request, "queueing/queue_status.html", context)
 
@@ -160,6 +166,9 @@ class QueueStatusAPIView(View):
                     "id": notification.id,
                     "notification_time": notification.notification_time.isoformat(),
                     "is_expired": notification.is_expired(),
+                    "is_cascade_notification": getattr(
+                        notification, "is_cascade_notification", False
+                    ),
                 }
 
             return JsonResponse(
@@ -171,6 +180,11 @@ class QueueStatusAPIView(View):
                     "total_waiting": total_waiting,
                     "has_notification": has_pending_notification,
                     "notification": notification_data,
+                    "is_cascade_notification": (
+                        notification_data.get("is_cascade_notification", False)
+                        if notification_data
+                        else False
+                    ),
                     "last_updated": timezone.now().isoformat(),
                 }
             )
@@ -178,7 +192,7 @@ class QueueStatusAPIView(View):
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)}, status=400)
 
-# TODO! Remove?
+
 class LeaveQueueBeforeNotificationAPIView(View):
     """Allow chauffeurs to leave the queue voluntarily before receiving any notification."""
 
@@ -192,14 +206,9 @@ class LeaveQueueBeforeNotificationAPIView(View):
 
             # Check if entry is active (i.e. waiting or notified)
             if entry.status in [QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED]:
-                # Log the voluntary departure
                 entry.status = QueueEntry.Status.LEFT_ZONE
                 entry.dequeued_at = timezone.now()
                 entry.save()
-
-                # Optional: Notify queue management system
-                queue_service = QueueService()
-                queue_service.process_queue_notifications(entry.queue)
 
                 return JsonResponse(
                     {"success": True, "message": "Successfully left the queue."}
@@ -214,28 +223,36 @@ class LeaveQueueBeforeNotificationAPIView(View):
 
 
 class LocationSelectionView(View):
-    """Handle location selection - Step 2."""
+    """Handle location selection (Step 2)"""
 
     def get(self, request):
         """Display location selection."""
-        # Check if user is authenticated from step 1
         chauffeur_uuid = request.session.get("authenticated_chauffeur_id")
         if not chauffeur_uuid:
-            messages.error(request, "Please authenticate first.")
+            print("Please authenticate first.")
             return redirect("queueing:chauffeur_login")
 
         try:
             chauffeur = Chauffeur.objects.get(id=chauffeur_uuid)
+
+            # Check if chauffeur is already in an active queue
+            active_entry = QueueEntry.objects.filter(
+                chauffeur=chauffeur,
+                status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
+            ).first()
+
+            if active_entry:
+                # If they're already in a queue, redirect them to that queue's status page
+                return redirect("queueing:queue_status", entry_uuid=active_entry.uuid)
+
         except Chauffeur.DoesNotExist:
-            messages.error(request, "Invalid session. Please authenticate again.")
+            print("Invalid session. Please authenticate again.")
             return redirect("queueing:chauffeur_login")
 
-        # Get available queues with queue counts
         active_queues = TaxiQueue.objects.filter(active=True).select_related(
             "buffer_zone", "pickup_zone"
         )
 
-        # Add waiting count to each queue
         for queue in active_queues:
             queue.waiting_count = queue.get_waiting_entries().count()
 
@@ -247,37 +264,34 @@ class LocationSelectionView(View):
 
     def post(self, request):
         """Process location selection and join queue."""
-        # Check authentication
         chauffeur_id = request.session.get("authenticated_chauffeur_id")
         if not chauffeur_id:
-            messages.error(request, "Please authenticate first.")
+            print("Please authenticate first.")
             return redirect("queueing:chauffeur_login")
 
         selected_queue_id = request.POST.get("selected_queue_id")
 
         if not selected_queue_id:
-            messages.error(request, "Please select a pickup location.")
+            print("Please select a pickup location.")
             return redirect("queueing:location_selection")
 
         try:
             chauffeur = Chauffeur.objects.get(id=chauffeur_id)
             queue = TaxiQueue.objects.get(id=selected_queue_id, active=True)
         except (Chauffeur.DoesNotExist, TaxiQueue.DoesNotExist):
-            messages.error(request, "Invalid selection. Please try again.")
+            print("Invalid selection. Please try again.")
             return redirect("queueing:location_selection")
 
-        # Mock location for geofencing check
+        # Mock location for testing
         mock_location = Point(4.9036, 52.3676)  # Amsterdam coordinates
 
         try:
-            # Use QueueService to add chauffeur to queue
             queue_service = QueueService()
             success, message, entry_uuid = queue_service.add_chauffeur_to_queue(
                 chauffeur=chauffeur, queue=queue, signup_location=mock_location
             )
 
             if success:
-                # Get the newly created queue entry
                 entry = (
                     QueueEntry.objects.filter(
                         queue=queue,
@@ -292,20 +306,18 @@ class LocationSelectionView(View):
                 )
 
                 if entry:
-                    # Clear session data
-                    request.session.pop("authenticated_chauffeur_id", None)
-                    messages.success(request, message)
-
+                    # request.session.pop("authenticated_chauffeur_id", None)
+                    print(message)
                     return redirect("queueing:queue_status", entry_uuid=entry.uuid)
                 else:
-                    messages.error(request, "Failed to retrieve queue entry.")
+                    print("Failed to retrieve queue entry.")
                     return redirect("queueing:location_selection")
             else:
-                messages.error(request, message)
+                print(message)
                 return redirect("queueing:queue_status", entry_uuid=entry_uuid)
 
         except Exception as e:
-            messages.error(request, f"Failed to join queue: {str(e)}")
+            print(f"Failed to join queue: {str(e)}")
             return redirect("queueing:location_selection")
 
 
@@ -318,7 +330,7 @@ class NotificationResponseView(View):
         try:
             data = json.loads(request.body)
             notification_id = data.get("notification_id")
-            response_type = data.get("response")  # 'accepted' or 'declined'
+            response_type = data.get("response")
 
             if not all([notification_id, response_type]):
                 return JsonResponse(
@@ -332,7 +344,6 @@ class NotificationResponseView(View):
 
             notification = get_object_or_404(QueueNotification, id=notification_id)
 
-            # Check if notification is still valid
             if notification.response != QueueNotification.ResponseType.PENDING:
                 return JsonResponse(
                     {
@@ -347,24 +358,78 @@ class NotificationResponseView(View):
                     {"success": False, "error": "Notification has expired"}, status=400
                 )
 
-            # Process response
             queue_service = QueueService()
+
             if response_type == "accepted":
                 notification.respond(QueueNotification.ResponseType.ACCEPTED)
                 message = (
                     "You have accepted the notification. Please proceed to pickup zone."
                 )
-                # Trigger next notifications if needed
-                queue_service.process_queue_notifications(
-                    notification.queue_entry.queue
+
+                queue_service.notify_next_chauffeurs(
+                    notification.queue_entry.queue,
+                    1,
+                    {
+                        "send_push": True,
+                        "force_refresh": True,
+                    },  # remove force_refresh later, it was for testing purposes
                 )
             else:
+                declined_entry = notification.queue_entry
+                queue = declined_entry.queue
+
+                waiting_entries = list(queue.get_waiting_entries())
+
+                current_position = -1
+                for i, entry in enumerate(waiting_entries):
+                    if entry.id == declined_entry.id:
+                        current_position = i
+                        break
+
                 notification.respond(QueueNotification.ResponseType.DECLINED)
                 message = "You have declined. You remain in the queue."
-                # Notify next chauffeur immediately
-                queue_service.process_queue_notifications(
-                    notification.queue_entry.queue
-                )
+
+                if current_position >= 0 and current_position + 1 < len(
+                    waiting_entries
+                ):
+                    next_entry = waiting_entries[current_position + 1]
+
+                    notification_options = {
+                        "send_push": True,
+                        "force_refresh": True,
+                        "cascade_notification": True,
+                        "message": f"The chauffeur ahead of you declined. You can now proceed to the pickup zone.",
+                    }
+
+                    try:
+                        notification = next_entry.notify()
+                        logger.info(
+                            f"Cascade notification sent to chauffeur {next_entry.chauffeur.license_plate}"
+                        )
+
+                        subs = PushSubscription.objects.filter(
+                            chauffeur=next_entry.chauffeur
+                        )
+                        if subs.exists():
+                            payload = {
+                                "title": "U kunt nu doorrijden",
+                                "body": f"De chauffeur voor u heeft geweigerd. U kunt nu naar ophaalzone: {queue.pickup_zone.name}",
+                                "url": f"/queueing/queue/{next_entry.uuid}/",
+                                "tag": f"queue-{queue.id}",
+                                "vibrate": [300, 100, 300],
+                                "data": {
+                                    "url": f"/queueing/queue/{next_entry.uuid}/",
+                                    "force_refresh": True,
+                                    "cascade_notification": True,
+                                },
+                            }
+
+                            for sub in subs:
+                                send_web_push(sub.subscription_info, payload)
+
+                        message += " The next chauffeur has been notified."
+                    except Exception as e:
+                        logger.error(f"Failed to send cascade notification: {e}")
 
             return JsonResponse({"success": True, "message": message})
 
@@ -389,11 +454,16 @@ class ManualTriggerView(View):
         """Process manual trigger."""
         queue = get_object_or_404(TaxiQueue, id=queue_id, active=True)
         slots_available = int(request.POST.get("slots_available", 1))
+        send_push = request.POST.get("send_push") == "1"
 
         try:
             queue_service = QueueService()
+            notification_options = {
+                "send_push": send_push,
+            }
+
             notified_count = queue_service.notify_next_chauffeurs(
-                queue, slots_available
+                queue, slots_available, notification_options
             )
 
             if notified_count > 0:
@@ -414,3 +484,20 @@ class ManualTriggerView(View):
 
         # Basic format: letters and numbers, 3-20 characters
         return re.match(r"^[A-Z0-9]{3,20}$", taxi_license) is not None
+
+
+def service_worker(request):
+    """Serve service worker from root URL"""
+    # Path to the service worker file in the static folder
+    sw_path = os.path.join(
+        settings.BASE_DIR, "queueing", "static", "queueing", "js", "sw.js"
+    )
+
+    # Serve the file with the correct mime type
+    response = FileResponse(open(sw_path, "rb"), content_type="application/javascript")
+
+    # Add cache control headers
+    response["Service-Worker-Allowed"] = "/"
+    response["Cache-Control"] = "no-cache"
+
+    return response
