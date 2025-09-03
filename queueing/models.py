@@ -44,20 +44,15 @@ class TaxiQueue(models.Model):
         )
 
     def get_next_in_queue(self, count=1):
-        print("RUNNING GET_NEXT_IN_QUEUE")
-        """Get the next N chauffeurs in queue."""
+        """Get the next n chauffeurs in queue."""
         return self.get_waiting_entries()[:count]
 
     def get_recently_dequeued(self, limit=7):
-        print("RUNNING GET_RECENTLY_DEQUEUED")
-        """Get the most recently dequeued entries (for officer visibility)."""
         return self.queueentry_set.filter(status=QueueEntry.Status.DEQUEUED).order_by(
             "-dequeued_at"
         )[:limit]
 
     def get_queue_position(self, chauffeur):
-        print("RUNNING GET_QUEUE_POSITION")
-        """Get the position of a chauffeur in the queue (1-indexed)."""
         try:
             entry = self.queueentry_set.get(
                 chauffeur=chauffeur, status=QueueEntry.Status.WAITING
@@ -66,10 +61,6 @@ class TaxiQueue(models.Model):
             return waiting_entries.index(entry) + 1
         except (QueueEntry.DoesNotExist, ValueError):
             return None
-
-    def has_available_slots(self, count=1):
-        """Check if pickup zone has available slots for the specified number of taxis."""
-        return self.pickup_zone.get_available_slots() >= count
 
     def __str__(self):
         return self.name or f"Queue {self.uuid}"
@@ -126,7 +117,7 @@ class QueueEntry(models.Model):
                 )
 
     def save(self, *args, **kwargs):
-        self.full_clean()  # Full clean to be sure
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def notify(self):
@@ -138,7 +129,6 @@ class QueueEntry(models.Model):
         self.notified_at = timezone.now()
         self.save()
 
-        # Create notification record
         notification = QueueNotification.objects.create(
             queue_entry=self, notification_time=self.notified_at
         )
@@ -156,23 +146,25 @@ class QueueEntry(models.Model):
         self.save()
 
     def decline_notification(self):
-        """Mark that chauffeur declined the notification."""
+        """Mark that chauffeur declined the notification but keep them in the queue."""
         if self.status != self.Status.NOTIFIED:
             raise ValidationError(
                 f"Cannot decline notification with status: {self.status}"
             )
 
-        self.status = self.Status.DECLINED
+        # Change status back to WAITING instead of DECLINED to keep the chauffeur in queue
+        self.status = self.Status.WAITING
         self.save()
 
     def timeout_notification(self):
-        """Mark that notification timed out."""
+        """Mark that notification timed out but keep them in the queue."""
         if self.status != self.Status.NOTIFIED:
             raise ValidationError(
                 f"Cannot timeout notification with status: {self.status}"
             )
 
-        self.status = self.Status.TIMEOUT
+        # Change status back to WAITING instead of TIMEOUT to keep the chauffeur in queue
+        self.status = self.Status.WAITING
         self.save()
 
     def is_notification_expired(self):
@@ -199,7 +191,7 @@ class QueueEntry(models.Model):
 class QueueNotification(models.Model):
     """
     Tracks notifications sent to chauffeurs and their responses.
-    Used for history, analytics, and timeout management.
+    Can be used for history, analytics, and timeout management.
     """
 
     class ResponseType(models.TextChoices):
@@ -218,6 +210,13 @@ class QueueNotification(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_cascade_notification = models.BooleanField(
+        default=False,
+        help_text="Whether this notification was triggered by a decline from another chauffeur",
+    )
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
 
     class Meta:
         indexes = [
@@ -235,7 +234,6 @@ class QueueNotification(models.Model):
         self.response_time = timezone.now()
         self.save()
 
-        # Update queue entry status
         if response_type == self.ResponseType.ACCEPTED:
             self.queue_entry.dequeue()
         elif response_type == self.ResponseType.DECLINED:
@@ -266,3 +264,15 @@ class QueueManager(models.Manager):
 
 
 TaxiQueue.add_to_class("objects", QueueManager())
+
+
+class PushSubscription(models.Model):
+    chauffeur = models.ForeignKey(
+        "accounts.Chauffeur", on_delete=models.CASCADE, null=True, blank=True
+    )
+    subscription_info = models.JSONField()
+    entry_uuid = models.UUIDField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"PushSubscription {self.id} for chauffeur {self.chauffeur}"

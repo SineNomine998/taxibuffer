@@ -1,3 +1,60 @@
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+async function registerSWAndSubscribe(vapidPublicKey, entryUuid) {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        console.warn('Push not supported in this browser');
+        return null;
+    }
+
+    console.log('Requesting notification permission...');
+    const permission = await Notification.requestPermission();
+    console.log('Notification permission response:', permission);
+
+    if (permission !== 'granted') {
+        console.warn('Notification permission not granted');
+        alert('Please enable notifications to receive updates when it\'s your turn');
+        return null;
+    }
+
+    try {
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        console.log('Service worker registered', reg);
+
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            console.warn('Notification permission not granted');
+            return null;
+        }
+
+        const sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+        });
+
+        await fetch('/queueing/api/push/subscribe/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': (function () { const c = document.cookie.split(';').find(x => x.trim().startsWith('csrftoken=')); return c ? decodeURIComponent(c.split('=')[1]) : '' })() },
+            body: JSON.stringify({ subscription: sub, entry_uuid: entryUuid })
+        });
+
+        console.log('Subscribed to push');
+        return sub;
+    } catch (e) {
+        console.error('subscribe failed', e);
+        return null;
+    }
+}
+
+
 class QueueManager {
     constructor(config) {
         this.config = {
@@ -17,34 +74,98 @@ class QueueManager {
             alignmentTimeout: null,
             isConnected: false,
             retryCount: 0,
-            initialUpdateDone: false // Track if initial update has been done
+            initialUpdateDone: false // track inital update
         };
 
-        // init and now DO force an immediate status fetch
-        this.init(true); // Pass true to indicate we want an immediate update
+        this.init(true);
+
+        this.setupServiceWorkerMessageListener();
+    }
+
+    setupServiceWorkerMessageListener() {
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            console.log('Received message from service worker:', event.data);
+
+            if (event.data && event.data.type === 'REFRESH_STATUS') {
+                // Force immediate status update
+                console.log('Received push notification, updating status immediately');
+                this.updateStatus('push_notification');
+
+                // Show visual feedback with cascade-specific wording if needed
+                if (event.data.data) {
+                    const isCascadeNotification = event.data.data.is_cascade_notification;
+                    const notificationData = {
+                        title: "U mag doorrijden",
+                        body: isCascadeNotification ?
+                            "De chauffeur voor u heeft geweigerd. U mag nu naar de ophaalzone." :
+                            "Ga naar de ophaalzone."
+                    };
+                    this.showPushReceivedFeedback(notificationData);
+                }
+            }
+        });
+    }
+
+    showPushReceivedFeedback(data) {
+        Swal.fire({
+            title: data.title || 'U mag doorrijden',
+            html: `
+        <div style="text-align: center; margin-bottom: 15px;">
+            <div>
+            <img src="../../../static/queueing/assets/pop-up-confirmed.svg" 
+                alt="Confirmed" 
+                style="max-width:80px;max-height:80px;width:100%;height:auto;">
+            </div>
+            <div style="font-size: 16px; margin-top: 10px; color: #333;">${data.body || 'Ga naar ophaalzone'}</div>
+        </div>
+    `,
+            showCancelButton: true,
+            confirmButtonText: 'Verlaten',
+            cancelButtonText: 'Blijven',
+            confirmButtonColor: '#E0BD22',
+            backdrop: true,
+            allowOutsideClick: false,
+            customClass: {
+                popup: 'notification-popup',
+                confirmButton: 'notification-accept-btn',
+                cancelButton: 'notification-decline-btn'
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                if (this.state.currentNotificationId) {
+                    this.respondToNotification('accepted').then(() => {
+                        window.location.href = '/queueing/locations/';
+                    }).catch(err => {
+                        console.error('Failed to respond to notification:', err);
+                        window.location.href = '/queueing/locations/';
+                    });
+                } else {
+                    window.location.href = '/queueing/locations/';
+                }
+            } else {
+                if (this.state.currentNotificationId) {
+                    this.respondToNotification('declined');
+                }
+            }
+        });
     }
 
     init(immediateUpdate = false) {
-        // Set connection as disconnected until we successfully fetch once
         this.setConnectionStatus(false);
 
-        // Perform immediate update if requested
         if (immediateUpdate) {
             console.log('Performing immediate update on page load...');
-            // Use a small timeout to ensure DOM is ready
             setTimeout(() => {
                 this.updateStatus('initial');
                 this.state.initialUpdateDone = true;
             }, 100);
         }
 
-        // Start the aligned polling mechanism (unaffected by immediate update)
         this.startAlignedPolling();
         console.log('QueueManager initialized, aligned polling started.');
     }
 
     startAlignedPolling() {
-        // Clear any existing timers
         if (this.state.alignmentTimeout) {
             clearTimeout(this.state.alignmentTimeout);
             this.state.alignmentTimeout = null;
@@ -54,7 +175,6 @@ class QueueManager {
             this.state.pollTimer = null;
         }
 
-        // Calculate time to next boundary with precision
         const calculateNextBoundaryDelay = () => {
             const now = new Date();
             const seconds = now.getSeconds();
@@ -69,7 +189,6 @@ class QueueManager {
             return (secondsToNext * 1000) - ms;
         };
 
-        // Schedule first update to happen exactly at the next :00 or :30
         const scheduleFirstUpdate = () => {
             const delay = calculateNextBoundaryDelay();
 
@@ -78,48 +197,37 @@ class QueueManager {
             this.updateLastUpdatedLabel(`Next aligned update: ${new Date(Date.now() + delay).toLocaleTimeString()}`);
 
             this.state.alignmentTimeout = setTimeout(() => {
-                // Execute right at the boundary
                 const boundaryTime = new Date();
                 console.log(`Aligned update at ${boundaryTime.toLocaleTimeString()}`);
 
-                // Execute update
                 this.updateStatus('aligned');
 
-                // Now start the self-correcting interval timer
                 this.setupSelfCorrectingInterval();
 
                 this.state.alignmentTimeout = null;
             }, delay);
         };
 
-        // Set up a self-correcting interval that maintains alignment with :00/:30
+        // Self-correcting interval that maintains alignment with :00/:30
         this.setupSelfCorrectingInterval = () => {
-            // Clear any existing poll timer
             if (this.state.pollTimer) clearInterval(this.state.pollTimer);
 
-            // Use a slightly shorter interval and self-correct
             this.state.pollTimer = setInterval(() => {
                 const now = new Date();
                 const seconds = now.getSeconds();
                 const ms = now.getMilliseconds();
 
-                // Check if we're at a proper boundary (within 100ms tolerance)
                 const isAtBoundary = (seconds === 0 || seconds === 30) && ms < 100;
 
                 if (isAtBoundary) {
-                    // We're at an exact boundary, make the request
-                    console.log(`Aligned update at ${now.toLocaleTimeString()}`);
                     this.updateStatus('aligned');
                 } else {
-                    // We've drifted, reschedule the whole mechanism
-                    console.log(`Detected drift (${seconds}s ${ms}ms), realigning...`);
                     clearInterval(this.state.pollTimer);
                     scheduleFirstUpdate();
                 }
-            }, this.config.updateInterval - 100); // Slightly shorter interval to detect drift
+            }, this.config.updateInterval - 100);
         };
 
-        // Start the alignment process
         scheduleFirstUpdate();
     }
 
@@ -159,23 +267,42 @@ class QueueManager {
             if (this.state.retryCount >= 3) {
                 this.showAlert('error', 'Verbindingsproblemen. Opnieuw proberen...');
             }
-            // Do not change alignment; let aligned interval continue
         }
     }
 
     updateElementsFromData(data) {
-        // position
         const pos = (data.position !== undefined ? data.position : '-');
         const posEl = document.getElementById('position-display');
         if (posEl) posEl.textContent = pos;
-
-        // any other elements can be updated here
     }
 
     handleNotification(data) {
         const hasActiveNotification = data.has_notification && data.notification && !data.notification.is_expired;
         if (hasActiveNotification) {
-            this.showNotification(data.notification);
+            this.state.currentNotificationId = data.notification.id;
+            this.startCountdown(new Date(data.notification.notification_time));
+
+            if (!this.state.shownNotifications) this.state.shownNotifications = {};
+
+            if (!this.state.shownNotifications[data.notification.id]) {
+                this.state.shownNotifications[data.notification.id] = true;
+
+                const isCascadeNotification = data.is_cascade_notification || false;
+
+                let notificationData = {
+                    title: "U mag doorrijden",
+                    body: "U staat op het punt de wachtrij te verlaten. Weet u het zeker?",
+                };
+
+                if (isCascadeNotification) {
+                    notificationData = {
+                        title: "U mag doorrijden",
+                        body: "De chauffeur voor u heeft geweigerd. U mag nu naar de ophaalzone. Wilt u de rij verlaten?",
+                    };
+                }
+
+                setTimeout(() => this.showPushReceivedFeedback(notificationData), 500);
+            }
         } else {
             this.hideNotification();
         }
@@ -183,9 +310,7 @@ class QueueManager {
 
     showNotification(notification) {
         this.state.currentNotificationId = notification.id;
-        // display countdown etc (you can adapt markup)
-        // For this design we choose to show an alert and start countdown in last-updated area
-        this.showAlert('success', 'U krijgt nu een seintje. Ga naar ophaalzone als u accepteert.');
+        this.showAlert('success', 'U bent nu aan de beurt en mag naar de ophaalzone.');
         this.startCountdown(new Date(notification.notification_time));
     }
 
@@ -207,6 +332,10 @@ class QueueManager {
             if (remaining <= 0) {
                 if (countdownEl) countdownEl.textContent = `Seintje verlopen. Laatste update: ${new Date().toLocaleTimeString()}`;
                 this.hideNotification();
+
+                setTimeout(() => {
+                    this.updateStatus('timeout');
+                }, 1000);
                 return;
             }
             const minutes = Math.floor(remaining / 60);
@@ -227,11 +356,10 @@ class QueueManager {
     async respondToNotification(response) {
         if (!this.state.currentNotificationId) {
             this.showAlert('error', 'Geen actieve notificatie om te beantwoorden.');
-            return;
+            return Promise.reject('No active notification');
         }
 
         try {
-            console.log("YOO")
             const res = await fetch(this.config.endpoints.respond, {
                 method: 'POST',
                 headers: {
@@ -250,13 +378,14 @@ class QueueManager {
             this.showAlert('success', result.message || 'Respons verzonden');
             this.hideNotification();
 
-            // Force immediate status fetch at next aligned tick (don't break alignment).
-            // Optionally we do a short delayed fetch to reflect change faster without breaking alignment:
             setTimeout(() => this.updateStatus(), 1000);
+
+            return result;
 
         } catch (err) {
             console.error('Respond failed', err);
             this.showAlert('error', 'Kon reactie niet versturen. Probeer opnieuw.');
+            return Promise.reject(err);
         }
     }
 

@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import push_views
 
 app_name = "queueing"
 
@@ -37,4 +38,7 @@ urlpatterns = [
         name="manual_trigger",
     ),
     path("signup/", views.ChauffeurLoginView.as_view(), name="signup"),
+    # Push notification subscription
+    path("api/push/subscribe/", push_views.push_subscribe, name="push_subscribe"),
+    path("api/push/test/", push_views.test_push, name="push_test"),
 ]
