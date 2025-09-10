@@ -29,7 +29,16 @@ DEBUG = True
 
 UNDER_CONSTRUCTION = False
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ["*"]
+
+SITE_ID = 1
+
+CONTROL_DOMAIN = "control.taxibuffer.com"
+MAIN_DOMAIN = "taxibuffer.com"
+
+if DEBUG:
+    CONTROL_DOMAIN = "localhost:8000/control"
+    MAIN_DOMAIN = "localhost:8000"
 
 
 # Application definition
@@ -41,27 +50,26 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.sites",
     # "django.contrib.gis",
-
-    'accounts',
-    'geofence',
-    'queueing',
-    'sensors',
+    "accounts",
+    "geofence",
+    "queueing",
+    "sensors",
+    "control_panel",
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-CORS_ALLOWED_HEADERS = [
-    '*'
-]
+CORS_ALLOWED_HEADERS = ["*"]
 
 CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -77,6 +85,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "taxibuffers.middleware.DomainRedirectMiddleware",
 ]
 
 ROOT_URLCONF = "taxibuffers.urls"
@@ -84,7 +93,7 @@ ROOT_URLCONF = "taxibuffers.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": ['templates'],
+        "DIRS": ["templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -107,15 +116,15 @@ WSGI_APPLICATION = "taxibuffers.wsgi.application"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': config("DATABASE_NAME"),
-        'USER': config("DATABASE_USER"),
-        'PASSWORD': config("DATABASE_PASSWORD"),
-        'HOST': config("DATABASE_HOST"),
-        'PORT': config("DATABASE_PORT"),
-        'OPTIONS': {
-            'options': '-c timezone=UTC',
+    "default": {
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
+        "NAME": config("DATABASE_NAME"),
+        "USER": config("DATABASE_USER"),
+        "PASSWORD": config("DATABASE_PASSWORD"),
+        "HOST": config("DATABASE_HOST"),
+        "PORT": config("DATABASE_PORT"),
+        "OPTIONS": {
+            "options": "-c timezone=UTC",
         },
     }
 }
@@ -140,9 +149,9 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication', # Fallback
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",  # Fallback
     ]
 }
 

@@ -26,6 +26,7 @@ def redirect_to_signup(request):
 urlpatterns = [
     path("admin/", admin.site.urls),
     path('queueing/', include('queueing.urls')),
+    path('control/', include('control_panel.urls')),
     path('', redirect_to_signup, name='home'),
     path('sw.js', service_worker, name='service_worker'),
 ]

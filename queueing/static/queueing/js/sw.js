@@ -12,23 +12,18 @@ self.addEventListener('push', (event) => {
     const data = event.data.json();
     if (DEBUG) console.log('[Service Worker] Push data:', data);
 
-    const isCascadeNotification = data.data && data.data.cascade_notification;
     
     let title = data.title || 'TaxiBuffer Bericht';
-    if (isCascadeNotification) {
-      title = 'U mag doorrijden';
-    }
 
     const options = {
       body: data.body || 'U mag doorrijden',
       icon: '/static/queueing/assets/logo.svg',
       badge: '/static/queueing/assets/check-badge.svg',
-      vibrate: isCascadeNotification ? [200, 100, 200, 100, 200] : data.vibrate || [200, 100, 200], // dunno how this feels like on a phone
+      vibrate: [200, 100, 200, 100, 200], // dunno how this feels like on a phone
       tag: data.tag || 'taxibuffer-notification',
       requireInteraction: true,
       data: {
         ...data.data,
-        is_cascade_notification: isCascadeNotification
       },
       actions: [
         {
@@ -53,7 +48,6 @@ self.addEventListener('push', (event) => {
                   type: 'REFRESH_STATUS',
                   data: {
                     ...data,
-                    is_cascade_notification: isCascadeNotification
                   },
                   options: options,
                   timestamp: Date.now()
