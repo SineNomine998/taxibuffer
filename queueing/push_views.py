@@ -5,10 +5,15 @@ from django.conf import settings
 from pywebpush import webpush, WebPushException
 from .models import PushSubscription
 from .models import QueueEntry
+from urllib.parse import urlparse
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @csrf_exempt
 def push_subscribe(request):
+    print("\nWHEN DO WE CALL THIS METHOD?\n")
     if request.method != "POST":
         return JsonResponse({"success": False}, status=405)
     body = json.loads(request.body.decode("utf-8"))
@@ -33,58 +38,62 @@ def push_subscribe(request):
     return JsonResponse({"success": True})
 
 
-def send_web_push(subscription_info, payload):
+def send_web_push(subscription_info, payload, ttl=0):
     try:
-        print(f"Sending push notification: {payload}")
-        print(f"To subscription: {subscription_info}")
-        
+        logger.info(f"Sending push notification: {payload}")
+        logger.info(f"To subscription: {subscription_info}")
+
         # Extract the audience from the endpoint
-        endpoint = subscription_info.get('endpoint', '')
+        endpoint = subscription_info.get("endpoint", "")
         audience = None
-        
+
         # Parse the endpoint URL to extract the origin
         if endpoint:
-            from urllib.parse import urlparse
             parsed_url = urlparse(endpoint)
             audience = f"{parsed_url.scheme}://{parsed_url.netloc}"
-        
+
         # Create vapid claims with the correct audience
         vapid_claims = {
-            "sub": settings.WEBPUSH_SETTINGS['VAPID_CLAIMS']['sub'],
-            "aud": audience
+            "sub": settings.WEBPUSH_SETTINGS["VAPID_CLAIMS"]["sub"],
+            "aud": audience,
         }
-        
-        print(f"Using VAPID claims: {vapid_claims}")
-        
+
+        logger.debug(f"Payload: {payload}")
+        logger.debug(f"Subscription info: {subscription_info}")
+        logger.debug(f"VAPID claims: {vapid_claims}")
+
         response = webpush(
             subscription_info=subscription_info,
             data=json.dumps(payload),
-            vapid_private_key=settings.WEBPUSH_SETTINGS['VAPID_PRIVATE_KEY'],
-            vapid_claims=vapid_claims
+            vapid_private_key=settings.WEBPUSH_SETTINGS["VAPID_PRIVATE_KEY"],
+            vapid_claims=vapid_claims,
+            ttl=ttl,  # default is 0, but configurable
+            headers={"x-wns-cache-policy": "no-cache" if ttl == 0 else "cache"},
         )
-        print(f"Push sent successfully: {response.status_code}")
+
+        logger.info(f"Push sent successfully: {response.status_code}")
+
         return True
+
     except WebPushException as ex:
         # More detailed error logging
-        print(f"WebPushException: {ex}")
+        logger.error(f"WebPushException: {ex}")
         if hasattr(ex, "response") and ex.response:
-            print(f"Response status: {ex.response.status_code}")
-            print(f"Response body: {ex.response.text}")
+            logger.error(f"Response status: {ex.response.status_code}")
+            logger.error(f"Response body: {ex.response.text}")
 
-            # If subscription is gone/invalid; remove it
+            # If subscription is gone/invalid, remove it
             if ex.response.status_code in (404, 410):
                 PushSubscription.objects.filter(
                     subscription_info__endpoint=subscription_info.get("endpoint")
                 ).delete()
-                print(
+                logger.warning(
                     f"Deleted invalid subscription with endpoint: {subscription_info.get('endpoint')}"
                 )
         return False
     except Exception as e:
-        print(f"General push error: {e}")
-        import traceback
-
-        traceback.print_exc()
+        logger.error(f"General push error: {e}")
+        logger.error("Push notification failed", exc_info=True)
         return False
 
 
@@ -125,7 +134,11 @@ def test_push(request):
                     "body": f"This is a test push from the server to {entry.chauffeur.license_plate}",
                     "url": f"/queueing/queue/{entry_uuid}/",
                     "tag": f"test-{entry_uuid}",
-                    "vibrate": [300, 100, 300],
+                    "vibrate": [
+                        300,
+                        100,
+                        300,
+                    ],  # no clue how this feels on a real phone
                     "data": {"url": f"/queueing/queue/{entry_uuid}/"},
                 }
 
@@ -143,7 +156,5 @@ def test_push(request):
             return JsonResponse({"success": False, "error": "Invalid entry UUID"})
 
     except Exception as e:
-        import traceback
-
-        traceback.print_exc()
+        logger.error("Error occurred while testing push notification", exc_info=True)
         return JsonResponse({"success": False, "error": str(e)})

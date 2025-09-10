@@ -91,17 +91,13 @@ class QueueManager {
                 console.log('Received push notification, updating status immediately');
                 this.updateStatus('push_notification');
 
-                // Show visual feedback with cascade-specific wording if needed
-                if (event.data.data) {
-                    const isCascadeNotification = event.data.data.is_cascade_notification;
-                    const notificationData = {
-                        title: "U mag doorrijden",
-                        body: isCascadeNotification ?
-                            "De chauffeur voor u heeft geweigerd. U mag nu naar de ophaalzone." :
-                            "Ga naar de ophaalzone."
-                    };
-                    this.showPushReceivedFeedback(notificationData);
-                }
+                // if (event.data.data) {
+                //     const notificationData = {
+                //         title: "U mag doorrijden",
+                //         body: "Ga naar de ophaalzone."
+                //     };
+                //     this.showPushReceivedFeedback(notificationData);
+                // }
             }
         });
     }
@@ -133,8 +129,12 @@ class QueueManager {
         }).then((result) => {
             if (result.isConfirmed) {
                 if (this.state.currentNotificationId) {
+                    Swal.showLoading();
                     this.respondToNotification('accepted').then(() => {
-                        window.location.href = '/queueing/locations/';
+                        console.log("Successfully responded to notification. Redirecting...")
+                        setTimeout(() => {
+                            window.location.href = '/queueing/locations/';
+                        }, 500)
                     }).catch(err => {
                         console.error('Failed to respond to notification:', err);
                         window.location.href = '/queueing/locations/';
@@ -163,6 +163,36 @@ class QueueManager {
 
         this.startAlignedPolling();
         console.log('QueueManager initialized, aligned polling started.');
+
+        this.checkAndRepairSubscription();
+    }
+
+    // this doesn't seem to work but leaving it in for now
+    checkAndRepairSubscription() {
+        setTimeout(async () => {
+            try {
+                if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                    console.warn('Push not supported in this browser');
+                    return;
+                }
+
+                // Check if we have a service worker and subscription
+                const reg = await navigator.serviceWorker.ready;
+                const sub = await reg.pushManager.getSubscription();
+
+                // If no subscription exists, try to resubscribe
+                if (!sub) {
+                    console.log('No push subscription found, attempting to resubscribe...');
+                    const vapidKey = document.querySelector('script[data-vapid-public-key]')?.dataset.vapidKey;
+                    if (vapidKey) {
+                        await registerSWAndSubscribe(vapidKey, this.config.entryUuid);
+                        console.log('Resubscription complete');
+                    }
+                }
+            } catch (e) {
+                console.error('Subscription check failed:', e);
+            }
+        }, 5000); // Check 5 seconds after page load
     }
 
     startAlignedPolling() {
@@ -287,19 +317,10 @@ class QueueManager {
             if (!this.state.shownNotifications[data.notification.id]) {
                 this.state.shownNotifications[data.notification.id] = true;
 
-                const isCascadeNotification = data.is_cascade_notification || false;
-
                 let notificationData = {
                     title: "U mag doorrijden",
                     body: "U staat op het punt de wachtrij te verlaten. Weet u het zeker?",
                 };
-
-                if (isCascadeNotification) {
-                    notificationData = {
-                        title: "U mag doorrijden",
-                        body: "De chauffeur voor u heeft geweigerd. U mag nu naar de ophaalzone. Wilt u de rij verlaten?",
-                    };
-                }
 
                 setTimeout(() => this.showPushReceivedFeedback(notificationData), 500);
             }

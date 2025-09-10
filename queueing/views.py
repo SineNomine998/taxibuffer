@@ -1,4 +1,3 @@
-from venv import logger
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import JsonResponse
@@ -12,12 +11,15 @@ import json
 from django.conf import settings
 from django.http import FileResponse
 import os
+import logging
 
 from accounts.models import Chauffeur, User
 from geofence.models import BufferZone, PickupZone
 from .models import TaxiQueue, QueueEntry, QueueNotification, PushSubscription
 from .services import QueueService
 from .push_views import send_web_push
+
+logger = logging.getLogger(__name__)
 
 
 class ChauffeurLoginView(View):
@@ -97,7 +99,7 @@ class ChauffeurLoginView(View):
         """Validate license plate format (basic validation)."""
         import re
 
-        # Dutch license plate formats: 1-ABC-23, AB-123-C, etc.
+        # TODO: Double check the Dutch license plate formats: 1-ABC-23, AB-123-C, etc.
         patterns = [
             r"^\d{1,2}-[A-Z]{2,3}-\d{1,2}$",  # 1-ABC-23
             r"^[A-Z]{2}-\d{3}-[A-Z]$",  # AB-123-C
@@ -166,9 +168,6 @@ class QueueStatusAPIView(View):
                     "id": notification.id,
                     "notification_time": notification.notification_time.isoformat(),
                     "is_expired": notification.is_expired(),
-                    "is_cascade_notification": getattr(
-                        notification, "is_cascade_notification", False
-                    ),
                 }
 
             return JsonResponse(
@@ -180,11 +179,6 @@ class QueueStatusAPIView(View):
                     "total_waiting": total_waiting,
                     "has_notification": has_pending_notification,
                     "notification": notification_data,
-                    "is_cascade_notification": (
-                        notification_data.get("is_cascade_notification", False)
-                        if notification_data
-                        else False
-                    ),
                     "last_updated": timezone.now().isoformat(),
                 }
             )
@@ -229,7 +223,7 @@ class LocationSelectionView(View):
         """Display location selection."""
         chauffeur_uuid = request.session.get("authenticated_chauffeur_id")
         if not chauffeur_uuid:
-            print("Please authenticate first.")
+            logger.warning("Please authenticate first.")
             return redirect("queueing:chauffeur_login")
 
         try:
@@ -246,7 +240,7 @@ class LocationSelectionView(View):
                 return redirect("queueing:queue_status", entry_uuid=active_entry.uuid)
 
         except Chauffeur.DoesNotExist:
-            print("Invalid session. Please authenticate again.")
+            logger.warning("Invalid session. Please authenticate again.")
             return redirect("queueing:chauffeur_login")
 
         active_queues = TaxiQueue.objects.filter(active=True).select_related(
@@ -266,23 +260,23 @@ class LocationSelectionView(View):
         """Process location selection and join queue."""
         chauffeur_id = request.session.get("authenticated_chauffeur_id")
         if not chauffeur_id:
-            print("Please authenticate first.")
+            logger.warning("Please authenticate first.")
             return redirect("queueing:chauffeur_login")
 
         selected_queue_id = request.POST.get("selected_queue_id")
 
         if not selected_queue_id:
-            print("Please select a pickup location.")
+            logger.warning("Please select a pickup location.")
             return redirect("queueing:location_selection")
 
         try:
             chauffeur = Chauffeur.objects.get(id=chauffeur_id)
             queue = TaxiQueue.objects.get(id=selected_queue_id, active=True)
         except (Chauffeur.DoesNotExist, TaxiQueue.DoesNotExist):
-            print("Invalid selection. Please try again.")
+            logger.warning("Invalid selection. Please try again.")
             return redirect("queueing:location_selection")
 
-        # Mock location for testing
+        # TODO: Change this mock location for real geofencing logic
         mock_location = Point(4.9036, 52.3676)  # Amsterdam coordinates
 
         try:
@@ -306,18 +300,17 @@ class LocationSelectionView(View):
                 )
 
                 if entry:
-                    # request.session.pop("authenticated_chauffeur_id", None)
-                    print(message)
+                    logger.debug(message)
                     return redirect("queueing:queue_status", entry_uuid=entry.uuid)
                 else:
-                    print("Failed to retrieve queue entry.")
+                    logger.warning("Failed to retrieve queue entry.")
                     return redirect("queueing:location_selection")
             else:
-                print(message)
+                logger.debug(message)
                 return redirect("queueing:queue_status", entry_uuid=entry_uuid)
 
         except Exception as e:
-            print(f"Failed to join queue: {str(e)}")
+            logger.error(f"Failed to join queue: {str(e)}")
             return redirect("queueing:location_selection")
 
 
@@ -371,8 +364,7 @@ class NotificationResponseView(View):
                     1,
                     {
                         "send_push": True,
-                        "force_refresh": True,
-                    },  # remove force_refresh later, it was for testing purposes
+                    },
                 )
             else:
                 declined_entry = notification.queue_entry
@@ -394,13 +386,6 @@ class NotificationResponseView(View):
                 ):
                     next_entry = waiting_entries[current_position + 1]
 
-                    notification_options = {
-                        "send_push": True,
-                        "force_refresh": True,
-                        "cascade_notification": True,
-                        "message": f"The chauffeur ahead of you declined. You can now proceed to the pickup zone.",
-                    }
-
                     try:
                         notification = next_entry.notify()
                         logger.info(
@@ -419,8 +404,6 @@ class NotificationResponseView(View):
                                 "vibrate": [300, 100, 300],
                                 "data": {
                                     "url": f"/queueing/queue/{next_entry.uuid}/",
-                                    "force_refresh": True,
-                                    "cascade_notification": True,
                                 },
                             }
 
@@ -437,6 +420,7 @@ class NotificationResponseView(View):
             return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
+# TODO: Replace this view with real sensor reading
 class ManualTriggerView(View):
     """Manual trigger for testing - simulates sensor detection of available slots."""
 

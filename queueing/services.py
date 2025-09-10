@@ -109,24 +109,21 @@ class QueueService:
             logger.error(f"Error deleting chauffeur: {e}")
             return False, f"Failed to delete the chauffeur: {str(e)}"
 
-    def notify_next_chauffeurs(self, queue: TaxiQueue, slots_available: int, options=None) -> int:
+    def notify_next_chauffeurs(
+        self, queue: TaxiQueue, slots_available: int, options=None
+    ) -> int:
         """
         Notify the next N chauffeurs in queue that slots are available.
-
-        Args:
-            queue: The taxi queue
-            slots_available: Number of available slots
-            options: Dict with notification options like send_push, force_refresh
 
         Returns:
             int: Number of chauffeurs notified
         """
         if slots_available <= 0:
             return 0
-            
+
         # Default options
         if options is None:
-            options = {'send_push': True}
+            options = {"send_push": True}
 
         try:
             # Get next chauffeurs in queue
@@ -145,13 +142,13 @@ class QueueService:
                             notified_count += 1
 
                             # Only send web push if option is enabled
-                            if options.get('send_push', True):
-                                try:                                    
+                            if options.get("send_push", True):
+                                try:
                                     try:
                                         subs = PushSubscription.objects.filter(
                                             chauffeur=entry.chauffeur
                                         )
-                                        
+
                                         if subs.exists():
                                             payload = {
                                                 "title": "U bent aan de beurt",
@@ -161,19 +158,26 @@ class QueueService:
                                                 "vibrate": [300, 100, 300],
                                                 "data": {
                                                     "url": f"/queueing/queue/{entry.uuid}/",
-                                                    "force_refresh": options.get('force_refresh', False)
                                                 },
                                             }
-                                            
+
                                             for s in subs:
-                                                send_web_push(s.subscription_info, payload)
-                                                logger.info(f"Push notification sent to {entry.chauffeur.license_plate}")
+                                                send_web_push(
+                                                    s.subscription_info, payload
+                                                )
+                                                logger.info(
+                                                    f"Push notification sent to {entry.chauffeur.license_plate}"
+                                                )
                                         else:
-                                            logger.warning(f"No push subscriptions found for chauffeur {entry.chauffeur.license_plate}")
-                                            
+                                            logger.warning(
+                                                f"No push subscriptions found for chauffeur {entry.chauffeur.license_plate}"
+                                            )
+
                                     except ProgrammingError:
-                                        logger.warning("PushSubscription table does not exist yet")
-                                        
+                                        logger.warning(
+                                            "PushSubscription table does not exist yet"
+                                        )
+
                                 except Exception as push_exc:
                                     logger.exception(
                                         f"Failed to send web-push for entry {entry.id}: {push_exc}"
@@ -185,7 +189,7 @@ class QueueService:
                     )
                     continue
 
-                return notified_count
+            return notified_count
 
         except Exception as e:
             logger.error(f"Error notifying chauffeurs: {e}")
@@ -270,23 +274,29 @@ class QueueService:
                                 f"Timed out notification for {notification.queue_entry.chauffeur.license_plate}"
                             )
                             timeout_count += 1
-                            
+
                             # This slot is now available again, so we can notify the next person in line
                             # But we only notify if there are other people in the queue
                             # (this avoids notifying the same person who just timed out)
                             queue = notification.queue_entry.queue
                             waiting_entries = queue.get_waiting_entries()
-                            
+
                             # Find the next entry that's not the one that just timed out
-                            next_entries = [entry for entry in waiting_entries 
-                                        if entry.chauffeur.id != notification.queue_entry.chauffeur.id]
-                            
+                            next_entries = [
+                                entry
+                                for entry in waiting_entries
+                                if entry.chauffeur.id
+                                != notification.queue_entry.chauffeur.id
+                            ]
+
                             if next_entries:
                                 # There's someone else in the queue, so we notify them
                                 self.notify_next_chauffeurs(
                                     queue,
-                                    1,  # One slot available
-                                    {"send_push": True, "force_refresh": True}
+                                    1,
+                                    {
+                                        "send_push": True,
+                                    },
                                 )
 
                     except Exception as e:

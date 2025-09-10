@@ -91,8 +91,6 @@ class QueueEntry(models.Model):
     notified_at = models.DateTimeField(null=True, blank=True)
     dequeued_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    # Location tracking
     signup_location = models.PointField(null=True, blank=True, srid=4326)
 
     class Meta:
@@ -210,10 +208,6 @@ class QueueNotification(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    is_cascade_notification = models.BooleanField(
-        default=False,
-        help_text="Whether this notification was triggered by a decline from another chauffeur",
-    )
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
