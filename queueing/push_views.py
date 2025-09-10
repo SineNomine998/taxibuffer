@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 @csrf_exempt
 def push_subscribe(request):
-    print("\nWHEN DO WE CALL THIS METHOD?\n")
     if request.method != "POST":
         return JsonResponse({"success": False}, status=405)
     body = json.loads(request.body.decode("utf-8"))

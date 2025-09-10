@@ -40,7 +40,7 @@ class TaxiQueue(models.Model):
         print("RUNNING GET_WAITING_ENTRIES")
         """Get all queue entries that are waiting, ordered by sign-up time."""
         return self.queueentry_set.filter(status=QueueEntry.Status.WAITING).order_by(
-            "created_at"
+            "-created_at"
         )
 
     def get_next_in_queue(self, count=1):
