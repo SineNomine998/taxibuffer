@@ -12,12 +12,27 @@ class Command(BaseCommand):
         self.stdout.write('Creating test data...')
         
         # Create buffer zone
-        buffer_coords = [
-            [4.8851, 52.3676],  # Amsterdam coordinates (lng, lat)
-            [4.8851, 52.3776],
-            [4.8951, 52.3776],
-            [4.8951, 52.3676],
-            [4.8851, 52.3676]
+        buffer_coords = [ # Laan op Zuid, Rotterdam
+            [
+              4.500310583560008,
+              51.9083638071713
+            ],
+            [
+              4.497139253806097,
+              51.90552322583062
+            ],
+            [
+              4.5028410550964395,
+              51.90372960740041
+            ],
+            [
+              4.5055836932230875,
+              51.90619761848478
+            ],
+            [
+              4.500310583560008,
+              51.9083638071713
+            ]
         ]
         buffer_polygon = Polygon(buffer_coords)
         
@@ -101,7 +116,8 @@ class Command(BaseCommand):
                     )
                     if sensor_created:
                         self.stdout.write(f'Created sensor: {sensor.sensor_id}')
-        
+
+        # TODO: Should you really create new sensors this way?
         # Create sensors for pickup zone
         for i in range(1, 8):  # 7 sensors
             sensor, created = Sensor.objects.get_or_create(
@@ -119,7 +135,7 @@ class Command(BaseCommand):
             buffer_zone=buffer_zone,
             pickup_zone=pickup_zone,
             defaults={
-                'notification_timeout_minutes': 2,
+                # 'notification_timeout_minutes': 2,
                 'active': True
             }
         )
@@ -133,8 +149,9 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 '\nTest data setup complete!\n'
                 'You can now:\n'
-                '1. Visit /queueing/signup/ to add chauffeurs to the queue\n'
-                f'2. Visit /queueing/queue/{queue.id}/trigger/ to manually trigger notifications\n'
-                '3. Test the notification system with multiple chauffeurs'
+                '1. Visit /queueing/ to login as a chauffeur\n'
+                f'2. Visit /queueing/admin/queue/{queue.id}/trigger/ to manually trigger notifications\n'
+                '3. Test the notification system with multiple chauffeurs\n'
+                '4. And visit /control/ to monitor the queue activity for all zones\n'
             )
         )
