@@ -109,22 +109,23 @@
             <span id="todayDate">{{ today_date }}</span>
         </p>
 
+
         <div class="row mt-4">
             <div class="col-md-4">
-                <div class="card status-card waiting">
+                <div class="card status-card dequeued">
                     <div class="card-header d-flex justify-content-between">
-                        <span>Waiting</span>
-                        <span id="waitingCount" class="badge bg-primary">{{ waiting_count }}</span>
+                        <span>Dequeued</span>
+                        <span id="dequeuedCount" class="badge bg-success">{{ dequeued_count }}</span>
                     </div>
                     <div class="card-body">
-                        <div id="waitingList">
-                            {% for entry in waiting_entries %}
+                        <div id="dequeuedList">
+                            {% for entry in dequeued_entries %}
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="license-plate">{{ entry.chauffeur.license_plate }}</span>
-                                <small class="timestamp">{{ entry.created_at|time:"H:i:s" }}</small>
+                                <small class="timestamp">{{ entry.dequeued_at|time:"H:i:s" }}</small>
                             </div>
                             {% empty %}
-                            <p class="text-muted">No chauffeurs waiting</p>
+                            <p class="text-muted">No chauffeurs dequeued</p>
                             {% endfor %}
                         </div>
                     </div>
@@ -150,23 +151,23 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card status-card dequeued">
-                    <div class="card-header d-flex justify-content-between">
-                        <span>Dequeued</span>
-                        <span id="dequeuedCount" class="badge bg-success">{{ dequeued_count }}</span>
-                    </div>
-                    <div class="card-body">
-                        <div id="dequeuedList">
-                            {% for entry in dequeued_entries %}
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="license-plate">{{ entry.chauffeur.license_plate }}</span>
-                                <small class="timestamp">{{ entry.dequeued_at|time:"H:i:s" }}</small>
-                            </div>
-                            {% empty %}
-                            <p class="text-muted">No chauffeurs dequeued</p>
-                            {% endfor %}
+        </div>
+        <div class="col-md-4">
+            <div class="card status-card waiting">
+                <div class="card-header d-flex justify-content-between">
+                    <span>Waiting</span>
+                    <span id="waitingCount" class="badge bg-primary">{{ waiting_count }}</span>
+                </div>
+                <div class="card-body">
+                    <div id="waitingList">
+                        {% for entry in waiting_entries %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="license-plate">{{ entry.chauffeur.license_plate }}</span>
+                            <small class="timestamp">{{ entry.created_at|time:"H:i:s" }}</small>
                         </div>
+                        {% empty %}
+                        <p class="text-muted">No chauffeurs waiting</p>
+                        {% endfor %}
                     </div>
                 </div>
             </div>

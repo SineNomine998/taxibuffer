@@ -7,6 +7,7 @@
     {% load static %}
     <title>TAXIBUFFER — Login</title>
 
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
 
     <style>
@@ -164,6 +165,33 @@
             font-weight: 300;
         }
 
+        .swal2-popup {
+            border-radius: 16px;
+            font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+        }
+
+        .swal2-title {
+            font-weight: 800;
+            font-size: 28px;
+            margin-bottom: 6px;
+        }
+
+        .swal2-html-container {
+            color: #4b4b4b;
+            font-size: 16px;
+            line-height: 1.35;
+        }
+
+        .swal2-confirm {
+            background: linear-gradient(92deg, #E0BD22 10%, #FEF508 100%) !important;
+            color: #222 !important;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 28px;
+            font-weight: 800;
+            box-shadow: 0 8px 20px rgba(2, 6, 23, 0.06);
+            min-width: 150px;
+        }
 
         @media (max-width:420px) {
             body {
@@ -222,7 +250,7 @@
                             value="{{ form_data.license_plate|default:'' }}" maxlength="10" />
                     </div>
                     <div class="input-wrap">
-                        <label for="taxi_license_number">RTX nummer</label>
+                        <label for="taxi_license_number">RTX-nummer</label>
                         <input type="text" id="taxi_license_number" name="taxi_license_number" required
                             placeholder="P12345" value="{{ form_data.taxi_license_number|default:'' }}"
                             maxlength="20" />
@@ -234,6 +262,92 @@
 
         <div class="footer">Coding the Curbs® in samenwerking met gemeente Rotterdam</div>
     </div>
+
+
+    {% if messages %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.querySelector('form');
+
+            function fireSwal(title, message) {
+                Swal.fire({
+                    title: title,
+                    html: `
+                        <div style="text-align: center; margin-bottom: 15px;">
+                            <div>
+                            <img src="../../../static/queueing/assets/pop-up-denied.svg" 
+                                alt="Denied" 
+                                style="max-width:80px;max-height:80px;width:100%;height:auto;">
+                            </div>
+                            <div style="font-size: 16px; margin-top: 10px; color: #333;">${message || 'Er is een fout opgetreden.'}</div>
+                        </div>
+                    `,
+                    confirmButtonText: 'Sluiten',
+                    confirmButtonColor: '#E0BD22'
+                });
+            }
+
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                const licensePlateEl = document.getElementById('license_plate');
+                const taxiLicenseEl = document.getElementById('taxi_license_number');
+                const licensePlate = licensePlateEl.value.trim().toUpperCase();
+                const taxiLicense = taxiLicenseEl.value.trim().toUpperCase();
+
+                // Bypass validation for testing purposes
+                if (licensePlate === "SINENOMINE" && taxiLicense === "TEST") {
+                    form.submit();
+                    return;
+                }
+
+                // A bit unnecessary, but just in case
+                if (!licensePlate) {
+                    title = "Kenteken vereist";
+                    message = "Vul uw kenteken in.";
+                    fireSwal(title, message);
+                    return;
+                } else if (!taxiLicense) {
+                    title = "RTX-nummer vereist";
+                    message = "Vul uw RTX-nummer in.";
+                    fireSwal(title, message);
+                    return;
+                }
+
+                // Basic Dutch license plate patterns
+                const patterns = [
+                    /^[A-Z]{2}-\d{2}-\d{2}$/,  // XX - 99 - 99
+                    /^\d{2}-\d{2}-[A-Z]{2}$/,  // 99 - 99 - XX
+                    /^[A-Z]{2}-\d{2}-[A-Z]{2}$/,  // XX - 99 - XX
+                    /^\d{2}-[A-Z]{2}-\d{2}$/,  // 99 - XX - 99
+                    /^[A-Z]{2}-[A-Z]{2}-\d{2}$/,  // XX - XX - 99
+                    /^\d{2}-[A-Z]{2}-[A-Z]{2}$/,  // 99 - XX - XX
+                    /^[A-Z]{1}-\d{3}-[A-Z]{2}$/,  // X - 999 - XX
+                    /^[A-Z]{2}-\d{3}-[A-Z]{1}$/,  // XX - 999 - X
+                    /^\d{3}-[A-Z]{2}-[A-Z]{1}$/,  // 999 - XX - X
+                    /^\d{3}-[A-Z]{1}-[A-Z]{2}$/,  // 999 - X - XX
+                    /^\d{1,2}-[A-Z]{2,3}-\d{1,2}$/,  // 1-ABC-23
+                    /^\d{3}-[A-Z]{2}-\d{1,2}$/,  // 123-AB-1
+                    /^[A-Z]{3}-\d{2}-\d{1,2}$/,  // ABC-12-3
+                ];
+                const validPlate = patterns.some((regex) => regex.test(licensePlate));
+
+                if (!validPlate) {
+                    title = "Ongeldig kenteken";
+                    message = "Vul een geldig Nederlands kenteken in (bijv. 1-ABC-23).";
+                    fireSwal(title, message);
+                    return;
+                }
+
+                form.submit();
+            });
+            {% for message in messages %}
+            let title = "Toegang Geweigerd";
+            let errorMessage = "Het ingevoerde kenteken of RTX-nummer is al in gebruik en verbonden met een ander kenteken of RTX-nummer. Controleer uw invoer of neem contact op met de administratie.";
+            fireSwal(title, errorMessage);
+            {% endfor %}
+        });
+    </script>
+    {% endif %}
 </body>
 
 </html>

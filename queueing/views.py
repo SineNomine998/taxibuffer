@@ -11,6 +11,7 @@ from django.db import transaction
 import json
 from django.conf import settings
 from django.http import FileResponse
+import re
 import os
 import logging
 
@@ -70,6 +71,25 @@ class ChauffeurLoginView(View):
             "taxi_license_number": taxi_license_number,
         }
 
+        # Bypass check for testing purposes
+        if license_plate == "SINENOMINE" and taxi_license_number == "TEST":
+            try:
+                chauffeur = Chauffeur.objects.get(license_plate="SINENOMINE")
+            except Chauffeur.DoesNotExist:
+                # Create a dummy test chauffeur
+                user = User.objects.create_user(
+                    username="test_chauffeur", is_chauffeur=True
+                )
+                chauffeur = Chauffeur.objects.create(
+                    user=user, 
+                    license_plate="SINENOMINE", 
+                    taxi_license_number="TEST",
+                    location=None
+                )
+            request.session["authenticated_chauffeur_id"] = chauffeur.id
+            request.session.pop("form_data", None)
+            return redirect("queueing:location_selection")
+
         # Basic validation
         if not all([license_plate, taxi_license_number]):
             messages.error(request, "All fields are required.")
@@ -81,7 +101,7 @@ class ChauffeurLoginView(View):
             return redirect("queueing:chauffeur_login")
 
         if not self.validate_taxi_license_format(taxi_license_number):
-            messages.error(request, "Invalid taxi license number format.")
+            messages.error(request, "Invalid RTX number format.")
             return redirect("queueing:chauffeur_login")
 
         try:
@@ -112,30 +132,40 @@ class ChauffeurLoginView(View):
                 # Store chauffeur info in session for step 2
                 request.session["authenticated_chauffeur_id"] = chauffeur.id
                 request.session.pop("form_data", None)  # Clear form data
-
                 return redirect("queueing:location_selection")
 
         except Exception as e:
+            print("BRO WHAT'S THE ISSUE???")
+            print(e)
             messages.error(request, f"Authentication failed: {str(e)}")
             return redirect("queueing:chauffeur_login")
 
     def validate_license_plate_format(self, license_plate):
         """Validate license plate format (basic validation)."""
-        import re
 
         # TODO: Double check the Dutch license plate formats: 1-ABC-23, AB-123-C, etc.
         patterns = [
+            r'^[A-Z]{2}-\d{2}-\d{2}$',  # XX-99-99
+            r'^\d{2}-\d{2}-[A-Z]{2}$',  # 99-99-XX
+            r'^[A-Z]{2}-\d{2}-[A-Z]{2}$',  # XX-99-XX
+            r'^\d{2}-[A-Z]{2}-\d{2}$',  # 99-XX-99
+            r'^[A-Z]{2}-[A-Z]{2}-\d{2}$',  # XX-XX-99
+            r'^\d{2}-[A-Z]{2}-[A-Z]{2}$',  # 99-XX-XX
+            r'^[A-Z]{1}-\d{3}-[A-Z]{2}$',  # X-999-XX
+            r'^[A-Z]{2}-\d{3}-[A-Z]{1}$',  # XX-999-X
+            r'^\d{3}-[A-Z]{2}-[A-Z]{1}$',  # 999-XX-X
+            r'^\d{3}-[A-Z]{1}-[A-Z]{2}$',  # 999-X-XX
             r"^\d{1,2}-[A-Z]{2,3}-\d{1,2}$",  # 1-ABC-23
-            r"^[A-Z]{2}-\d{3}-[A-Z]$",  # AB-123-C
             r"^\d{3}-[A-Z]{2}-\d{1,2}$",  # 123-AB-1
             r"^[A-Z]{3}-\d{2}-\d{1,2}$",  # ABC-12-3
+
         ]
         return any(re.match(pattern, license_plate) for pattern in patterns)
 
+    # TODO: Validate RTX numbers with a proper pattern if available in the future (if necessary)
     def validate_taxi_license_format(self, taxi_license):
         """Validate taxi license format (basic validation)."""
-        import re
-
+        return True
         # Basic format: letters and numbers, 3-20 characters
         return re.match(r"^[A-Z0-9]{3,20}$", taxi_license) is not None
 
@@ -301,7 +331,7 @@ class LocationSelectionView(View):
             return redirect("queueing:location_selection")
 
         # TODO: Change this mock location for real geofencing logic
-        mock_location = Point(4.9036, 52.3676)  # Amsterdam coordinates
+        mock_location = Point(4.9036, 52.3676)  # Amsterdam coordinates if I'm not mistaken
 
         try:
             queue_service = QueueService()
@@ -370,6 +400,7 @@ class NotificationResponseView(View):
                     status=400,
                 )
 
+            # Remove timeout functionality
             if notification.is_expired():
                 return JsonResponse(
                     {"success": False, "error": "Notification has expired"}, status=400
@@ -380,7 +411,7 @@ class NotificationResponseView(View):
             if response_type == "accepted":
                 notification.respond(QueueNotification.ResponseType.ACCEPTED)
                 message = (
-                    "Perfect! You may now proceed to the pickup zone."
+                    "Drive safely :)"
                 )
 
                 queue_service.notify_next_chauffeurs(
@@ -390,7 +421,7 @@ class NotificationResponseView(View):
                         "send_push": True,
                     },
                 )
-            else: # TODO? You may remove this part (maybe) since it's not possible in the new version to decline the notification.
+            else: # TODO: Delete this part since it's not possible in the new version to decline the notification.
                 declined_entry = notification.queue_entry
                 queue = declined_entry.queue
 
@@ -410,6 +441,7 @@ class NotificationResponseView(View):
                 ):
                     next_entry = waiting_entries[current_position + 1]
 
+                    # This functionality is not implemented fully, so feel free to ignore.
                     try:
                         notification = next_entry.notify()
                         logger.info(
@@ -444,7 +476,7 @@ class NotificationResponseView(View):
             return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
-# TODO: Replace this view with real sensor reading
+# Manual trigger view for testing/admin purposes
 class ManualTriggerView(View):
     """Manual trigger for testing - simulates sensor detection of available slots."""
 
@@ -488,7 +520,6 @@ class ManualTriggerView(View):
 
     def validate_taxi_license_format(self, taxi_license):
         """Validate taxi license format (basic validation)."""
-        import re
 
         # Basic format: letters and numbers, 3-20 characters
         return re.match(r"^[A-Z0-9]{3,20}$", taxi_license) is not None

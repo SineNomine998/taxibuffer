@@ -115,9 +115,8 @@ class QueueManager {
             <div style="font-size: 16px; margin-top: 10px; color: #333;">${data.body || 'Ga naar ophaalzone'}</div>
         </div>
     `,
-            showCancelButton: true,
-            confirmButtonText: 'Verlaten',
-            cancelButtonText: 'Blijven',
+            showCancelButton: false,
+            confirmButtonText: 'Begrepen',
             confirmButtonColor: '#E0BD22',
             backdrop: true,
             allowOutsideClick: false,
@@ -319,7 +318,7 @@ class QueueManager {
 
                 let notificationData = {
                     title: "U mag doorrijden",
-                    body: "U staat op het punt de wachtrij te verlaten. Weet u het zeker?",
+                    body: "Rij door naar de ophaallocatie voor de Cruise Terminal. Volg de borden.",
                 };
 
                 setTimeout(() => this.showPushReceivedFeedback(notificationData), 500);
