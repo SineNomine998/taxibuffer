@@ -83,6 +83,7 @@ class QueueService:
         self, chauffeur: Chauffeur, queue: TaxiQueue, signup_location: Point
     ) -> Tuple[bool, str]:
         try:
+            # TODO! Remove old logic (safely :pray:)
             with transaction.atomic():
                 entry = QueueEntry.objects.filter(
                     chauffeur=chauffeur,
