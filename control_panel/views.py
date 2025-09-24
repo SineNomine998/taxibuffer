@@ -91,10 +91,21 @@ class OfficerDashboardView(LoginRequiredMixin, View):
             messages.error(request, "Access denied. Officer credentials required.")
             return redirect("control_panel:login")
 
-        # Get all active queues
+        europe = pytz.timezone("Europe/Amsterdam")
+        now_local = timezone.now().astimezone(europe)
+        today_start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start_utc = today_start_local.astimezone(pytz.UTC)
+
         queues = TaxiQueue.objects.filter(active=True).select_related(
             "buffer_zone", "pickup_zone"
         )
+
+        for queue in queues:
+            queue.dequeued_count = QueueEntry.objects.filter(
+                queue=queue,
+                status=QueueEntry.Status.DEQUEUED,
+                dequeued_at__gte=today_start_utc,
+            ).count()
 
         context = {"officer": request.user.officer, "queues": queues}
         return render(request, "control_panel/control_dashboard.html", context)
