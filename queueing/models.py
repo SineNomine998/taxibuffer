@@ -76,8 +76,8 @@ class QueueEntry(models.Model):
         WAITING = "waiting", "Waiting in Queue"
         NOTIFIED = "notified", "Notified to Leave"
         DEQUEUED = "dequeued", "Dequeued (Allowed to Pickup)"
-        DECLINED = "declined", "Declined Notification"
-        TIMEOUT = "timeout", "Notification Timeout"
+        # DECLINED = "declined", "Declined Notification"
+        # TIMEOUT = "timeout", "Notification Timeout"
         LEFT_ZONE = "left_zone", "Left Buffer Zone"
 
     uuid = models.UUIDField(default=uuid.uuid4, null=False, blank=False, editable=False)
@@ -143,36 +143,27 @@ class QueueEntry(models.Model):
         self.dequeued_at = timezone.now()
         self.save()
 
-    def decline_notification(self):
-        """Mark that chauffeur declined the notification but keep them in the queue."""
-        if self.status != self.Status.NOTIFIED:
-            raise ValidationError(
-                f"Cannot decline notification with status: {self.status}"
-            )
+    # TODO! Remove timeout functionality
+    # def timeout_notification(self):
+    #     """Mark that notification timed out but keep them in the queue."""
+    #     if self.status != self.Status.NOTIFIED:
+    #         raise ValidationError(
+    #             f"Cannot timeout notification with status: {self.status}"
+    #         )
 
-        # Change status back to WAITING instead of DECLINED to keep the chauffeur in queue
-        self.status = self.Status.WAITING
-        self.save()
-
-    def timeout_notification(self):
-        """Mark that notification timed out but keep them in the queue."""
-        if self.status != self.Status.NOTIFIED:
-            raise ValidationError(
-                f"Cannot timeout notification with status: {self.status}"
-            )
-
-        # Change status back to WAITING instead of TIMEOUT to keep the chauffeur in queue
-        self.status = self.Status.WAITING
-        self.save()
+    #     # Change status back to WAITING instead of TIMEOUT to keep the chauffeur in queue
+    #     self.status = self.Status.WAITING
+    #     self.save()
 
     def is_notification_expired(self):
         """Check if notification has expired based on timeout setting."""
-        if self.status != self.Status.NOTIFIED or not self.notified_at:
-            return False
+        # if self.status != self.Status.NOTIFIED or not self.notified_at:
+            # return False
 
-        timeout_minutes = self.queue.notification_timeout_minutes
-        expiry_time = self.notified_at + timezone.timedelta(minutes=timeout_minutes)
-        return timezone.now() > expiry_time
+        # timeout_minutes = self.queue.notification_timeout_minutes
+        # expiry_time = self.notified_at + timezone.timedelta(minutes=timeout_minutes)
+        # return timezone.now() > expiry_time
+        return False
 
     def get_queue_position(self):
         """Get current position in queue (1-indexed)."""
@@ -195,8 +186,8 @@ class QueueNotification(models.Model):
     class ResponseType(models.TextChoices):
         PENDING = "pending", "Pending Response"
         ACCEPTED = "accepted", "Accepted (Will Leave)"
-        DECLINED = "declined", "Declined (Will Stay)"
-        TIMEOUT = "timeout", "No Response (Timeout)"
+        # DECLINED = "declined", "Declined (Will Stay)"
+        # TIMEOUT = "timeout", "No Response (Timeout)"
 
     uuid = models.UUIDField(default=uuid.uuid4, null=False, blank=False, editable=False)
     queue_entry = models.ForeignKey(QueueEntry, on_delete=models.CASCADE)
@@ -230,14 +221,15 @@ class QueueNotification(models.Model):
 
         if response_type == self.ResponseType.ACCEPTED:
             self.queue_entry.dequeue()
-        elif response_type == self.ResponseType.DECLINED:
-            self.queue_entry.decline_notification()
-        elif response_type == self.ResponseType.TIMEOUT:
-            self.queue_entry.timeout_notification()
+        # elif response_type == self.ResponseType.DECLINED:
+        #     self.queue_entry.decline_notification()
+        # elif response_type == self.ResponseType.TIMEOUT:
+        #     self.queue_entry.timeout_notification()
 
     def is_expired(self):
         """Check if notification has expired."""
-        return self.queue_entry.is_notification_expired()
+        # return self.queue_entry.is_notification_expired()
+        return False
 
     def __str__(self):
         return f"Notification to {self.queue_entry.chauffeur} at {self.notification_time} ({self.get_response_display()})"

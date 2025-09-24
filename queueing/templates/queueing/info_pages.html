@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="nl">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    {% load static %}
+    <title>TAXIBUFFER — Info</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        html,
+        body {
+            height: 100%
+        }
+
+        body {
+            font-family: 'DM Sans', Arial, sans-serif;
+            background: #121212;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .card {
+            width: 375px;
+            height: 812px;
+            background: linear-gradient(92.18deg, #E0BD22 -4.05%, #FEF508 116.02%);
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 32px 22px;
+            color: #111;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .top {
+            display: flex;
+            align-items: center;
+            gap: 0.875rem;
+            margin-top: 0.375rem;
+            justify-content: center;
+        }
+
+        .content {
+            text-align: center;
+            padding: 0.625rem 0.75rem;
+            margin-top: 2.25rem;
+            flex: 0 1 auto;
+        }
+
+        .logo-small {
+            width: 52px;
+            height: 52px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: transparent;
+        }
+
+        .logo-small img {
+            max-width: 100%;
+            max-height: 44px;
+            display: block;
+        }
+
+        .brand-text {
+            font-weight: 700;
+            letter-spacing: 4px;
+            font-size: 20px;
+            color: #161616;
+            white-space: nowrap;
+        }
+
+        .step-indicator {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            font-size: 12px;
+            color: #161616;
+            background: rgba(255, 255, 255, 0.12);
+            padding: 6px 10px;
+            border-radius: 8px;
+        }
+
+        .title {
+            font-weight: 700;
+            font-size: 22px;
+            margin-bottom: 10px;
+            color: #161616;
+        }
+
+        .lead {
+            font-size: 15px;
+            line-height: 1.6;
+            color: #161616;
+            opacity: 0.95;
+        }
+
+        .btn-wrap {
+            text-align: center;
+            margin-bottom: 6px;
+        }
+
+        .btn {
+            display: inline-block;
+            width: 260px;
+            padding: 14px 18px;
+            border-radius: 999px;
+            border: none;
+            background: #ffffff;
+            font-weight: 700;
+            color: #595959;
+            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 12px;
+            font-style: italic;
+            font-weight: 300;
+            color: #595959;
+            margin-top: 20px;
+        }
+
+        .dots {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            align-items: center;
+            margin-top: 12px;
+            margin-bottom: 8px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.15);
+            /* inactive look: subtle */
+            border: 2px solid rgba(0, 0, 0, 0.12);
+            box-shadow: none;
+            transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
+        }
+
+        .dot.active {
+            width: 16px;
+            height: 16px;
+            background: #161616;
+            border-color: rgba(0, 0, 0, 0.25);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+            transform: scale(1.02);
+        }
+
+        .dot:focus {
+            outline: 2px solid #FFF3C4;
+            outline-offset: 4px;
+        }
+
+        @media(max-width:420px) {
+            body {
+                background: linear-gradient(92.18deg, #E0BD22 -4.05%, #FEF508 116.02%);
+                padding: 0;
+            }
+
+            .card {
+                width: 100vw;
+                height: 100vh;
+                border-radius: 0;
+                padding: 28px 18px;
+                box-shadow: none;
+            }
+
+            .brand-text {
+                font-size: 18px;
+            }
+
+            .btn {
+                width: 220px;
+            }
+
+            .dots {
+                gap: 10px;
+            }
+
+            .dot {
+                width: 10px;
+                height: 10px;
+            }
+
+            .dot.active {
+                width: 14px;
+                height: 14px;
+            }
+
+            .content {
+                margin-top: 22px;
+                padding: 6px 6px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card" role="main" aria-live="polite">
+
+        <div class="top" aria-hidden="true">
+            <div class="logo-small">
+                <img src="{% static 'queueing/assets/logo.svg' %}" alt="Taxibuffer logo"
+                    onerror="this.style.display='none'">
+            </div>
+            <div class="brand-text">TAXIBUFFER</div>
+        </div>
+
+        <div class="content">
+            {% if step == 1 %}
+            <div class="title">Welkom!</div>
+            <div class="lead">
+                In de Taxi Buffer meld je je eenvoudig aan zodra je in de bufferzone staat.
+                <br><br>
+                Je ontvangt automatisch een oproep wanneer je aan de beurt bent.
+            </div>
+            {% else %}
+            <div class="title">Waarom dit systeem?</div>
+            <div class="lead">
+                Met de Taxi Buffer voorkomen we files en overlast op de pier.
+                <br><br>
+                Zo houden we het veilig voor passagiers en eerlijk voor alle chauffeurs.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- page indicator -->
+        <div class="dots" role="group" aria-label="Info pagina indicator">
+            <span class="dot {% if step == 1 %}active{% endif %}" aria-hidden="true"></span>
+            <span class="dot {% if step == 2 %}active{% endif %}" aria-hidden="true"></span>
+        </div>
+
+        <form method="post" style="margin-top:6px;">
+            {% csrf_token %}
+            <div class="btn-wrap">
+                <button class="btn" type="submit">Verder</button>
+            </div>
+        </form>
+
+        <div class="footer-note">Coding the Curbs® in samenwerking met gemeente Rotterdam</div>
+    </div>
+
+    <script>
+        // allow keyboard Enter to progress
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                const form = document.querySelector('form');
+                if (form) form.submit();
+            }
+        });
+    </script>
+</body>
+
+</html>

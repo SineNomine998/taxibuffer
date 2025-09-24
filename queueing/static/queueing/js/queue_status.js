@@ -310,7 +310,7 @@ class QueueManager {
         const hasActiveNotification = data.has_notification && data.notification && !data.notification.is_expired;
         if (hasActiveNotification) {
             this.state.currentNotificationId = data.notification.id;
-            this.startCountdown(new Date(data.notification.notification_time));
+            // this.startCountdown(new Date(data.notification.notification_time));
 
             if (!this.state.shownNotifications) this.state.shownNotifications = {};
 
@@ -332,47 +332,47 @@ class QueueManager {
     showNotification(notification) {
         this.state.currentNotificationId = notification.id;
         this.showAlert('success', 'U bent nu aan de beurt en mag naar de ophaalzone.');
-        this.startCountdown(new Date(notification.notification_time));
+        // this.startCountdown(new Date(notification.notification_time));
     }
 
     hideNotification() {
-        this.clearCountdown();
+        // this.clearCountdown();
         this.state.currentNotificationId = null;
     }
 
-    startCountdown(notificationTime) {
-        this.clearCountdown();
-        const totalSeconds = this.config.notificationTimeoutMinutes * 60;
-        const countdownEl = document.getElementById('last-updated');
+    // startCountdown(notificationTime) {
+    //     this.clearCountdown();
+    //     const totalSeconds = this.config.notificationTimeoutMinutes * 60;
+    //     const countdownEl = document.getElementById('last-updated');
 
-        this.state.countdownInterval = setInterval(() => {
-            const now = new Date();
-            const elapsed = Math.floor((now - notificationTime) / 1000);
-            const remaining = totalSeconds - elapsed;
+    //     this.state.countdownInterval = setInterval(() => {
+    //         const now = new Date();
+    //         const elapsed = Math.floor((now - notificationTime) / 1000);
+    //         const remaining = totalSeconds - elapsed;
 
-            if (remaining <= 0) {
-                if (countdownEl) countdownEl.textContent = `Seintje verlopen. Laatste update: ${new Date().toLocaleTimeString()}`;
-                this.hideNotification();
+    //         if (remaining <= 0) {
+    //             if (countdownEl) countdownEl.textContent = `Seintje verlopen. Laatste update: ${new Date().toLocaleTimeString()}`;
+    //             this.hideNotification();
 
-                setTimeout(() => {
-                    this.updateStatus('timeout');
-                }, 1000);
-                return;
-            }
-            const minutes = Math.floor(remaining / 60);
-            const seconds = remaining % 60;
-            if (countdownEl) {
-                countdownEl.textContent = `Time remaining: ${minutes}:${String(seconds).padStart(2, '0')}`;
-            }
-        }, 1000);
-    }
+    //             setTimeout(() => {
+    //                 this.updateStatus('timeout');
+    //             }, 1000);
+    //             return;
+    //         }
+    //         const minutes = Math.floor(remaining / 60);
+    //         const seconds = remaining % 60;
+    //         if (countdownEl) {
+    //             countdownEl.textContent = `Time remaining: ${minutes}:${String(seconds).padStart(2, '0')}`;
+    //         }
+    //     }, 1000);
+    // }
 
-    clearCountdown() {
-        if (this.state.countdownInterval) {
-            clearInterval(this.state.countdownInterval);
-            this.state.countdownInterval = null;
-        }
-    }
+    // clearCountdown() {
+    //     if (this.state.countdownInterval) {
+    //         clearInterval(this.state.countdownInterval);
+    //         this.state.countdownInterval = null;
+    //     }
+    // }
 
     async respondToNotification(response) {
         if (!this.state.currentNotificationId) {
@@ -480,7 +480,7 @@ class QueueManager {
     destroy() {
         if (this.state.alignmentTimeout) clearTimeout(this.state.alignmentTimeout);
         if (this.state.pollTimer) clearInterval(this.state.pollTimer);
-        this.clearCountdown();
+        // this.clearCountdown();
         console.log('QueueManager destroyed');
     }
 }

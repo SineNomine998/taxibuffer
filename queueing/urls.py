@@ -6,7 +6,7 @@ app_name = "queueing"
 
 urlpatterns = [
     # Two-step chauffeur authentication and queue joining
-    path("", views.ChauffeurLoginView.as_view(), name="chauffeur_login"),
+    path("", views.InfoPagesView.as_view(), name="info_pages"),
     path("login/", views.ChauffeurLoginView.as_view(), name="chauffeur_login"),
     path(
         "locations/", views.LocationSelectionView.as_view(), name="location_selection"
