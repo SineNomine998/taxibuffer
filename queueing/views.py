@@ -4,6 +4,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.views import View
+from django.urls import reverse
 from django.contrib.gis.geos import Point
 from django.utils import timezone
 from django.db import transaction
@@ -20,6 +21,29 @@ from .services import QueueService
 from .push_views import send_web_push
 
 logger = logging.getLogger(__name__)
+
+
+class InfoPagesView(View):
+    """Serves informational pages regarding this taxi buffer system TaxiBuffer."""
+
+    def get(self, request):
+        """Display info page."""
+        step = int(request.session.get("info_step", 1))
+        print("CURRENT INFO STEP:", step)
+        context = {"step": step}
+        return render(request, "queueing/info_pages.html", context)
+    
+    def post(self, request):
+        """Handle navigation between info pages."""
+        step = int(request.session.get("info_step", 1))
+
+        if step < 2:
+            step += 1
+            request.session["info_step"] = step
+            return redirect(reverse("queueing:info_pages"))
+        else:
+            request.session.pop("info_step", None)
+            return redirect("queueing:chauffeur_login")
 
 
 class ChauffeurLoginView(View):
@@ -167,7 +191,7 @@ class QueueStatusAPIView(View):
                 notification_data = {
                     "id": notification.id,
                     "notification_time": notification.notification_time.isoformat(),
-                    "is_expired": notification.is_expired(),
+                    # "is_expired": notification.is_expired(),
                 }
 
             return JsonResponse(
@@ -356,7 +380,7 @@ class NotificationResponseView(View):
             if response_type == "accepted":
                 notification.respond(QueueNotification.ResponseType.ACCEPTED)
                 message = (
-                    "You have accepted the notification. Please proceed to pickup zone."
+                    "Perfect! You may now proceed to the pickup zone."
                 )
 
                 queue_service.notify_next_chauffeurs(
@@ -366,7 +390,7 @@ class NotificationResponseView(View):
                         "send_push": True,
                     },
                 )
-            else:
+            else: # TODO? You may remove this part (maybe) since it's not possible in the new version to decline the notification.
                 declined_entry = notification.queue_entry
                 queue = declined_entry.queue
 

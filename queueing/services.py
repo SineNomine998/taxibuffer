@@ -89,9 +89,9 @@ class QueueService:
                     queue=queue,
                     status__in=[
                         QueueEntry.Status.LEFT_ZONE,
-                        QueueEntry.Status.DECLINED,
+                        # QueueEntry.Status.DECLINED,
                         QueueEntry.Status.DEQUEUED,
-                        QueueEntry.Status.TIMEOUT,
+                        # QueueEntry.Status.TIMEOUT,
                     ],
                 ).first()
 
@@ -255,6 +255,7 @@ class QueueService:
         timeout_count = 0
 
         try:
+            # TODO! Remove old logic (safely :pray:) 
             # Get all pending notifications that have expired
             queryset = QueueNotification.objects.filter(
                 response=QueueNotification.ResponseType.PENDING
@@ -326,8 +327,8 @@ class QueueService:
             avg_wait_time = queue.entries.filter(
                 status__in=[
                     QueueEntry.Status.DEQUEUED,
-                    QueueEntry.Status.DECLINED,
-                    QueueEntry.Status.TIMEOUT,
+                    # QueueEntry.Status.DECLINED,
+                    # QueueEntry.Status.TIMEOUT,
                 ]
             ).aggregate(
                 avg_minutes=Avg(

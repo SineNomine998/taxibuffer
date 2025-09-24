@@ -22,7 +22,7 @@ class Command(BaseCommand):
         buffer_polygon = Polygon(buffer_coords)
         
         buffer_zone, created = BufferZone.objects.get_or_create(
-            name='Central Amsterdam Buffer Zone',
+            name='Laan op Zuid Rotterdam Buffer Zone',
             defaults={
                 'zone': buffer_polygon,
                 'active': True
