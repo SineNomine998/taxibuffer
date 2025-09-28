@@ -401,73 +401,9 @@ class NotificationResponseView(View):
                     status=400,
                 )
 
-            # Remove timeout functionality
-            if notification.is_expired():
-                return JsonResponse(
-                    {"success": False, "error": "Notification has expired"}, status=400
-                )
-
-            queue_service = QueueService()
-
             if response_type == "accepted":
                 notification.respond(QueueNotification.ResponseType.ACCEPTED)
                 message = "Drive safely :)"
-
-                queue_service.notify_next_chauffeurs(
-                    notification.queue_entry.queue,
-                    1,
-                    {
-                        "send_push": True,
-                    },
-                )
-            else:  # TODO: Delete this part since it's not possible in the new version to decline the notification.
-                declined_entry = notification.queue_entry
-                queue = declined_entry.queue
-
-                waiting_entries = list(queue.get_waiting_entries())
-
-                current_position = -1
-                for i, entry in enumerate(waiting_entries):
-                    if entry.id == declined_entry.id:
-                        current_position = i
-                        break
-
-                notification.respond(QueueNotification.ResponseType.DECLINED)
-                message = "You have declined. You remain in the queue."
-
-                if current_position >= 0 and current_position + 1 < len(
-                    waiting_entries
-                ):
-                    next_entry = waiting_entries[current_position + 1]
-
-                    # This functionality is not implemented fully, so feel free to ignore.
-                    try:
-                        notification = next_entry.notify()
-                        logger.info(
-                            f"Cascade notification sent to chauffeur {next_entry.chauffeur.license_plate}"
-                        )
-
-                        subs = PushSubscription.objects.filter(
-                            chauffeur=next_entry.chauffeur
-                        )
-                        if subs.exists():
-                            payload = {
-                                "title": "U kunt nu doorrijden",
-                                "body": f"De chauffeur voor u heeft geweigerd. U kunt nu naar ophaalzone: {queue.pickup_zone.name}",
-                                "url": f"/queueing/queue/{next_entry.uuid}/",
-                                "tag": f"queue-{queue.id}",
-                                "vibrate": [300, 100, 300],
-                                "data": {
-                                    "url": f"/queueing/queue/{next_entry.uuid}/",
-                                },
-                            }
-
-                            for sub in subs:
-                                send_web_push(sub.subscription_info, payload)
-
-                        message += " The next chauffeur has been notified."
-                    except Exception as e:
-                        logger.error(f"Failed to send cascade notification: {e}")
 
             return JsonResponse({"success": True, "message": message})
 

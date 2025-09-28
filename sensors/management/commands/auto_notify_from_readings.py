@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from django.core.management.base import BaseCommand
 from django.utils import timezone as dj_timezone
 from django.core.cache import cache
@@ -50,7 +49,7 @@ class Command(BaseCommand):
             self.stdout.write("No active sensors found for the given filters.")
             return
 
-        # group by pickup_zone
+        # 2) group by pickup_zone
         zones = {}
         for s in sensors:
             zones.setdefault(s.pickup_zone_id, []).append(s)
