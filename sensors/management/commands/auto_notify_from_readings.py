@@ -85,7 +85,7 @@ class Command(BaseCommand):
             cached = cache.get(cache_key)  # expected format: {"free": int, "ts": "iso"}
             last_free = cached.get("free") if cached else None
 
-            # TODO: Should we only notify if free_count changed?
+            # TODO: Should we only notify if free_count changed? Hmm maybe... not?
             if last_free is None or free_count != last_free:
                 self.stdout.write(
                     f"Free count changed for zone {zone_id}: Last free ({last_free}) -> {free_count}"

@@ -1,11 +1,9 @@
-from django.shortcuts import render
 import base64
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import timezone
 
 import bcrypt
-from django.conf import settings
 from django.http import JsonResponse
 from django.utils import timezone as dj_timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -30,10 +28,9 @@ def parse_timestamp(timestamp_string):
     """Parse 'YYYY-mm-dd HH:MM:SS' or ISO strings into aware datetime in default TZ."""
     if not timestamp_string:
         return dj_timezone.now()
-    for format in ("%Y-%m-%d %H:%M:%S",):  # TODO? add more if needed
+    for format in ("%Y-%m-%d %H:%M:%S",):
         try:
             datetime = datetime.strptime(timestamp_string, format)
-            # assume UTC if no timezone; convert to project timezone
             datetime = datetime.replace(tzinfo=timezone.utc)
             return datetime.astimezone(dj_timezone.get_default_timezone())
         except Exception:
@@ -46,7 +43,6 @@ def parse_timestamp(timestamp_string):
 
 
 def map_status(status_str):
-    print("STATUS IS: ", status_str)
     if status_str is None:
         return True  # default to occupied if missing
     status = str(status_str).strip().upper()
