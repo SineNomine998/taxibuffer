@@ -5,10 +5,13 @@ from geofence.models import PickupZone
 
 class Sensor(models.Model):
     """Represents a sensor in a pickup zone."""
+
     id = models.BigAutoField(primary_key=True)
     uuid = models.UUIDField(default=uuid.uuid4, null=False, blank=False, editable=False)
     sensor_id = models.CharField(blank=False, max_length=255)
-    pickup_zone = models.ForeignKey(PickupZone, related_name='sensors', on_delete=models.CASCADE)
+    pickup_zone = models.ForeignKey(
+        PickupZone, related_name="sensors", on_delete=models.CASCADE
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -27,6 +30,7 @@ class Sensor(models.Model):
 
 class SensorReading(models.Model):
     """Represents a reading from a sensor in a pickup zone."""
+
     id = models.BigAutoField(primary_key=True)
     uuid = models.UUIDField(default=uuid.uuid4, null=False, blank=False, editable=False)
     sensor = models.ForeignKey(Sensor, on_delete=models.CASCADE)
@@ -44,3 +48,14 @@ class SensorReading(models.Model):
             models.Index(fields=["sensor", "date"]),
             models.Index(fields=["status"], name="status_idx"),
         ]
+
+
+class ApiKey(models.Model):
+    """API keys for accessing sensor data. (copied from CTC project hehe :sweat_smile:)"""
+    uuid = models.UUIDField(default=uuid.uuid4, null=False, blank=False, editable=False)
+    key = models.TextField(null=False)
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(blank=True, null=True)
+    label = models.CharField(max_length=255)
+    description = models.TextField()

@@ -33,7 +33,7 @@ class InfoPagesView(View):
         print("CURRENT INFO STEP:", step)
         context = {"step": step}
         return render(request, "queueing/info_pages.html", context)
-    
+
     def post(self, request):
         """Handle navigation between info pages."""
         step = int(request.session.get("info_step", 1))
@@ -81,10 +81,10 @@ class ChauffeurLoginView(View):
                     username="test_chauffeur", is_chauffeur=True
                 )
                 chauffeur = Chauffeur.objects.create(
-                    user=user, 
-                    license_plate="SINENOMINE", 
+                    user=user,
+                    license_plate="SINENOMINE",
                     taxi_license_number="TEST",
-                    location=None
+                    location=None,
                 )
             request.session["authenticated_chauffeur_id"] = chauffeur.id
             request.session.pop("form_data", None)
@@ -145,20 +145,19 @@ class ChauffeurLoginView(View):
 
         # TODO: Double check the Dutch license plate formats: 1-ABC-23, AB-123-C, etc.
         patterns = [
-            r'^[A-Z]{2}-\d{2}-\d{2}$',  # XX-99-99
-            r'^\d{2}-\d{2}-[A-Z]{2}$',  # 99-99-XX
-            r'^[A-Z]{2}-\d{2}-[A-Z]{2}$',  # XX-99-XX
-            r'^\d{2}-[A-Z]{2}-\d{2}$',  # 99-XX-99
-            r'^[A-Z]{2}-[A-Z]{2}-\d{2}$',  # XX-XX-99
-            r'^\d{2}-[A-Z]{2}-[A-Z]{2}$',  # 99-XX-XX
-            r'^[A-Z]{1}-\d{3}-[A-Z]{2}$',  # X-999-XX
-            r'^[A-Z]{2}-\d{3}-[A-Z]{1}$',  # XX-999-X
-            r'^\d{3}-[A-Z]{2}-[A-Z]{1}$',  # 999-XX-X
-            r'^\d{3}-[A-Z]{1}-[A-Z]{2}$',  # 999-X-XX
+            r"^[A-Z]{2}-\d{2}-\d{2}$",  # XX-99-99
+            r"^\d{2}-\d{2}-[A-Z]{2}$",  # 99-99-XX
+            r"^[A-Z]{2}-\d{2}-[A-Z]{2}$",  # XX-99-XX
+            r"^\d{2}-[A-Z]{2}-\d{2}$",  # 99-XX-99
+            r"^[A-Z]{2}-[A-Z]{2}-\d{2}$",  # XX-XX-99
+            r"^\d{2}-[A-Z]{2}-[A-Z]{2}$",  # 99-XX-XX
+            r"^[A-Z]{1}-\d{3}-[A-Z]{2}$",  # X-999-XX
+            r"^[A-Z]{2}-\d{3}-[A-Z]{1}$",  # XX-999-X
+            r"^\d{3}-[A-Z]{2}-[A-Z]{1}$",  # 999-XX-X
+            r"^\d{3}-[A-Z]{1}-[A-Z]{2}$",  # 999-X-XX
             r"^\d{1,2}-[A-Z]{2,3}-\d{1,2}$",  # 1-ABC-23
             r"^\d{3}-[A-Z]{2}-\d{1,2}$",  # 123-AB-1
             r"^[A-Z]{3}-\d{2}-\d{1,2}$",  # ABC-12-3
-
         ]
         return any(re.match(pattern, license_plate) for pattern in patterns)
 
@@ -331,7 +330,9 @@ class LocationSelectionView(View):
             return redirect("queueing:location_selection")
 
         # TODO: Change this mock location for real geofencing logic
-        mock_location = Point(4.9036, 52.3676)  # Amsterdam coordinates if I'm not mistaken
+        mock_location = Point(
+            4.9036, 52.3676
+        )  # Amsterdam coordinates if I'm not mistaken
 
         try:
             queue_service = QueueService()
@@ -400,75 +401,9 @@ class NotificationResponseView(View):
                     status=400,
                 )
 
-            # Remove timeout functionality
-            if notification.is_expired():
-                return JsonResponse(
-                    {"success": False, "error": "Notification has expired"}, status=400
-                )
-
-            queue_service = QueueService()
-
             if response_type == "accepted":
                 notification.respond(QueueNotification.ResponseType.ACCEPTED)
-                message = (
-                    "Drive safely :)"
-                )
-
-                queue_service.notify_next_chauffeurs(
-                    notification.queue_entry.queue,
-                    1,
-                    {
-                        "send_push": True,
-                    },
-                )
-            else: # TODO: Delete this part since it's not possible in the new version to decline the notification.
-                declined_entry = notification.queue_entry
-                queue = declined_entry.queue
-
-                waiting_entries = list(queue.get_waiting_entries())
-
-                current_position = -1
-                for i, entry in enumerate(waiting_entries):
-                    if entry.id == declined_entry.id:
-                        current_position = i
-                        break
-
-                notification.respond(QueueNotification.ResponseType.DECLINED)
-                message = "You have declined. You remain in the queue."
-
-                if current_position >= 0 and current_position + 1 < len(
-                    waiting_entries
-                ):
-                    next_entry = waiting_entries[current_position + 1]
-
-                    # This functionality is not implemented fully, so feel free to ignore.
-                    try:
-                        notification = next_entry.notify()
-                        logger.info(
-                            f"Cascade notification sent to chauffeur {next_entry.chauffeur.license_plate}"
-                        )
-
-                        subs = PushSubscription.objects.filter(
-                            chauffeur=next_entry.chauffeur
-                        )
-                        if subs.exists():
-                            payload = {
-                                "title": "U kunt nu doorrijden",
-                                "body": f"De chauffeur voor u heeft geweigerd. U kunt nu naar ophaalzone: {queue.pickup_zone.name}",
-                                "url": f"/queueing/queue/{next_entry.uuid}/",
-                                "tag": f"queue-{queue.id}",
-                                "vibrate": [300, 100, 300],
-                                "data": {
-                                    "url": f"/queueing/queue/{next_entry.uuid}/",
-                                },
-                            }
-
-                            for sub in subs:
-                                send_web_push(sub.subscription_info, payload)
-
-                        message += " The next chauffeur has been notified."
-                    except Exception as e:
-                        logger.error(f"Failed to send cascade notification: {e}")
+                message = "Drive safely :)"
 
             return JsonResponse({"success": True, "message": message})
 
@@ -507,14 +442,12 @@ class ManualTriggerView(View):
             )
 
             if notified_count > 0:
-                messages.success(
-                    request, f"Notified {notified_count} chauffeur(s) to proceed."
-                )
+                print(f"Notified {notified_count} chauffeur(s) to proceed.")
             else:
-                messages.info(request, "No chauffeurs in queue to notify.")
+                print("No chauffeurs in queue to notify.")
 
         except Exception as e:
-            messages.error(request, f"Error: {str(e)}")
+            print(f"Error: {str(e)}")
 
         return redirect("queueing:manual_trigger", queue_id=queue_id)
 

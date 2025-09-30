@@ -21,13 +21,16 @@ from django.shortcuts import redirect
 from queueing.views import service_worker
 from queueing.views import InfoPagesView
 
+
 def redirect_to_signup(request):
-    return redirect('queueing:chauffeur_login')
+    return redirect("queueing:chauffeur_login")
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path('queueing/', include('queueing.urls')),
-    path('control/', include('control_panel.urls')),
-    path('', InfoPagesView.as_view(), name='info_pages'),
-    path('sw.js', service_worker, name='service_worker'),
+    path("queueing/", include("queueing.urls")),
+    path("control/", include("control_panel.urls")),
+    path("", InfoPagesView.as_view(), name="info_pages"),
+    path("sw.js", service_worker, name="service_worker"),
+    path("", include("sensors.urls")),
 ]

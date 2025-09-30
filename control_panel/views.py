@@ -129,7 +129,7 @@ class QueueMonitorView(LoginRequiredMixin, View):
         queue = TaxiQueue.objects.get(id=queue_id)
 
         # Get chauffeurs in different states - FILTERED FOR TODAY
-        waiting_entries = queue.get_waiting_entries().filter(
+        waiting_entries = queue.get_waiting_entries_control().filter(
             created_at__gte=today_start_utc
         )
 
@@ -183,7 +183,7 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
 
             # Filter for today's entries only
             waiting_entries = list(
-                queue.get_waiting_entries()
+                queue.get_waiting_entries_control()
                 .filter(created_at__gte=today_start_utc)
                 .values(
                     "id", "uuid", "chauffeur__license_plate", "created_at", "status"

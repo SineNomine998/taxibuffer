@@ -205,7 +205,7 @@ class QueueService:
             int: Number of chauffeurs notified
         """
         try:
-            # Mock sensor data - simulate checking pickup zone occupancy
+            # Mock sensor data - simulate checking pickup zone occupancy (for testing purposes)
             mock_available_slots = self.get_mock_available_slots(queue.pickup_zone)
 
             if mock_available_slots > 0:
