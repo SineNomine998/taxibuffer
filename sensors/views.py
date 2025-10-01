@@ -137,17 +137,10 @@ def sensor_data(request):
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     # 5) determine sensor_id (serial)
-    sensor_id = request_body.get("id") or request_body.get("sensor_info", {}).get(
-        "serial_number", None
-    )
+    sensor_id = request_body.get("sensor_info", {}).get("serial_number", None)
 
     if not sensor_id:
         return JsonResponse({"error": "Sensor ID missing"}, status=400)
-
-    sensor_activeness = request_body.get("sensor_info", {}).get("status", "NOT ACTIVE")
-
-    if sensor_activeness != "ACTIVE":
-        return JsonResponse({"error": "Sensor not active"}, status=400)
 
     # 6) find Sensor (active)
     try:
