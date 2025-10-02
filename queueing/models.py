@@ -2,7 +2,7 @@ from django.contrib.gis.db import models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 import uuid
-from accounts.models import Chauffeur
+from accounts.models import Chauffeur, VehicleType
 from geofence.models import BufferZone, PickupZone
 
 
@@ -42,7 +42,7 @@ class TaxiQueue(models.Model):
         return self.queueentry_set.filter(status=QueueEntry.Status.WAITING).order_by(
             "created_at"
         )
-    
+
     def get_waiting_entries_control(self):
         print("RUNNING GET_WAITING_ENTRIES_CONTROL")
         """Get all queue entries that are waiting, ordered by sign-up time."""
@@ -92,6 +92,9 @@ class QueueEntry(models.Model):
     chauffeur = models.ForeignKey(Chauffeur, on_delete=models.CASCADE)
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.WAITING
+    )
+    vehicle_type = models.CharField(
+        max_length=10, choices=VehicleType.choices, null=True, blank=True
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -165,7 +168,7 @@ class QueueEntry(models.Model):
     def is_notification_expired(self):
         """Check if notification has expired based on timeout setting."""
         # if self.status != self.Status.NOTIFIED or not self.notified_at:
-            # return False
+        # return False
 
         # timeout_minutes = self.queue.notification_timeout_minutes
         # expiry_time = self.notified_at + timezone.timedelta(minutes=timeout_minutes)

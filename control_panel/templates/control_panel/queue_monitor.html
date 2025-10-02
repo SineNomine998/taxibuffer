@@ -95,7 +95,6 @@
     </nav>
 
     <div class="container mt-4">
-        <!-- Add this below the queue name heading -->
         <div class="d-flex justify-content-between align-items-center">
             <h2>{{ queue.name }}</h2>
             <span id="connectionStatus" class="badge bg-success">Connected</span>
@@ -108,6 +107,26 @@
         <p class="text-muted">Monitoring queue activity for {{ queue.pickup_zone.name }} on
             <span id="todayDate">{{ today_date }}</span>
         </p>
+
+        <button id="bypassBusjeBtn" data-queue-id="{{ queue.id }}">Busje Nodig</button>
+        <script>
+        document.getElementById('bypassBusjeBtn').addEventListener('click', function() {
+            const queueId = this.getAttribute('data-queue-id');
+            fetch(`/control/queue/${queueId}/busje/`, {
+            method: "POST",
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+            }).then(r => r.json())
+            .then(data => {
+                if(data.success) {
+                alert(data.message);
+                } else {
+                alert("Error: " + data.error);
+                }
+            });
+        });
+        </script>
 
 
         <div class="row mt-4">

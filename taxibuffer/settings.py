@@ -35,6 +35,8 @@ ALLOWED_HOSTS = ["*"]
 
 SITE_ID = 1
 
+LOGIN_URL = "/queueing/login/"
+
 CONTROL_DOMAIN = "control.taxibuffer.com"
 MAIN_DOMAIN = "taxibuffer.com"
 

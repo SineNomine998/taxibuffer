@@ -16,10 +16,8 @@ import os
 import logging
 
 from accounts.models import Chauffeur, User
-from geofence.models import BufferZone, PickupZone
-from .models import TaxiQueue, QueueEntry, QueueNotification, PushSubscription
+from .models import TaxiQueue, QueueEntry, QueueNotification
 from .services import QueueService
-from .push_views import send_web_push
 
 logger = logging.getLogger(__name__)
 
@@ -407,6 +405,26 @@ class NotificationResponseView(View):
 
             return JsonResponse({"success": True, "message": message})
 
+        except Exception as e:
+            return JsonResponse({"success": False, "error": str(e)}, status=500)
+        
+
+class SetVehicleTypeView(View):
+    def post(self, request):
+        vt = request.POST.get("vehicle_type") or (request.body and json.loads(request.body).get("vehicle_type"))
+        if vt not in ("auto","busje"):
+            return JsonResponse({"success": False, "error": "invalid vehicle_type"}, status=400)
+        try:
+            chauffeur_id = request.session.get("authenticated_chauffeur_id")
+            if chauffeur_id:
+                chauffeur = Chauffeur.objects.get(id=chauffeur_id)
+            else:
+                if not request.user.is_authenticated or not hasattr(request.user, 'chauffeur'):
+                    return JsonResponse({"success": False, "error": "User not authenticated as chauffeur"}, status=403)
+            print("BRO DO WE HAVE A PROPER CHAUFFEUR?\n", chauffeur)
+            chauffeur.vehicle_type = vt
+            chauffeur.save(update_fields=["vehicle_type"])
+            return JsonResponse({"success": True, "vehicle_type": vt})
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)}, status=500)
 

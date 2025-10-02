@@ -18,8 +18,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect
-from queueing.views import service_worker
-from queueing.views import InfoPagesView
+from queueing.views import service_worker, InfoPagesView
 
 
 def redirect_to_signup(request):

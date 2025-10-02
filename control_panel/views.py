@@ -1,13 +1,21 @@
 from django.utils import timezone
 import pytz
 from django.http import JsonResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.views import View
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import user_passes_test
+from django.utils.decorators import method_decorator
 from django.contrib.auth.mixins import LoginRequiredMixin
 from accounts.models import Officer, User
-from queueing.models import TaxiQueue, QueueEntry
+from queueing.models import TaxiQueue, QueueEntry, PushSubscription
+from queueing.push_views import send_web_push
+
+from django.db.utils import ProgrammingError
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class OfficerLoginView(View):
@@ -244,5 +252,73 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
                 }
             )
 
+        except Exception as e:
+            return JsonResponse({"success": False, "error": str(e)}, status=400)
+
+
+# Simple check if user is an officer
+def is_officer(user):
+    return hasattr(user, "officer")
+
+
+@method_decorator(user_passes_test(is_officer), name="dispatch")
+class BypassBusjeView(View):
+    """
+    When an officer triggers this view, the first "busje" in the specified queue is popped
+    and notified immediately. (hopefully :crossed_fingers:)
+    """
+    def post(self, request, queue_id):
+        try:
+            queue = get_object_or_404(TaxiQueue, id=queue_id, active=True)
+            busje_entry = queue.queueentry_set.filter(
+                status=QueueEntry.Status.WAITING,
+                chauffeur__vehicle_type="busje"
+            ).order_by("created_at").first()
+            
+            if busje_entry:
+                busje_entry.notify()
+                try:
+                    try:
+                        subs = PushSubscription.objects.filter(
+                            chauffeur=busje_entry.chauffeur
+                        )
+
+                        if subs.exists():
+                            payload = {
+                                "title": "U bent aan de beurt",
+                                "body": f"Ga naar ophaalzone: {busje_entry.queue.pickup_zone.name}",
+                                "url": f"/queueing/queue/{busje_entry.uuid}/",
+                                "tag": f"queue-{busje_entry.queue.id}",
+                                "vibrate": [300, 100, 300],
+                                "data": {
+                                    "url": f"/queueing/queue/{busje_entry.uuid}/",
+                                },
+                            }
+
+                            for s in subs:
+                                send_web_push(
+                                    s.subscription_info, payload
+                                )
+                                logger.info(
+                                    f"Push notification sent to {busje_entry.chauffeur.license_plate}"
+                                )
+                        else:
+                            logger.warning(
+                                f"No push subscriptions found for chauffeur {busje_entry.chauffeur.license_plate}"
+                            )
+
+                    except ProgrammingError:
+                        logger.warning(
+                            "PushSubscription table does not exist yet"
+                        )
+
+                except Exception as push_exc:
+                    logger.exception(
+                        f"Failed to send web-push for busje_entry {busje_entry.id}: {push_exc}"
+                    )
+
+                return JsonResponse({"success": True, "message": "Busje chauffeur notified!"})
+            else:
+                return JsonResponse({"success": False, "error": "No busje chauffeur found in queue."})
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)}, status=400)
