@@ -29,7 +29,7 @@ class Chauffeur(models.Model):
         User, on_delete=models.CASCADE, related_name="chauffeur"
     )
     license_plate = models.CharField(max_length=10)
-    taxi_license_number = models.CharField(max_length=100, unique=True)  # RTX-nummer
+    taxi_license_number = models.CharField(max_length=100)  # RTX-nummer
     vehicle_type = models.CharField(
         max_length=10,
         choices=VehicleType.choices,

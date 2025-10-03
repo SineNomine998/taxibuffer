@@ -99,7 +99,7 @@ class ChauffeurLoginView(View):
             return redirect("queueing:chauffeur_login")
 
         if not self.validate_taxi_license_format(taxi_license_number):
-            messages.error(request, "Invalid RTX number format.")
+            messages.error(request, "Invalid RTX number format.", extra_tags="RTX")
             return redirect("queueing:chauffeur_login")
 
         try:

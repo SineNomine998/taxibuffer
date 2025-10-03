@@ -252,7 +252,7 @@
                     <div class="input-wrap">
                         <label for="taxi_license_number">RTX-nummer</label>
                         <input type="text" id="taxi_license_number" name="taxi_license_number" required
-                            placeholder="P12345" value="{{ form_data.taxi_license_number|default:'' }}"
+                            placeholder="1234" value="{{ form_data.taxi_license_number|default:'' }}"
                             maxlength="20" />
                     </div>
                     <button type="submit" class="btn-login">Login</button>
@@ -313,36 +313,41 @@
                     return;
                 }
 
+                // NOT DOING LICENSE PLATE CHECK ANYMORE AS THERE SEEMS TO BE TOO MANY VARIATIONS
                 // Basic Dutch license plate patterns
-                const patterns = [
-                    /^[A-Z]{2}-\d{2}-\d{2}$/,  // XX - 99 - 99
-                    /^\d{2}-\d{2}-[A-Z]{2}$/,  // 99 - 99 - XX
-                    /^[A-Z]{2}-\d{2}-[A-Z]{2}$/,  // XX - 99 - XX
-                    /^\d{2}-[A-Z]{2}-\d{2}$/,  // 99 - XX - 99
-                    /^[A-Z]{2}-[A-Z]{2}-\d{2}$/,  // XX - XX - 99
-                    /^\d{2}-[A-Z]{2}-[A-Z]{2}$/,  // 99 - XX - XX
-                    /^[A-Z]{1}-\d{3}-[A-Z]{2}$/,  // X - 999 - XX
-                    /^[A-Z]{2}-\d{3}-[A-Z]{1}$/,  // XX - 999 - X
-                    /^\d{3}-[A-Z]{2}-[A-Z]{1}$/,  // 999 - XX - X
-                    /^\d{3}-[A-Z]{1}-[A-Z]{2}$/,  // 999 - X - XX
-                    /^\d{1,2}-[A-Z]{2,3}-\d{1,2}$/,  // 1-ABC-23
-                    /^\d{3}-[A-Z]{2}-\d{1,2}$/,  // 123-AB-1
-                    /^[A-Z]{3}-\d{2}-\d{1,2}$/,  // ABC-12-3
-                ];
-                const validPlate = patterns.some((regex) => regex.test(licensePlate));
+                // const patterns = [
+                //     /^[A-Z]{2}-\d{2}-\d{2}$/,  // XX - 99 - 99
+                //     /^\d{2}-\d{2}-[A-Z]{2}$/,  // 99 - 99 - XX
+                //     /^[A-Z]{2}-\d{2}-[A-Z]{2}$/,  // XX - 99 - XX
+                //     /^\d{2}-[A-Z]{2}-\d{2}$/,  // 99 - XX - 99
+                //     /^[A-Z]{2}-[A-Z]{2}-\d{2}$/,  // XX - XX - 99
+                //     /^\d{2}-[A-Z]{2}-[A-Z]{2}$/,  // 99 - XX - XX
+                //     /^[A-Z]{1}-\d{3}-[A-Z]{2}$/,  // X - 999 - XX
+                //     /^[A-Z]{2}-\d{3}-[A-Z]{1}$/,  // XX - 999 - X
+                //     /^\d{3}-[A-Z]{2}-[A-Z]{1}$/,  // 999 - XX - X
+                //     /^\d{3}-[A-Z]{1}-[A-Z]{2}$/,  // 999 - X - XX
+                //     /^\d{1,2}-[A-Z]{2,3}-\d{1,2}$/,  // 1-ABC-23
+                //     /^\d{3}-[A-Z]{2}-\d{1,2}$/,  // 123-AB-1
+                //     /^[A-Z]{3}-\d{2}-\d{1,2}$/,  // ABC-12-3
+                // ];
+                // const validPlate = patterns.some((regex) => regex.test(licensePlate));
 
-                if (!validPlate) {
-                    title = "Ongeldig kenteken";
-                    message = "Vul een geldig Nederlands kenteken in (bijv. 1-ABC-23).";
-                    fireSwal(title, message);
-                    return;
-                }
+                // if (!validPlate) {
+                //     title = "Ongeldig kenteken";
+                //     message = "Vul een geldig Nederlands kenteken in (bijv. 1-ABC-23).";
+                //     fireSwal(title, message);
+                //     return;
+                // }
 
                 form.submit();
             });
             {% for message in messages %}
             let title = "Toegang Geweigerd";
-            let errorMessage = "Het ingevoerde kenteken of RTX-nummer is al in gebruik en verbonden met een ander kenteken of RTX-nummer. Controleer uw invoer of neem contact op met de administratie.";
+            {% if message.extra_tags == 'RTX' %}
+            let errorMessage = "Ongeldig RTX-nummer. Probeer het opnieuw.";
+            {% else %}
+            let errorMessage = "{{ message }}"; // just in case bro
+            {% endif %}
             fireSwal(title, errorMessage);
             {% endfor %}
         });
