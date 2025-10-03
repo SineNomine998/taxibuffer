@@ -153,6 +153,12 @@ class QueueMonitorView(LoginRequiredMixin, View):
             dequeued_at__gte=today_start_utc,
         ).order_by("-dequeued_at")[:20]
 
+        total_dequeued_count = QueueEntry.objects.filter(
+            queue=queue,
+            status=QueueEntry.Status.DEQUEUED,
+            dequeued_at__gte=today_start_utc,
+        ).count()
+
         context = {
             "queue": queue,
             "waiting_entries": waiting_entries,
@@ -160,7 +166,7 @@ class QueueMonitorView(LoginRequiredMixin, View):
             "dequeued_entries": dequeued_entries,
             "waiting_count": waiting_entries.count(),
             "notified_count": notified_entries.count(),
-            "dequeued_count": dequeued_entries.count(),
+            "dequeued_count": total_dequeued_count,
         }
         return render(request, "control_panel/queue_monitor.html", context)
 
@@ -189,7 +195,7 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
                 pytz.UTC
             )  # Convert back to UTC for DB query
 
-            # Filter for today's entries only
+            # Filter for today's entries only (important)
             waiting_entries = list(
                 queue.get_waiting_entries_control()
                 .filter(created_at__gte=today_start_utc)
@@ -203,7 +209,9 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
                     queue=queue,
                     status=QueueEntry.Status.NOTIFIED,
                     notified_at__gte=today_start_utc,
-                ).values(
+                )
+                .order_by("-notified_at")
+                .values(
                     "id", "uuid", "chauffeur__license_plate", "notified_at", "status"
                 )
             )
@@ -214,11 +222,17 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
                     status=QueueEntry.Status.DEQUEUED,
                     dequeued_at__gte=today_start_utc,
                 )
-                .order_by("-dequeued_at")
+                .order_by("-dequeued_at")[:20]
                 .values(
                     "id", "uuid", "chauffeur__license_plate", "dequeued_at", "status"
-                )[:20]
+                )
             )
+
+            total_dequeued_count = QueueEntry.objects.filter(
+                queue=queue,
+                status=QueueEntry.Status.DEQUEUED,
+                dequeued_at__gte=today_start_utc,
+            ).count()
 
             # Format datetimes for display
             for entry in waiting_entries:
@@ -246,7 +260,7 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
                     "dequeued_entries": dequeued_entries,
                     "waiting_count": len(waiting_entries),
                     "notified_count": len(notified_entries),
-                    "dequeued_count": len(dequeued_entries),
+                    "dequeued_count": total_dequeued_count,
                     "last_updated": last_updated_local.strftime("%H:%M:%S"),
                     "today_date": now_local.strftime("%d-%m-%Y"),
                 }
@@ -267,14 +281,18 @@ class BypassBusjeView(View):
     When an officer triggers this view, the first "busje" in the specified queue is popped
     and notified immediately. (hopefully :crossed_fingers:)
     """
+
     def post(self, request, queue_id):
         try:
             queue = get_object_or_404(TaxiQueue, id=queue_id, active=True)
-            busje_entry = queue.queueentry_set.filter(
-                status=QueueEntry.Status.WAITING,
-                chauffeur__vehicle_type="busje"
-            ).order_by("created_at").first()
-            
+            busje_entry = (
+                queue.queueentry_set.filter(
+                    status=QueueEntry.Status.WAITING, chauffeur__vehicle_type="busje"
+                )
+                .order_by("created_at")
+                .first()
+            )
+
             if busje_entry:
                 busje_entry.notify()
                 try:
@@ -296,9 +314,7 @@ class BypassBusjeView(View):
                             }
 
                             for s in subs:
-                                send_web_push(
-                                    s.subscription_info, payload
-                                )
+                                send_web_push(s.subscription_info, payload)
                                 logger.info(
                                     f"Push notification sent to {busje_entry.chauffeur.license_plate}"
                                 )
@@ -308,17 +324,19 @@ class BypassBusjeView(View):
                             )
 
                     except ProgrammingError:
-                        logger.warning(
-                            "PushSubscription table does not exist yet"
-                        )
+                        logger.warning("PushSubscription table does not exist yet")
 
                 except Exception as push_exc:
                     logger.exception(
                         f"Failed to send web-push for busje_entry {busje_entry.id}: {push_exc}"
                     )
 
-                return JsonResponse({"success": True, "message": "Busje chauffeur notified!"})
+                return JsonResponse(
+                    {"success": True, "message": "Busje chauffeur notified!"}
+                )
             else:
-                return JsonResponse({"success": False, "error": "No busje chauffeur found in queue."})
+                return JsonResponse(
+                    {"success": False, "error": "No busje chauffeur found in queue."}
+                )
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)}, status=400)
