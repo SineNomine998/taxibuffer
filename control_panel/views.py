@@ -139,7 +139,9 @@ class QueueMonitorView(LoginRequiredMixin, View):
         # Get chauffeurs in different states - FILTERED FOR TODAY
         waiting_entries = queue.get_waiting_entries_control().filter(
             created_at__gte=today_start_utc
-        )
+        )[:10]
+
+        total_waiting_count = waiting_entries.count()
 
         notified_entries = QueueEntry.objects.filter(
             queue=queue,
@@ -164,7 +166,7 @@ class QueueMonitorView(LoginRequiredMixin, View):
             "waiting_entries": waiting_entries,
             "notified_entries": notified_entries,
             "dequeued_entries": dequeued_entries,
-            "waiting_count": waiting_entries.count(),
+            "waiting_count": total_waiting_count,
             "notified_count": notified_entries.count(),
             "dequeued_count": total_dequeued_count,
         }
@@ -201,7 +203,13 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
                 .filter(created_at__gte=today_start_utc)
                 .values(
                     "id", "uuid", "chauffeur__license_plate", "created_at", "status"
-                )
+                )[:10]
+            )
+
+            total_waiting_count = (
+                queue.get_waiting_entries_control()
+                .filter(created_at__gte=today_start_utc)
+                .count()
             )
 
             notified_entries = list(
@@ -258,7 +266,7 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
                     "waiting_entries": waiting_entries,
                     "notified_entries": notified_entries,
                     "dequeued_entries": dequeued_entries,
-                    "waiting_count": len(waiting_entries),
+                    "waiting_count": total_waiting_count,
                     "notified_count": len(notified_entries),
                     "dequeued_count": total_dequeued_count,
                     "last_updated": last_updated_local.strftime("%H:%M:%S"),
