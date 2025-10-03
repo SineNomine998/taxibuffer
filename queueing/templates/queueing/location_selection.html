@@ -64,6 +64,23 @@
       gap: 12px;
     }
 
+    .info-icon {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #000000;
+      border: 2px solid #000000;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
     .logo-wrap {
       background: transparent;
       border-radius: 8px;
@@ -303,6 +320,7 @@
   <div class="app" role="main" aria-label="Taxibuffer app">
 
     <header class="header" role="banner">
+      <div class="info-icon" id="helpBtn" aria-label="Help">i</div>
 
       <div class="brand">
         <div class="logo-wrap" aria-hidden="true">
@@ -442,18 +460,9 @@
     }
 
     function showHelp() {
-      const helpModal = document.getElementById('helpModal');
-      if (helpModal) {
-        helpModal.style.display = 'flex';
-      }
+      window.location.href = "{% url 'queueing:location_selection_info' %}";
     }
 
-    function hideHelp() {
-      const helpModal = document.getElementById('helpModal');
-      if (helpModal) {
-        helpModal.style.display = 'none';
-      }
-    }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script>
@@ -494,16 +503,12 @@
             });
           }
         }).then(() => {
-          if(!Swal.isVisible()) resolve(null);
+          if (!Swal.isVisible()) resolve(null);
         }).catch(err => {
           reject(err);
         });
       });
     }
-
-    // document.addEventListener('DOMContentLoaded', function () {
-    //   showVehicleTypeDialog();
-    // });
 
     function setVehicleType(vt) {
       return fetch("{% url 'queueing:set_vehicle_type' %}", {

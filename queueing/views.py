@@ -173,6 +173,11 @@ class ChauffeurLoginView(View):
         return bool(re.fullmatch(pattern, taxi_license))
 
 
+class LocationSelectionInfoView(View):
+    def get(self, request):
+        return render(request, "queueing/location_selection_info.html")
+
+
 class QueueStatusView(View):
     """Display queue status for a specific chauffeur."""
 

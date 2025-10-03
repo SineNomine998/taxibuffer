@@ -11,6 +11,7 @@ urlpatterns = [
     path(
         "locations/", views.LocationSelectionView.as_view(), name="location_selection"
     ),
+    path("locations/info/", views.LocationSelectionInfoView.as_view(), name="location_selection_info"),
     # Queue status and management
     path(
         "queue/<uuid:entry_uuid>/", views.QueueStatusView.as_view(), name="queue_status"

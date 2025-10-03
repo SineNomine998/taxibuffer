@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    {% load static %}
+    <title>TAXIBUFFER - Locatie Selecteren</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gold-1: #E0BD22;
+            --gold-2: #FEF508;
+            --bg: #F6F6FC;
+            --muted: #666666;
+            --max-width: 420px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+            -webkit-font-smoothing: antialiased;
+            background: #eceff4;
+            min-height: 100vh;
+        }
+
+        .app {
+            width: 100%;
+            max-width: var(--max-width);
+            min-height: 100vh;
+            background: var(--bg);
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .header {
+            background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            min-height: 110px;
+            flex-shrink: 0;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-wrap {
+            background: transparent;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-wrap img {
+            display: block;
+            width: auto;
+            max-height: 28px;
+        }
+
+        .brand-text {
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: #333;
+            font-size: clamp(18px, 4vw, 20px);
+            white-space: nowrap;
+        }
+
+        .content {
+            padding: 18px;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            flex: 1;
+            padding-bottom: 84px;
+        }
+
+        .info-title {
+            font-size: clamp(20px, 5vw, 22px);
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 12px;
+        }
+
+        .content p {
+            font-size: 16px;
+            color: #4b4b4b;
+            line-height: 1.5;
+            margin-bottom: 16px;
+        }
+
+        .back-button {
+            display: inline-block;
+            text-decoration: none;
+            text-align: center;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            background: #fff;
+            color: #444;
+            padding: 12px 26px;
+            border-radius: 22px;
+            font-weight: 700;
+            font-size: clamp(13px, 3.5vw, 14px);
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .footer {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 54px;
+            background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+            padding: 12px 16px;
+            text-align: center;
+            font-size: clamp(12px, 2.5vw, 12px);
+            color: #595959;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app" role="main" aria-label="Taxibuffer app">
+        <header class="header" role="banner">
+            <div class="brand">
+                <div class="logo-wrap" aria-hidden="true">
+                    <img src="{% static 'queueing/assets/logo.svg' %}" alt="Taxibuffer logo"
+                        onerror="this.style.display='none'">
+                </div>
+                <div class="brand-text">TAXIBUFFER</div>
+            </div>
+        </header>
+
+        <main class="content" role="main">
+            <section>
+                <div class="info-title">Informatie</div>
+                <p><strong>Wanneer kan ik me aanmelden?</strong><br>
+                    Alleen als je in de bufferzone staat. Dit gebeurt automatisch via je locatie.</p>
+                <p><strong>Hoe werkt de oproep?</strong><br>
+                    Zodra er plek is bij de pier, krijg je een melding. Je kan dan doorrijden naar de ophaallocatie.</p>
+                <p><strong>Wat als ik niet reageer op de oproep?</strong><br>
+                    Je verliest je plek in de wachtrij en moet opnieuw aanmelden.</p>
+                <p><strong>Is het gratis?</strong><br>
+                    Ja, het gebruik is gratis.</p>
+            </section>
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="{% url 'queueing:location_selection' %}" class="back-button">Ga terug</a>
+            </div>
+        </main>
+
+        <footer class="footer" role="contentinfo">
+            Coding the Curbs® in samenwerking met Gemeente Rotterdam
+        </footer>
+    </div>
+</body>
+
+</html>
