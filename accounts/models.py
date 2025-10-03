@@ -40,7 +40,7 @@ class Chauffeur(models.Model):
     location = models.PointField(null=True, blank=True, srid=4326)
 
     def __str__(self):
-        return f"License plate: {self.license_plate} (taxi: {self.taxi_license_number})"
+        return f"License plate: {self.license_plate} (RTX-nummer: {self.taxi_license_number})"
 
 
 class Officer(models.Model):

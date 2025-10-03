@@ -140,31 +140,37 @@ class ChauffeurLoginView(View):
 
     def validate_license_plate_format(self, license_plate):
         """Validate license plate format (basic validation)."""
+        return True
 
         # TODO: Double check the Dutch license plate formats: 1-ABC-23, AB-123-C, etc.
-        patterns = [
-            r"^[A-Z]{2}-\d{2}-\d{2}$",  # XX-99-99
-            r"^\d{2}-\d{2}-[A-Z]{2}$",  # 99-99-XX
-            r"^[A-Z]{2}-\d{2}-[A-Z]{2}$",  # XX-99-XX
-            r"^\d{2}-[A-Z]{2}-\d{2}$",  # 99-XX-99
-            r"^[A-Z]{2}-[A-Z]{2}-\d{2}$",  # XX-XX-99
-            r"^\d{2}-[A-Z]{2}-[A-Z]{2}$",  # 99-XX-XX
-            r"^[A-Z]{1}-\d{3}-[A-Z]{2}$",  # X-999-XX
-            r"^[A-Z]{2}-\d{3}-[A-Z]{1}$",  # XX-999-X
-            r"^\d{3}-[A-Z]{2}-[A-Z]{1}$",  # 999-XX-X
-            r"^\d{3}-[A-Z]{1}-[A-Z]{2}$",  # 999-X-XX
-            r"^\d{1,2}-[A-Z]{2,3}-\d{1,2}$",  # 1-ABC-23
-            r"^\d{3}-[A-Z]{2}-\d{1,2}$",  # 123-AB-1
-            r"^[A-Z]{3}-\d{2}-\d{1,2}$",  # ABC-12-3
-        ]
-        return any(re.match(pattern, license_plate) for pattern in patterns)
+        # Apparently, there are quite a few valid formats (excluding these ones), so for now we don't check the format at all
+        # patterns = [
+        #     r"^[A-Z]{2}-\d{2}-\d{2}$",  # XX-99-99
+        #     r"^\d{2}-\d{2}-[A-Z]{2}$",  # 99-99-XX
+        #     r"^[A-Z]{2}-\d{2}-[A-Z]{2}$",  # XX-99-XX
+        #     r"^\d{2}-[A-Z]{2}-\d{2}$",  # 99-XX-99
+        #     r"^[A-Z]{2}-[A-Z]{2}-\d{2}$",  # XX-XX-99
+        #     r"^\d{2}-[A-Z]{2}-[A-Z]{2}$",  # 99-XX-XX
+        #     r"^[A-Z]{1}-\d{3}-[A-Z]{2}$",  # X-999-XX
+        #     r"^[A-Z]{2}-\d{3}-[A-Z]{1}$",  # XX-999-X
+        #     r"^\d{3}-[A-Z]{2}-[A-Z]{1}$",  # 999-XX-X
+        #     r"^\d{3}-[A-Z]{1}-[A-Z]{2}$",  # 999-X-XX
+        #     r"^\d{1,2}-[A-Z]{2,3}-\d{1,2}$",  # 1-ABC-23
+        #     r"^\d{3}-[A-Z]{2}-\d{1,2}$",  # 123-AB-1
+        #     r"^[A-Z]{3}-\d{2}-\d{1,2}$",  # ABC-12-3
+        # ]
+        # return any(re.match(pattern, license_plate) for pattern in patterns)
 
-    # TODO: Validate RTX numbers with a proper pattern if available in the future (if necessary)
     def validate_taxi_license_format(self, taxi_license):
-        """Validate taxi license format (basic validation)."""
-        return True
-        # Basic format: letters and numbers, 3-20 characters
-        return re.match(r"^[A-Z0-9]{3,20}$", taxi_license) is not None
+        """Validate taxi license format.
+
+            Allowed formats:
+                - DDDD      (4 digits)
+                - DDDDD     (5 digits)
+                - DDDD-XD   (4 digits, a dash, one letter, one digit)
+        """
+        pattern = r"^(?:\d{4}|\d{5}|\d{4}-[A-Za-z]\d)$"
+        return bool(re.fullmatch(pattern, taxi_license))
 
 
 class QueueStatusView(View):

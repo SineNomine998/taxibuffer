@@ -368,7 +368,16 @@
         button.addEventListener('click', function (e) {
           e.stopPropagation();
           const queueId = this.getAttribute('data-queue-id');
-          selectAndSubmit(queueId, e);
+          showVehicleTypeDialog().then(vehicleType => {
+            setVehicleType(vehicleType).then(() => {
+              selectAndSubmit(queueId, e);
+            }).catch(err => {
+              console.error("Could not set vehicle type:", err);
+              alert("Er is een fout opgetreden bij het instellen van het voertuigtype. Probeer het opnieuw.");
+            });
+          }).catch(() => {
+            console.log("User closed the pop-up without selecting a vehicle type.");
+          })
         });
       });
 
@@ -448,63 +457,74 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script>
-  function showVehicleTypeDialog() {
-    const autoText = "Auto";
-    const busjeText = "Busje";
-    const message = "Heb je een groot voertuig voor meer dan 3 personen, geef dat dan aan.";
-    return Swal.fire({
-      title: 'Kies je voertuig',
-      html: `<div>
-                  <img src="{% static 'queueing/assets/warning-badge.svg' %}" alt="Warning" 
-                      style="max-width:80px;max-height:80px;width:100%;height:auto;">
-                  </div>` + `<div style="margin-top:8px; margin-bottom:32px">${message}</div>` +
-        `<div style="display: flex; flex-direction: column; gap: 12px;">
+    function showVehicleTypeDialog() {
+      return new Promise((resolve, reject) => {
+
+        const autoText = "Auto";
+        const busjeText = "Busje";
+        const message = "Heb je een groot voertuig voor meer dan 3 personen, geef dat dan aan.";
+        Swal.fire({
+          title: 'Kies je voertuig',
+          html: `<div>
+        <img src="{% static 'queueing/assets/warning-badge.svg' %}" alt="Warning" 
+        style="max-width:80px;max-height:80px;width:100%;height:auto;">
+        </div>` + `<div style="margin-top:8px; margin-bottom:32px">${message}</div>` +
+            `<div style="display: flex; flex-direction: column; gap: 12px;">
           <button id="confirmBtn" class="swal2-confirm" style="width: 100%;">Auto</button>
           <button id="cancelBtn" class="swal2-cancel" style="width: 100%;">Busje</button>
-        </div>`,
-      showConfirmButton: false,
-      showCancelButton: false,
-      allowOutsideClick: false,
-      customClass: {
-        popup: 'notification-popup',
-        confirmButton: 'notification-accept-btn',
-        cancelButton: 'notification-decline-btn'
-      },
-      didOpen: () => {
-        document.getElementById('confirmBtn').addEventListener('click', function () {
-          setVehicleType('auto');
-          Swal.close();
+          </div>`,
+          showConfirmButton: false,
+          showCancelButton: false,
+          allowOutsideClick: false,
+          customClass: {
+            popup: 'notification-popup',
+            confirmButton: 'notification-accept-btn',
+            cancelButton: 'notification-decline-btn'
+          },
+          didOpen: () => {
+            document.getElementById('confirmBtn').addEventListener('click', function () {
+              // setVehicleType('auto');
+              Swal.close();
+              resolve('auto');
+            });
+            document.getElementById('cancelBtn').addEventListener('click', function () {
+              // setVehicleType('busje');
+              Swal.close();
+              resolve('busje');
+            });
+          }
+        }).then(() => {
+          if(!Swal.isVisible()) resolve(null);
+        }).catch(err => {
+          reject(err);
         });
-        document.getElementById('cancelBtn').addEventListener('click', function () {
-          setVehicleType('busje');
-          Swal.close();
-        });
-      }
-    });
-  }
-
-  document.addEventListener('DOMContentLoaded', function () {
-    showVehicleTypeDialog();
-  });
-
-  function setVehicleType(vt) {
-    fetch("{% url 'queueing:set_vehicle_type' %}", {
-      method: "POST",
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': '{{ csrf_token }}'
-      },
-      body: JSON.stringify({ vehicle_type: vt })
-    }).then(r => r.json())
-      .then(j => {
-        if (j.success) {
-          console.log("Vehicle type set to:", vt);
-        } else {
-          Swal.fire({ icon: 'error', title: 'Fout', text: j.error });
-        }
       });
-  }
-</script>
+    }
+
+    // document.addEventListener('DOMContentLoaded', function () {
+    //   showVehicleTypeDialog();
+    // });
+
+    function setVehicleType(vt) {
+      return fetch("{% url 'queueing:set_vehicle_type' %}", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ vehicle_type: vt })
+      }).then(r => r.json())
+        .then(j => {
+          if (j.success) {
+            console.log("Vehicle type set to:", vt);
+            return Promise.resolve();
+          } else {
+            // Swal.fire({ icon: 'error', title: 'Fout', text: j.error });
+            return Promise.reject(j.error);
+          }
+        });
+    }
+  </script>
 </body>
 
 </html>
