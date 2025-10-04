@@ -284,6 +284,24 @@ def is_officer(user):
 
 
 @method_decorator(user_passes_test(is_officer), name="dispatch")
+class PauseQueueView(View):
+    """Toggle pause state for a specific queue"""
+
+    def post(self, request, queue_id):
+        queue = get_object_or_404(TaxiQueue, id=queue_id)
+        action = request.POST.get('action')  # 'pause' or 'resume'
+        if action == 'pause':
+            queue.notifications_paused = True
+            queue.save(update_fields=['notifications_paused'])
+        elif action == 'resume':
+            queue.notifications_paused = False
+            queue.save(update_fields=['notifications_paused'])
+        else:
+            return JsonResponse({"success": False, "error": "invalid action"}, status=400)
+        return JsonResponse({"success": True, "notifications_paused": queue.notifications_paused})
+
+
+@method_decorator(user_passes_test(is_officer), name="dispatch")
 class BypassBusjeView(View):
     """
     When an officer triggers this view, the first "busje" in the specified queue is popped

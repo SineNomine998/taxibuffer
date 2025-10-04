@@ -23,6 +23,7 @@ class TaxiQueue(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=True)
+    notifications_paused = models.BooleanField(default=False, help_text="If true, no new notifications will be sent for this queue.")
 
     class Meta:
         unique_together = ("buffer_zone", "pickup_zone")

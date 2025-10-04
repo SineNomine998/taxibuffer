@@ -81,6 +81,11 @@ class Command(BaseCommand):
                 logger.debug("No TaxiQueue found for pickup_zone %s; skipping", zone_id)
                 continue
 
+            queues = queues.filter(notifications_paused=False)
+            if not queues.exists():
+                logger.info("All queues paused for pickup_zone %s; skipping notifications, Sir!", zone_id)
+                continue
+
             cache_key = f"{CACHE_PREFIX}:{zone_id}"
             cached = cache.get(cache_key)  # expected format: {"free": int, "ts": "iso"}
             last_free = cached.get("free") if cached else None

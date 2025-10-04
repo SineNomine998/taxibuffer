@@ -110,24 +110,86 @@
 
         <button id="bypassBusjeBtn" data-queue-id="{{ queue.id }}">Busje Nodig</button>
         <script>
-        document.getElementById('bypassBusjeBtn').addEventListener('click', function() {
-            const queueId = this.getAttribute('data-queue-id');
-            fetch(`/control/queue/${queueId}/busje/`, {
-            method: "POST",
-            headers: {
-                'X-CSRFToken': '{{ csrf_token }}'
-            }
-            }).then(r => r.json())
-            .then(data => {
-                if(data.success) {
-                alert(data.message);
-                } else {
-                alert("Error: " + data.error);
-                }
+            document.getElementById('bypassBusjeBtn').addEventListener('click', function () {
+                const queueId = this.getAttribute('data-queue-id');
+                fetch(`/control/queue/${queueId}/busje/`, {
+                    method: "POST",
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    }
+                }).then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message);
+                        } else {
+                            alert("Error: " + data.error);
+                        }
+                    });
             });
-        });
         </script>
 
+        <form id="pauseForm{{ queue.id }}" class="pause-form" method="post" onsubmit="return false;">
+            {% csrf_token %}
+            <button type="button" id="pauseBtn{{ queue.id }}" class="btn btn-warning" style="margin-top: 15px;"
+                data-paused="{{ queue.notifications_paused|yesno:'1,0' }}"
+                aria-pressed="{{ queue.notifications_paused|yesno:'true,false' }}"
+                onclick="togglePause({{ queue.id }})">
+                {{ queue.notifications_paused|yesno:"Resume,Pause" }}
+            </button>
+        </form>
+
+        <script>
+            function getCookie(name) {
+                const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+                return v ? v.pop() : '';
+            }
+
+            async function togglePause(queueId) {
+                const btn = document.getElementById('pauseBtn' + queueId);
+                if (!btn) {
+                    console.error('Pause button not found for queue', queueId);
+                    return;
+                }
+
+                const pausedNow = btn.dataset.paused === '1';
+                const action = pausedNow ? 'resume' : 'pause';
+                const url = `/control/queue/${queueId}/toggle-pause/`;
+
+                btn.disabled = true;
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCookie('csrftoken'),
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                        },
+                        body: 'action=' + encodeURIComponent(action)
+                    });
+
+                    if (!response.ok) {
+                        const text = await response.text();
+                        throw new Error('HTTP ' + response.status + ': ' + text);
+                    }
+
+                    const data = await response.json();
+                    if (!data || data.success !== true) {
+                        throw new Error(data && data.error ? data.error : 'Unexpected response');
+                    }
+
+                    const isPaused = !!data.notifications_paused;
+                    btn.dataset.paused = isPaused ? '1' : '0';
+                    btn.setAttribute('aria-pressed', isPaused ? 'true' : 'false');
+                    btn.textContent = isPaused ? 'Resume' : 'Pause';
+
+                } catch (err) {
+                    console.error('Toggle pause failed', err);
+                    alert('Kon de actie niet uitvoeren: ' + err.message);
+                } finally {
+                    btn.disabled = false;
+                }
+            }
+        </script>
 
         <div class="row mt-4">
             <div class="col-md-4">
