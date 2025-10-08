@@ -340,6 +340,9 @@
         <div class="cards" aria-live="polite">
           {% if queues %}
           <form method="post" id="locationForm">{% csrf_token %}
+            <input type="hidden" name="signup_lat" id="signup_lat" value="">
+            <input type="hidden" name="signup_lng" id="signup_lng" value="">
+            <input type="hidden" name="selected_queue_id" id="selectedQueueId">
             {% for queue in queues %}
             <div class="location-card" data-queue-id="{{ queue.id }}">
               <div class="location-image" aria-hidden="true">
@@ -360,7 +363,6 @@
               </div>
             </div>
             {% endfor %}
-            <input type="hidden" name="selected_queue_id" id="selectedQueueId">
           </form>
           {% else %}
           <div class="no-locations">
@@ -379,109 +381,181 @@
     <footer class="footer" role="contentinfo">Coding the Curbs® in samenwerking met Gemeente Rotterdam</footer>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script>
+    function fireSwal(title, message) {
+      Swal.fire({
+        title: title,
+        html: `
+        <div style="text-align: center; margin-bottom: 15px;">
+          <div>
+            <img src="{% static 'queueing/assets/pop-up-denied.svg' %}" 
+                 alt="Denied" 
+                 style="max-width:80px;max-height:80px;width:100%;height:auto;">
+          </div>
+          <div style="font-size: 16px; margin-top: 10px; color: #333;">${message || 'Er is een fout opgetreden.'}</div>
+        </div>
+      `,
+        confirmButtonText: 'Sluiten',
+        confirmButtonColor: '#E0BD22'
+      });
+    }
+
+    function getLocation(options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }) {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          return reject(new Error('Geolocation not supported by this browser'));
+        }
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      });
+    }
+
+    {% for message in messages %}
+    title = "Geweigerd";
+    {% if message.extra_tags == 'geofence' %}
+    console.log("Geofence message:", "{{ message }}");
+    errorMessage = "{{ message }}";
+    {% else %}
+    console.log("General message:", "{{ message }}");
+    errorMessage = "{{ message }}";
+    {% endif %}
+    fireSwal(title, errorMessage);
+    {% endfor %}
+
+    async function askAndSubmit(queueId, evt) {
+      if (evt && evt.stopPropagation) evt.stopPropagation();
+
+      const form = document.getElementById('locationForm');
+      const latInput = document.getElementById('signup_lat');
+      const lngInput = document.getElementById('signup_lng');
+      const selectedQueueInput = document.getElementById('selectedQueueId');
+
+      if (selectedQueueInput) selectedQueueInput.value = queueId;
+
+      let clickedButton = evt && evt.currentTarget
+        ? evt.currentTarget
+        : document.querySelector(`.register-button[data-queue-id="${queueId}"]`);
+
+      let originalText = "";
+      if (clickedButton) {
+        originalText = clickedButton.textContent;
+        clickedButton.disabled = true;
+        clickedButton.textContent = 'Bezig...';
+      }
+
+      let pos;
+      try {
+        pos = await getLocation();
+      } catch (locErr) {
+        console.error('Geolocation error:', locErr);
+        fireSwal("Locatie Fout", locErr.code === locErr.PERMISSION_DENIED ?
+          "Locatie-toestemming geweigerd. Schakel locatievoorziening in en probeer opnieuw." :
+          "Kon uw locatie niet bepalen. Controleer uw apparaatinstellingen en probeer opnieuw.");
+        if (clickedButton) {
+          clickedButton.disabled = false;
+          clickedButton.textContent = originalText;
+        }
+        return;
+      }
+
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      if (latInput) latInput.value = lat;
+      if (lngInput) lngInput.value = lng;
+
+      try {
+        const validateResponse = await fetch("{% url 'geofence:validate_location' %}", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": "{{ csrf_token }}"
+          },
+          body: JSON.stringify({ lat: lat, lng: lng, selected_queue_id: queueId })
+        });
+        const validateResult = await validateResponse.json();
+        if (!validateResult.is_valid) {
+          fireSwal("Geweigerd", validateResult.error_message || "U bevindt zich niet in de bufferzone.");
+          if (clickedButton) {
+            clickedButton.disabled = false;
+            clickedButton.textContent = originalText;
+          }
+          return;
+        }
+      } catch (validationError) {
+        console.error("Location validation error:", validationError);
+        fireSwal("Fout", "Kon de locatie niet valideren. Probeer het opnieuw.");
+        if (clickedButton) {
+          clickedButton.disabled = false;
+          clickedButton.textContent = originalText;
+        }
+        return;
+      }
+
+      // Only after successful validation, ask for vehicle type
+      try {
+        const vehicleType = await showVehicleTypeDialog();
+        if (!vehicleType) {
+          if (clickedButton) {
+            clickedButton.disabled = false;
+            clickedButton.textContent = originalText;
+          }
+          return;
+        }
+        await setVehicleType(vehicleType);
+        console.log("Vehicle type set, submitting form.");
+        form.submit();
+      } catch (err) {
+        console.error("Error setting vehicle type:", err);
+        fireSwal("Fout", err || "Er is een fout opgetreden bij het instellen van het voertuigtype. Probeer het opnieuw.");
+      } finally {
+        if (clickedButton) {
+          clickedButton.disabled = false;
+          clickedButton.textContent = originalText;
+        }
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
       const registerButtons = document.querySelectorAll('.register-button[data-queue-id]');
       registerButtons.forEach(button => {
-        button.addEventListener('click', function (e) {
-          e.stopPropagation();
+        button.addEventListener('click', function (evt) {
           const queueId = this.getAttribute('data-queue-id');
-          showVehicleTypeDialog().then(vehicleType => {
-            setVehicleType(vehicleType).then(() => {
-              selectAndSubmit(queueId, e);
-            }).catch(err => {
-              console.error("Could not set vehicle type:", err);
-              alert("Er is een fout opgetreden bij het instellen van het voertuigtype. Probeer het opnieuw.");
-            });
-          }).catch(() => {
-            console.log("User closed the pop-up without selecting a vehicle type.");
-          })
-        });
-      });
-
-      const locationCards = document.querySelectorAll('.location-card[data-queue-id]');
-      locationCards.forEach(card => {
-        card.addEventListener('click', function () {
-          const queueId = this.getAttribute('data-queue-id');
-          selectLocation(queueId);
+          askAndSubmit(queueId, evt);
         });
       });
 
       const helpBtn = document.getElementById('helpBtn');
       if (helpBtn) {
-        helpBtn.addEventListener('click', showHelp);
+        helpBtn.addEventListener('click', function () {
+          window.location.href = "{% url 'queueing:location_selection_info' %}";
+        });
       }
 
       const backBtn = document.getElementById('backBtn');
       if (backBtn) {
-        backBtn.addEventListener('click', goBack);
+        backBtn.addEventListener('click', function () {
+          if (confirm('Weet u zeker dat u terug wilt? U moet uw gegevens opnieuw invoeren.')) {
+            window.location.href = "{% url 'queueing:chauffeur_login' %}";
+          }
+        });
       }
-
-      document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') {
-          hideHelp();
-        }
-      });
     });
 
-    function selectAndSubmit(queueId, evt) {
-      if (evt && evt.stopPropagation) {
-        evt.stopPropagation();
-      }
-
-      const form = document.getElementById('locationForm');
-      const input = document.getElementById('selectedQueueId');
-
-      if (input) {
-        input.value = queueId;
-      }
-
-      if (evt && evt.currentTarget) {
-        evt.currentTarget.disabled = true;
-        evt.currentTarget.textContent = 'Bezig...';
-      }
-
-      if (form) {
-        form.submit();
-      }
-    }
-
-    function selectLocation(queueId) {
-      const input = document.getElementById('selectedQueueId');
-      if (input) {
-        input.value = queueId;
-      }
-    }
-
-    function goBack() {
-      if (confirm('Weet u zeker dat u terug wilt? U moet uw gegevens opnieuw invoeren.')) {
-        window.location.href = "{% url 'queueing:chauffeur_login' %}";
-      }
-    }
-
-    function showHelp() {
-      window.location.href = "{% url 'queueing:location_selection_info' %}";
-    }
-
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script>
     function showVehicleTypeDialog() {
       return new Promise((resolve, reject) => {
-
-        const autoText = "Auto";
-        const busjeText = "Busje";
         const message = "Heb je een groot voertuig voor meer dan 3 personen, geef dat dan aan.";
         Swal.fire({
           title: 'Kies je voertuig',
-          html: `<div>
-        <img src="{% static 'queueing/assets/warning-badge.svg' %}" alt="Warning" 
-        style="max-width:80px;max-height:80px;width:100%;height:auto;">
-        </div>` + `<div style="margin-top:8px; margin-bottom:32px">${message}</div>` +
-            `<div style="display: flex; flex-direction: column; gap: 12px;">
-          <button id="confirmBtn" class="swal2-confirm" style="width: 100%;">Auto</button>
-          <button id="cancelBtn" class="swal2-cancel" style="width: 100%;">Busje</button>
-          </div>`,
+          html: `
+          <div style="text-align: center;">
+              <img src="{% static 'queueing/assets/warning-badge.svg' %}" alt="Warning" style="max-width:80px;max-height:80px;width:100%;height:auto;">
+          </div>
+          <div style="margin-top:8px; margin-bottom:32px">${message}</div>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+              <button id="confirmBtn" class="swal2-confirm" style="width: 100%;">Auto</button>
+              <button id="cancelBtn" class="swal2-cancel" style="width: 100%;">Busje</button>
+          </div>
+        `,
           showConfirmButton: false,
           showCancelButton: false,
           allowOutsideClick: false,
@@ -492,12 +566,10 @@
           },
           didOpen: () => {
             document.getElementById('confirmBtn').addEventListener('click', function () {
-              // setVehicleType('auto');
               Swal.close();
               resolve('auto');
             });
             document.getElementById('cancelBtn').addEventListener('click', function () {
-              // setVehicleType('busje');
               Swal.close();
               resolve('busje');
             });
@@ -524,7 +596,6 @@
             console.log("Vehicle type set to:", vt);
             return Promise.resolve();
           } else {
-            // Swal.fire({ icon: 'error', title: 'Fout', text: j.error });
             return Promise.reject(j.error);
           }
         });

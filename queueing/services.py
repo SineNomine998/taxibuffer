@@ -7,8 +7,10 @@ from django.db.models import Avg, F
 import logging
 
 from .models import TaxiQueue, QueueEntry, QueueNotification, PushSubscription
-from accounts.models import Chauffeur
 from .push_views import send_web_push
+from accounts.models import Chauffeur
+from geofence.models import BufferZone
+from geofence.services import point_in_buffer
 
 
 logger = logging.getLogger(__name__)
@@ -17,13 +19,48 @@ logger = logging.getLogger(__name__)
 class QueueService:
     """Service class for handling queue operations and business logic."""
 
-    def mock_geofencing_check(self, location: Point, buffer_zone) -> bool:
+    def geofence_check(
+        self, chauffeur: Chauffeur, signup_location: Point, buffer_zone: BufferZone
+    ) -> tuple:
         """
-        Mock geofencing function for testing.
-        In production, this would check if location is within buffer_zone.zone
-        For now, always returns True.
+        Defensive geofence validation.
+        Returns: (allowed: bool, message: Optional[str])
         """
-        return True
+        if signup_location is None and getattr(chauffeur, "location", None):
+            signup_location = chauffeur.location
+
+        if signup_location is None:
+            logger.warning(
+                "No signup_location for chauffeur %s",
+                getattr(chauffeur, "id", "unknown"),
+            )
+            return (
+                False,
+                "Kon uw locatie niet bepalen. Schakel locatievoorziening in en probeer opnieuw.",
+            )
+
+        try:
+            lat = getattr(signup_location, "y", None)
+            lng = getattr(signup_location, "x", None)
+            if lat is None or lng is None:
+                raise ValueError("Invalid Point object (missing x/y).")
+        except Exception as e:
+            logger.exception("Invalid signup_location Point: %s", e)
+            return False, "Ongeldige locatiegegevens."
+
+        try:
+            allowed = point_in_buffer(buffer_zone, lat, lng, inclusive=True)
+        except Exception as e:
+            logger.exception("Server-side geofence service error: %s", e)
+            allowed = False
+
+        if not allowed:
+            return (
+                False,
+                "U bevindt zich nog niet in de bufferzone. Ga naar de bufferzone om aan te melden.",
+            )
+
+        return True, None
 
     def add_chauffeur_to_queue(
         self, chauffeur: Chauffeur, queue: TaxiQueue, signup_location: Point
@@ -43,7 +80,6 @@ class QueueService:
                     chauffeur=chauffeur,
                     status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
                 ).first()
-                print("\nDEBUG Existing entry:", existing_entry, "\n")
 
                 if existing_entry:
                     return (
@@ -52,11 +88,13 @@ class QueueService:
                         existing_entry.uuid,
                     )
 
-                # Mock geofencing check
-                if not self.mock_geofencing_check(signup_location, queue.buffer_zone):
+                allowed, err_msg = self.geofence_check(
+                    chauffeur, signup_location, queue.buffer_zone
+                )
+                if not allowed:
                     return (
                         False,
-                        "You must be in the buffer zone to join the queue.",
+                        err_msg or "You must be in the buffer zone to join the queue.",
                         None,
                     )
 
@@ -256,7 +294,7 @@ class QueueService:
         timeout_count = 0
 
         try:
-            # TODO! Remove old logic (safely :pray:) 
+            # TODO! Remove old logic (safely :pray:)
             # Get all pending notifications that have expired
             queryset = QueueNotification.objects.filter(
                 response=QueueNotification.ResponseType.PENDING

@@ -29,6 +29,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("queueing/", include("queueing.urls")),
     path("control/", include("control_panel.urls")),
+    path("geofence/", include("geofence.urls")),
     path("", InfoPagesView.as_view(), name="info_pages"),
     path("sw.js", service_worker, name="service_worker"),
     path("", include("sensors.urls")),

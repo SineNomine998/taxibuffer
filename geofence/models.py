@@ -1,8 +1,8 @@
 from django.contrib.gis.db import models
 import uuid
-from django.contrib.gis.geos import Point
 from channels.db import database_sync_to_async
 from django.db.models import Subquery, OuterRef
+from .services import point_in_buffer
 
 # Create your models here.
 
@@ -15,9 +15,9 @@ class BufferZone(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=True)
 
-    def is_taxi_nearby(self, taxi_location: Point) -> bool:
-        """Check if a taxi is within the buffer zone."""
-        return self.zone.contains(taxi_location)
+    def contains_lat_lang(self, latitude: float, longitude: float, inclusive: bool = True) -> bool:
+        """Conveniece wrapper: returns True if (latitude, longitude) is inside the buffer zone."""
+        return point_in_buffer(self, latitude, longitude, inclusive=inclusive)
 
 
 class PickupZone(models.Model):

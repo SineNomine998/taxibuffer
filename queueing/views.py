@@ -7,6 +7,7 @@ from django.views import View
 from django.urls import reverse
 from django.contrib.gis.geos import Point
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 from django.db import transaction
 import json
 from django.conf import settings
@@ -18,6 +19,7 @@ import logging
 from accounts.models import Chauffeur, User
 from .models import TaxiQueue, QueueEntry, QueueNotification
 from .services import QueueService
+from geofence.services import point_in_buffer, make_point_from_lat_lng
 
 logger = logging.getLogger(__name__)
 
@@ -164,10 +166,10 @@ class ChauffeurLoginView(View):
     def validate_taxi_license_format(self, taxi_license):
         """Validate taxi license format.
 
-            Allowed formats:
-                - DDDD      (4 digits)
-                - DDDDD     (5 digits)
-                - DDDD-XD   (4 digits, a dash, one letter, one digit)
+        Allowed formats:
+            - DDDD      (4 digits)
+            - DDDDD     (5 digits)
+            - DDDD-XD   (4 digits, a dash, one letter, one digit)
         """
         pattern = r"^(?:\d{4}|\d{5}|\d{4}-[A-Za-z]\d)$"
         return bool(re.fullmatch(pattern, taxi_license))
@@ -326,7 +328,6 @@ class LocationSelectionView(View):
             return redirect("queueing:chauffeur_login")
 
         selected_queue_id = request.POST.get("selected_queue_id")
-
         if not selected_queue_id:
             logger.warning("Please select a pickup location.")
             return redirect("queueing:location_selection")
@@ -338,15 +339,66 @@ class LocationSelectionView(View):
             logger.warning("Invalid selection. Please try again.")
             return redirect("queueing:location_selection")
 
-        # TODO: Change this mock location for real geofencing logic
-        mock_location = Point(
-            4.9036, 52.3676
-        )  # Amsterdam coordinates if I'm not mistaken
+        latitude = request.POST.get("signup_lat")
+        longitude = request.POST.get("signup_lng")
+        signup_point = None
+
+        if latitude and longitude:
+            try:
+                latitude = float(latitude)
+                longitude = float(longitude)
+                signup_point = make_point_from_lat_lng(latitude, longitude, srid=4326)
+            except ValueError:
+                logger.warning("Invalid latitude/longitude values.")
+                messages.error(
+                    request, "Invalid location coordinates.", extra_tags="location"
+                )
+                return redirect("queueing:location_selection")
+        else:
+            logger.warning("Missing latitude/longitude values.")
+            messages.error(
+                request, "Location coordinates are required.", extra_tags="location"
+            )
+            return redirect("queueing:location_selection")
+
+        if signup_point is None and getattr(chauffeur, "location", None):
+            signup_point = chauffeur.location
+
+        if signup_point is None:
+            logger.warning("Could not determine signup location.")
+            messages.error(
+                request,
+                "Kon uw locatie niet bepalen. Schakel locatievoorziening in en probeer opnieuw.",
+                extra_tags="location",
+            )
+            return redirect("queueing:location_selection")
+        
+
+        buffer_zone = getattr(queue, "buffer_zone", None)
+        if buffer_zone and getattr(buffer_zone, "zone", None):
+            try:
+                if 'point_in_buffer' in globals() and callable(point_in_buffer):
+                    inside = point_in_buffer(buffer_zone, signup_point.y, signup_point.x, inclusive=True)
+                else:
+                    inside = buffer_zone.zone.intersects(signup_point)
+            except Exception as e:
+                logger.exception("Geofence spatial check failed: %s", e)
+                inside = False
+
+            if not inside:
+                messages.error(
+                    request,
+                    mark_safe(f"U bevindt zich nog niet in de buurt van bufferzone <strong>{buffer_zone.name}</strong> en kunt u dus nog niet aanmelden voor de wachtrij."),
+                    extra_tags="geofence",
+                )
+                return redirect("queueing:location_selection")
+        else:
+            logger.warning("Queue %s has no buffer zone defined; allowing join", queue.id)
 
         try:
             queue_service = QueueService()
             success, message, entry_uuid = queue_service.add_chauffeur_to_queue(
-                chauffeur=chauffeur, queue=queue, signup_location=mock_location
+                chauffeur=chauffeur, queue=queue, signup_location=signup_point
             )
 
             if success:
@@ -368,13 +420,16 @@ class LocationSelectionView(View):
                     return redirect("queueing:queue_status", entry_uuid=entry.uuid)
                 else:
                     logger.warning("Failed to retrieve queue entry.")
+                    messages.error(request, "Er is iets misgegaan. Neem contact op met de beheerder.")
                     return redirect("queueing:location_selection")
             else:
                 logger.debug(message)
+                messages.error(request, message or "Kon niet aanmelden :(")
                 return redirect("queueing:queue_status", entry_uuid=entry_uuid)
 
         except Exception as e:
             logger.error(f"Failed to join queue: {str(e)}")
+            messages.error(request, "Er is iets misgegaan bij het aanmelden. Probeer later opnieuw.")
             return redirect("queueing:location_selection")
 
 
@@ -418,20 +473,32 @@ class NotificationResponseView(View):
 
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)}, status=500)
-        
+
 
 class SetVehicleTypeView(View):
     def post(self, request):
-        vt = request.POST.get("vehicle_type") or (request.body and json.loads(request.body).get("vehicle_type"))
-        if vt not in ("auto","busje"):
-            return JsonResponse({"success": False, "error": "invalid vehicle_type"}, status=400)
+        vt = request.POST.get("vehicle_type") or (
+            request.body and json.loads(request.body).get("vehicle_type")
+        )
+        if vt not in ("auto", "busje"):
+            return JsonResponse(
+                {"success": False, "error": "invalid vehicle_type"}, status=400
+            )
         try:
             chauffeur_id = request.session.get("authenticated_chauffeur_id")
             if chauffeur_id:
                 chauffeur = Chauffeur.objects.get(id=chauffeur_id)
             else:
-                if not request.user.is_authenticated or not hasattr(request.user, 'chauffeur'):
-                    return JsonResponse({"success": False, "error": "User not authenticated as chauffeur"}, status=403)
+                if not request.user.is_authenticated or not hasattr(
+                    request.user, "chauffeur"
+                ):
+                    return JsonResponse(
+                        {
+                            "success": False,
+                            "error": "User not authenticated as chauffeur",
+                        },
+                        status=403,
+                    )
             print("BRO DO WE HAVE A PROPER CHAUFFEUR?\n", chauffeur)
             chauffeur.vehicle_type = vt
             chauffeur.save(update_fields=["vehicle_type"])
