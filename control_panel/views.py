@@ -104,7 +104,7 @@ class OfficerDashboardView(LoginRequiredMixin, View):
         today_start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
         today_start_utc = today_start_local.astimezone(pytz.UTC)
 
-        queues = TaxiQueue.objects.filter(active=True).select_related(
+        queues = TaxiQueue.objects.select_related(
             "buffer_zone", "pickup_zone"
         )
 
