@@ -179,6 +179,12 @@ class QueueService:
                                 f"Notified chauffeur {entry.chauffeur.license_plate}"
                             )
                             notified_count += 1
+                            sequence_number = getattr(
+                                notification, "sequence_number", None
+                            )
+                            display_number = (
+                                f"#{sequence_number}" if sequence_number else "#--"
+                            )
 
                             # Only send web push if option is enabled
                             if options.get("send_push", True):
@@ -190,13 +196,14 @@ class QueueService:
 
                                         if subs.exists():
                                             payload = {
-                                                "title": "U bent aan de beurt",
-                                                "body": f"Ga naar ophaalzone: {entry.queue.pickup_zone.name}",
+                                                "title": f"U mag doorrijden\n{display_number}",
+                                                "body": "Rij door naar de ophaal locatie voor de Cruise Terminal. Volg de borden en laat je nummer zien.",
                                                 "url": f"/queueing/queue/{entry.uuid}/",
                                                 "tag": f"queue-{entry.queue.id}",
                                                 "vibrate": [300, 100, 300],
                                                 "data": {
                                                     "url": f"/queueing/queue/{entry.uuid}/",
+                                                    "sequence_number": sequence_number,
                                                 },
                                             }
 

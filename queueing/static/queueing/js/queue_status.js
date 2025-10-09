@@ -87,24 +87,15 @@ class QueueManager {
             console.log('Received message from service worker:', event.data);
 
             if (event.data && event.data.type === 'REFRESH_STATUS') {
-                // Force immediate status update
                 console.log('Received push notification, updating status immediately');
                 this.updateStatus('push_notification');
-
-                // if (event.data.data) {
-                //     const notificationData = {
-                //         title: "U mag doorrijden",
-                //         body: "Ga naar de ophaalzone."
-                //     };
-                //     this.showPushReceivedFeedback(notificationData);
-                // }
             }
         });
     }
 
     showPushReceivedFeedback(data) {
         Swal.fire({
-            title: data.title || 'U mag doorrijden',
+            title: data.title || f`U mag doorrijden\n#${data.sequence_number || '--'}`,
             html: `
         <div style="text-align: center; margin-bottom: 15px;">
             <div>
@@ -317,8 +308,8 @@ class QueueManager {
                 this.state.shownNotifications[data.notification.id] = true;
 
                 let notificationData = {
-                    title: "U mag doorrijden",
-                    body: "Rij door naar de ophaallocatie voor de Cruise Terminal. Volg de borden.",
+                    title: `U mag doorrijden\n#${data.sequence_number || '--'}`,
+                    body: "Rij door naar de ophaal locatie voor de Cruise Terminal. Volg de borden en laat je nummer zien.",
                 };
 
                 setTimeout(() => this.showPushReceivedFeedback(notificationData), 500);

@@ -1,4 +1,4 @@
-const DEBUG = true;
+const DEBUG = false;
 
 self.addEventListener('push', (event) => {
   if (DEBUG) console.log('[Service Worker] Push received:', event);

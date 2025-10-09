@@ -1,6 +1,7 @@
 from django.contrib.gis.db import models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.db import transaction
 import uuid
 from accounts.models import Chauffeur, VehicleType
 from geofence.models import BufferZone, PickupZone
@@ -23,7 +24,11 @@ class TaxiQueue(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=True)
-    notifications_paused = models.BooleanField(default=False, help_text="If true, no new notifications will be sent for this queue.")
+    notifications_paused = models.BooleanField(
+        default=False,
+        help_text="If true, no new notifications will be sent for this queue.",
+    )
+    next_notification_number = models.PositiveIntegerField(default=1)
 
     class Meta:
         unique_together = ("buffer_zone", "pickup_zone")
@@ -132,14 +137,24 @@ class QueueEntry(models.Model):
         if self.status != self.Status.WAITING:
             raise ValidationError(f"Cannot notify chauffeur with status: {self.status}")
 
-        self.status = self.Status.NOTIFIED
-        self.notified_at = timezone.now()
-        self.save()
+        with transaction.atomic():
+            queue = TaxiQueue.objects.select_for_update().get(pk=self.queue.pk)
 
-        notification = QueueNotification.objects.create(
-            queue_entry=self, notification_time=self.notified_at
-        )
-        return notification
+            sequence = queue.next_notification_number
+            queue.next_notification_number = sequence + 1
+            queue.save(update_fields=["next_notification_number"])
+
+            notification = QueueNotification.objects.create(
+                queue_entry=self,
+                notification_time=timezone.now(),
+                sequence_number=sequence,
+            )
+
+            self.status = QueueEntry.Status.NOTIFIED
+            self.notified_at = timezone.now()
+            self.save(update_fields=["status", "notified_at"])
+
+            return notification
 
     def dequeue(self):
         """Mark entry as dequeued (allowed to go to pickup zone)."""
@@ -205,9 +220,9 @@ class QueueNotification(models.Model):
     response = models.CharField(
         max_length=20, choices=ResponseType.choices, default=ResponseType.PENDING
     )
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    sequence_number = models.PositiveIntegerField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

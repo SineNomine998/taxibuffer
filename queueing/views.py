@@ -231,7 +231,7 @@ class QueueStatusAPIView(View):
                 notification_data = {
                     "id": notification.id,
                     "notification_time": notification.notification_time.isoformat(),
-                    # "is_expired": notification.is_expired(),
+                    "sequence_number": notification.sequence_number,
                 }
 
             return JsonResponse(
@@ -243,6 +243,7 @@ class QueueStatusAPIView(View):
                     "total_waiting": total_waiting,
                     "has_notification": has_pending_notification,
                     "notification": notification_data,
+                    "sequence_number": notification_data.get("sequence_number") if notification_data else None,
                     "last_updated": timezone.now().isoformat(),
                 }
             )
