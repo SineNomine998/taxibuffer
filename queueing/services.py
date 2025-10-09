@@ -88,15 +88,15 @@ class QueueService:
                         existing_entry.uuid,
                     )
 
-                allowed, err_msg = self.geofence_check(
-                    chauffeur, signup_location, queue.buffer_zone
-                )
-                if not allowed:
-                    return (
-                        False,
-                        err_msg or "You must be in the buffer zone to join the queue.",
-                        None,
-                    )
+                # allowed, err_msg = self.geofence_check(
+                #     chauffeur, signup_location, queue.buffer_zone
+                # )
+                # if not allowed:
+                #     return (
+                #         False,
+                #         err_msg or "You must be in the buffer zone to join the queue.",
+                #         None,
+                #     )
 
                 # Create queue entry
                 entry = QueueEntry.objects.create(

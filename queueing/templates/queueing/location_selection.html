@@ -343,6 +343,8 @@
             <input type="hidden" name="signup_lat" id="signup_lat" value="">
             <input type="hidden" name="signup_lng" id="signup_lng" value="">
             <input type="hidden" name="selected_queue_id" id="selectedQueueId">
+            <!-- license plate SINENOMINE bypass -->
+            <input type="hidden" id="license_plate" value="{{ form_data.license_plate|default:'' }}">
             {% for queue in queues %}
             <div class="location-card" data-queue-id="{{ queue.id }}">
               <div class="location-image" aria-hidden="true">
@@ -429,6 +431,7 @@
       const latInput = document.getElementById('signup_lat');
       const lngInput = document.getElementById('signup_lng');
       const selectedQueueInput = document.getElementById('selectedQueueId');
+      const licensePlateEl = document.getElementById('license_plate');
 
       if (selectedQueueInput) selectedQueueInput.value = queueId;
 
@@ -442,6 +445,8 @@
         clickedButton.disabled = true;
         clickedButton.textContent = 'Bezig...';
       }
+
+      let licensePlate = licensePlateEl ? licensePlateEl.value.trim().toUpperCase() : "";
 
       let pos;
       try {
@@ -464,15 +469,15 @@
       if (lngInput) lngInput.value = lng;
 
       try {
-        const validateResponse = await fetch("{% url 'geofence:validate_location' %}", {
+        const validateLocation = await fetch("{% url 'geofence:validate_location' %}", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "X-CSRFToken": "{{ csrf_token }}"
           },
-          body: JSON.stringify({ lat: lat, lng: lng, selected_queue_id: queueId })
+          body: JSON.stringify({ lat: lat, lng: lng, selected_queue_id: queueId, license_plate: licensePlate })
         });
-        const validateResult = await validateResponse.json();
+        const validateResult = await validateLocation.json();
         if (!validateResult.is_valid) {
           fireSwal("Geweigerd", validateResult.error_message || "U bevindt zich niet in de bufferzone.");
           if (clickedButton) {
