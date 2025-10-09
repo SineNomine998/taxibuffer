@@ -260,7 +260,6 @@ class QueueManager {
                 cache: 'no-store'
             });
 
-            console.log("BEFORE 'DATA FIRST'")
 
             if (!response.ok) {
                 console.log("NOLUYOR AQ")
@@ -268,11 +267,9 @@ class QueueManager {
             }
 
             const data = await response.json();
-            console.log('DATA FIRST:', data);
             if (!data.success) {
                 throw new Error(data.error || 'API returned unsuccessful');
             }
-            console.log("AFTER 'DATA FIRST'")
 
             this.state.retryCount = 0;
             this.setConnectionStatus(true);
@@ -301,10 +298,8 @@ class QueueManager {
     }
 
     handleNotification(data) {
-        console.log("HANDLE NOTIFICATION DATA 1: ", data);
         const hasActiveNotification = data.has_notification && data.notification;
         if (hasActiveNotification) {
-            console.log("HANDLE NOTIFICATION DATA 2: ", data);
             this.state.currentNotificationId = data.notification.id;
             // this.startCountdown(new Date(data.notification.notification_time));
 
@@ -313,8 +308,6 @@ class QueueManager {
             if (!this.state.shownNotifications[data.notification.id]) {
                 this.state.shownNotifications[data.notification.id] = true;
 
-                console.log("DATA SECOND: ", data);
-                console.log("DATA.SEQUENCE_NUMBER: ", data.sequence_number);
                 let notificationData = {
                     title: `U mag doorrijden\n#${data.sequence_number || '--'}`,
                     body: "Rij door naar de ophaal locatie voor de Cruise Terminal. Volg de borden en laat je nummer zien.",
