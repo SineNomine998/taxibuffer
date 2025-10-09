@@ -266,6 +266,7 @@ class QueueManager {
             }
 
             const data = await response.json();
+            console.log('DATA FIRST:', data);
             if (!data.success) {
                 throw new Error(data.error || 'API returned unsuccessful');
             }
@@ -307,6 +308,8 @@ class QueueManager {
             if (!this.state.shownNotifications[data.notification.id]) {
                 this.state.shownNotifications[data.notification.id] = true;
 
+                console.log("DATA SECOND: ", data);
+                console.log("DATA.SEQUENCE_NUMBER: ", data.sequence_number);
                 let notificationData = {
                     title: `U mag doorrijden\n#${data.sequence_number || '--'}`,
                     body: "Rij door naar de ophaal locatie voor de Cruise Terminal. Volg de borden en laat je nummer zien.",
