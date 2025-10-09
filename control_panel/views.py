@@ -289,16 +289,40 @@ class PauseQueueView(View):
 
     def post(self, request, queue_id):
         queue = get_object_or_404(TaxiQueue, id=queue_id)
-        action = request.POST.get('action')  # 'pause' or 'resume'
-        if action == 'pause':
+        action = request.POST.get("action")  # 'pause' or 'resume'
+        if action == "pause":
             queue.notifications_paused = True
-            queue.save(update_fields=['notifications_paused'])
-        elif action == 'resume':
+            queue.save(update_fields=["notifications_paused"])
+        elif action == "resume":
             queue.notifications_paused = False
-            queue.save(update_fields=['notifications_paused'])
+            queue.save(update_fields=["notifications_paused"])
         else:
-            return JsonResponse({"success": False, "error": "invalid action"}, status=400)
-        return JsonResponse({"success": True, "notifications_paused": queue.notifications_paused})
+            return JsonResponse(
+                {"success": False, "error": "invalid action"}, status=400
+            )
+        return JsonResponse(
+            {"success": True, "notifications_paused": queue.notifications_paused}
+        )
+
+
+@method_decorator(user_passes_test(is_officer), name="dispatch")
+class ToggleQueueActivationView(View):
+    """Activate or deactivate a specific queue"""
+
+    def post(self, request, queue_id):
+        queue = get_object_or_404(TaxiQueue, id=queue_id)
+        action = request.POST.get("action")
+        if action == "activate":
+            queue.active = True
+            queue.save(update_fields=["active"])
+        elif action == "deactivate":
+            queue.active = False
+            queue.save(update_fields=["active"])
+        else:
+            return JsonResponse(
+                {"success": False, "error": "invalid action"}, status=400
+            )
+        return JsonResponse({"success": True, "active": queue.active})
 
 
 @method_decorator(user_passes_test(is_officer), name="dispatch")

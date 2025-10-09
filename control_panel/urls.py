@@ -11,4 +11,5 @@ urlpatterns = [
     path("api/queue/<int:queue_id>/status/", views.QueueStatusAPIView.as_view(), name="queue_status_api"),
     path("queue/<int:queue_id>/busje/", views.BypassBusjeView.as_view(), name="busje_management"),
     path("queue/<int:queue_id>/toggle-pause/", views.PauseQueueView.as_view(), name="toggle_queue_pause"),
+    path("queue/<int:queue_id>/toggle-activation/", views.ToggleQueueActivationView.as_view(), name="toggle_queue_activation"),
 ]

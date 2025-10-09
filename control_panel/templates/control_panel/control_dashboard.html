@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,37 +11,44 @@
             color: #E0BD22;
             font-weight: bold;
         }
+
         .card {
             transition: all 0.3s ease;
             border: none;
             border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
             margin-bottom: 20px;
         }
+
         .card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
         }
+
         .card-header {
             background-color: #E0BD22;
             color: #333;
             font-weight: bold;
             border-radius: 10px 10px 0 0 !important;
         }
+
         .stat-number {
             font-size: 2em;
             font-weight: bold;
         }
+
         .queue-card {
             height: 100%;
         }
     </style>
 </head>
+
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
             <a class="navbar-brand" href="{% url 'control_panel:dashboard' %}">TAXI<span>BUFFER</span> Control</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-label="Toggle navigation">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
@@ -68,7 +76,7 @@
                     <div class="card-body">
                         <h5 class="card-title">{{ queue.pickup_zone.name }}</h5>
                         <p class="card-text">Buffer Zone: {{ queue.buffer_zone.name }}</p>
-                        
+
                         <div class="stats d-flex justify-content-between mb-3">
                             <div class="text-center">
                                 <span class="stat-number text-primary">{{ queue.get_waiting_entries.count }}</span>
@@ -87,14 +95,18 @@
                                 <div class="stat-label">Dequeued</div>
                             </div>
                         </div>
-                        
+
                         <div class="d-grid">
-                            <a href="{% url 'control_panel:queue_monitor' queue.id %}" 
-                               class="btn btn-primary">Monitor Queue</a>
+                            <a href="{% url 'control_panel:queue_monitor' queue.id %}" class="btn btn-primary">Monitor
+                                Queue</a>
+                            <button type="button" class="btn btn-secondary toggle-activation" style="margin-top: 10px;"
+                                data-queue-id="{{ queue.id }}" data-active="{{ queue.active|yesno:'true,false' }}">
+                                {% if queue.active %}Deactivate{% else %}Activate{% endif %}
+                            </button>
                         </div>
                     </div>
                     <div class="card-footer text-muted">
-                        Notification timeout: {{ queue.notification_timeout_minutes }} minutes
+                        Sensors are checked every 2 minutes.
                     </div>
                 </div>
             </div>
@@ -107,5 +119,44 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function getCookie(name) {
+            const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return v ? v.pop() : '';
+        }
+
+        async function toggleActivation(queueId, currentActive, btnElement) {
+            const action = currentActive === 'true' ? 'deactivate' : 'activate';
+            try {
+                const response = await fetch(`/control/queue/${queueId}/toggle-activation/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                    },
+                    body: 'action=' + encodeURIComponent(action)
+                });
+                const data = await response.json();
+                if (data.success) {
+                    btnElement.dataset.active = data.active ? 'true' : 'false';
+                    btnElement.textContent = data.active ? 'Deactivate' : 'Activate';
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error('Toggle activation error:', err);
+                alert('Error toggling queue activation.');
+            }
+        }
+
+        document.querySelectorAll('.toggle-activation').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const queueId = this.dataset.queueId;
+                const currentActive = this.dataset.active;
+                toggleActivation(queueId, currentActive, this);
+            });
+        });
+    </script>
 </body>
+
 </html>
