@@ -16,7 +16,7 @@ self.addEventListener('push', (event) => {
     let title = data.title || 'TaxiBuffer Bericht';
 
     const options = {
-      body: data.body || 'U mag doorrijden',
+      body: data.body || `U mag doorrijden\n#${data.sequence_number || '--'}`,
       icon: '/static/queueing/assets/logo.svg',
       badge: '/static/queueing/assets/check-badge.svg',
       vibrate: [200, 100, 200, 100, 200], // dunno how this feels like on a phone

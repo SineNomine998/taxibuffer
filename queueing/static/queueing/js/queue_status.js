@@ -95,7 +95,7 @@ class QueueManager {
 
     showPushReceivedFeedback(data) {
         Swal.fire({
-            title: data.title || f`U mag doorrijden\n#${data.sequence_number || '--'}`,
+            title: data.title || `U mag doorrijden\n#${data.sequence_number || '--'}`,
             html: `
         <div style="text-align: center; margin-bottom: 15px;">
             <div>
