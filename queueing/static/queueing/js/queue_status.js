@@ -260,6 +260,8 @@ class QueueManager {
                 cache: 'no-store'
             });
 
+            console.log("BEFORE 'DATA FIRST'")
+
             if (!response.ok) {
                 console.log("NOLUYOR AQ")
                 throw new Error(`HTTP ${response.status}`);
@@ -270,6 +272,7 @@ class QueueManager {
             if (!data.success) {
                 throw new Error(data.error || 'API returned unsuccessful');
             }
+            console.log("AFTER 'DATA FIRST'")
 
             this.state.retryCount = 0;
             this.setConnectionStatus(true);
@@ -298,8 +301,10 @@ class QueueManager {
     }
 
     handleNotification(data) {
-        const hasActiveNotification = data.has_notification && data.notification && !data.notification.is_expired;
+        console.log("HANDLE NOTIFICATION DATA 1: ", data);
+        const hasActiveNotification = data.has_notification && data.notification;
         if (hasActiveNotification) {
+            console.log("HANDLE NOTIFICATION DATA 2: ", data);
             this.state.currentNotificationId = data.notification.id;
             // this.startCountdown(new Date(data.notification.notification_time));
 
