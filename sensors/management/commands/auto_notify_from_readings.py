@@ -37,19 +37,22 @@ class Command(BaseCommand):
         pickup_zone_override = options.get("pickup_zone_id")
         serials_filter = options.get("serials")
 
-        # 1) select sensors
+        # select sensors
         qs = Sensor.objects.filter(active=True).select_related("pickup_zone")
         if pickup_zone_override:
             qs = qs.filter(pickup_zone_id=pickup_zone_override)
         if serials_filter:
             qs = qs.filter(sensor_id__in=serials_filter)
 
+        # extra filter: only sensors with serial specific serial numbers
+        qs = qs.filter(sensor_id__in=["FC072B5B", "FC072B5C", "FC072B5D"])
+
         sensors = list(qs)
         if not sensors:
             self.stdout.write("No active sensors found for the given filters.")
             return
 
-        # 2) group by pickup_zone
+        # group by pickup_zone
         zones = {}
         for s in sensors:
             zones.setdefault(s.pickup_zone_id, []).append(s)
@@ -66,7 +69,7 @@ class Command(BaseCommand):
                         "Sensor %s has no readings yet; treating as occupied.",
                         s.sensor_id,
                     )
-                    # treat as occupied (do not count as free). Change policy here if desired
+                    # treat as occupied (do not count as free)
                     continue
                 if last.status is False:  # False = free
                     free_count += 1
@@ -83,7 +86,10 @@ class Command(BaseCommand):
 
             queues = queues.filter(notifications_paused=False)
             if not queues.exists():
-                logger.info("All queues paused for pickup_zone %s; skipping notifications, Sir!", zone_id)
+                logger.info(
+                    "All queues paused for pickup_zone %s; skipping notifications, Sir!",
+                    zone_id,
+                )
                 continue
 
             cache_key = f"{CACHE_PREFIX}:{zone_id}"
@@ -126,7 +132,6 @@ class Command(BaseCommand):
                             total_notified += notified
                             remaining -= notified
                         else:
-                            # if the service returns something else, we just log it
                             logger.info(
                                 "notify_next_chauffeurs returned %s for queue %s",
                                 type(notified),
