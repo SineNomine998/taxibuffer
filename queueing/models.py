@@ -147,6 +147,7 @@ class QueueEntry(models.Model):
             notification = QueueNotification.objects.create(
                 queue_entry=self,
                 notification_time=timezone.now(),
+                response=QueueNotification.ResponseType.PENDING,
                 sequence_number=sequence,
             )
 
