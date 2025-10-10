@@ -203,6 +203,9 @@
                             {% for entry in dequeued_entries %}
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="license-plate">{{ entry.chauffeur.license_plate }}</span>
+                                {% if entry.sequence_number %}
+                                <span class="badge bg-secondary" style="margin-right: 140px;">#{{ entry.sequence_number }}</span>
+                                {% endif %}
                                 <small class="timestamp">{{ entry.dequeued_at|time:"H:i:s" }}</small>
                             </div>
                             {% empty %}
@@ -223,6 +226,9 @@
                             {% for entry in notified_entries %}
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="license-plate">{{ entry.chauffeur.license_plate }}</span>
+                                {% if entry.sequence_number %}
+                                <span class="badge bg-secondary" style="margin-right: 140px;">#{{ entry.sequence_number }}</span>
+                                {% endif %}
                                 <small class="timestamp">{{ entry.notified_at|time:"H:i:s" }}</small>
                             </div>
                             {% empty %}
@@ -296,6 +302,7 @@
                             return `
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="license-plate">${entry.chauffeur__license_plate}</span>
+                                    <span class="sequence-number" style="margin-right: 140px;">#${entry.sequence_number || '--'}</span>
                                     <small class="timestamp">${entry.notified_at}</small>
                                 </div>
                             `;
@@ -307,6 +314,7 @@
                             return `
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="license-plate">${entry.chauffeur__license_plate}</span>
+                                    <span class="sequence-number" style="margin-right: 140px;">#${entry.sequence_number || '--'}</span>
                                     <small class="timestamp">${entry.dequeued_at}</small>
                                 </div>
                             `;

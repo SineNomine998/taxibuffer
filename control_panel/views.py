@@ -9,10 +9,11 @@ from django.contrib.auth.decorators import user_passes_test
 from django.utils.decorators import method_decorator
 from django.contrib.auth.mixins import LoginRequiredMixin
 from accounts.models import Officer, User
-from queueing.models import TaxiQueue, QueueEntry, PushSubscription
+from queueing.models import QueueNotification, TaxiQueue, QueueEntry, PushSubscription
 from queueing.push_views import send_web_push
-
+from django.db.models import Subquery, OuterRef, IntegerField
 from django.db.utils import ProgrammingError
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -104,9 +105,7 @@ class OfficerDashboardView(LoginRequiredMixin, View):
         today_start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
         today_start_utc = today_start_local.astimezone(pytz.UTC)
 
-        queues = TaxiQueue.objects.select_related(
-            "buffer_zone", "pickup_zone"
-        )
+        queues = TaxiQueue.objects.select_related("buffer_zone", "pickup_zone")
 
         for queue in queues:
             queue.dequeued_count = QueueEntry.objects.filter(
@@ -143,17 +142,54 @@ class QueueMonitorView(LoginRequiredMixin, View):
 
         total_waiting_count = waiting_entries.count()
 
-        notified_entries = QueueEntry.objects.filter(
-            queue=queue,
-            status=QueueEntry.Status.NOTIFIED,
-            notified_at__gte=today_start_utc,
-        ).order_by("-notified_at")
+        latest_notification_seq = Subquery(
+            QueueNotification.objects.filter(queue_entry=OuterRef("pk"))
+            .order_by("-notification_time")
+            .values("sequence_number")[:1],
+            output_field=IntegerField(),
+        )
 
-        dequeued_entries = QueueEntry.objects.filter(
-            queue=queue,
-            status=QueueEntry.Status.DEQUEUED,
-            dequeued_at__gte=today_start_utc,
-        ).order_by("-dequeued_at")[:20]
+        notified_qs = (
+            QueueEntry.objects.filter(
+                queue=queue,
+                status=QueueEntry.Status.NOTIFIED,
+                notified_at__gte=today_start_utc,
+            )
+            .annotate(sequence_number=latest_notification_seq)
+            .order_by("-notified_at")
+        )
+
+        notified_entries = list(
+            notified_qs.values(
+                "id",
+                "uuid",
+                "chauffeur__license_plate",
+                "notified_at",
+                "status",
+                "sequence_number",
+            )
+        )
+
+        dequeued_qs = (
+            QueueEntry.objects.filter(
+                queue=queue,
+                status=QueueEntry.Status.DEQUEUED,
+                dequeued_at__gte=today_start_utc,
+            )
+            .annotate(sequence_number=latest_notification_seq)
+            .order_by("-dequeued_at")[:20]
+        )
+
+        dequeued_entries = list(
+            dequeued_qs.values(
+                "id",
+                "uuid",
+                "chauffeur__license_plate",
+                "dequeued_at",
+                "status",
+                "sequence_number",
+            )
+        )
 
         total_dequeued_count = QueueEntry.objects.filter(
             queue=queue,
@@ -167,7 +203,7 @@ class QueueMonitorView(LoginRequiredMixin, View):
             "notified_entries": notified_entries,
             "dequeued_entries": dequeued_entries,
             "waiting_count": total_waiting_count,
-            "notified_count": notified_entries.count(),
+            "notified_count": len(notified_entries),
             "dequeued_count": total_dequeued_count,
         }
         return render(request, "control_panel/queue_monitor.html", context)
@@ -212,27 +248,52 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
                 .count()
             )
 
-            notified_entries = list(
+            latest_notification_seq = Subquery(
+                QueueNotification.objects.filter(queue_entry=OuterRef("pk"))
+                .order_by("-notification_time")
+                .values("sequence_number")[:1],
+                output_field=IntegerField(),
+            )
+
+            notified_qs = (
                 QueueEntry.objects.filter(
                     queue=queue,
                     status=QueueEntry.Status.NOTIFIED,
                     notified_at__gte=today_start_utc,
                 )
+                .annotate(sequence_number=latest_notification_seq)
                 .order_by("-notified_at")
-                .values(
-                    "id", "uuid", "chauffeur__license_plate", "notified_at", "status"
+            )
+
+            notified_entries = list(
+                notified_qs.values(
+                    "id",
+                    "uuid",
+                    "chauffeur__license_plate",
+                    "notified_at",
+                    "status",
+                    "sequence_number",
                 )
             )
 
-            dequeued_entries = list(
+            dequeued_qs = (
                 QueueEntry.objects.filter(
                     queue=queue,
                     status=QueueEntry.Status.DEQUEUED,
                     dequeued_at__gte=today_start_utc,
                 )
+                .annotate(sequence_number=latest_notification_seq)
                 .order_by("-dequeued_at")[:20]
-                .values(
-                    "id", "uuid", "chauffeur__license_plate", "dequeued_at", "status"
+            )
+
+            dequeued_entries = list(
+                dequeued_qs.values(
+                    "id",
+                    "uuid",
+                    "chauffeur__license_plate",
+                    "dequeued_at",
+                    "status",
+                    "sequence_number",
                 )
             )
 
