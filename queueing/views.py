@@ -76,7 +76,6 @@ class ChauffeurLoginView(View):
             try:
                 chauffeur = Chauffeur.objects.get(license_plate="SINENOMINE")
             except Chauffeur.DoesNotExist:
-                # Create a dummy test chauffeur
                 user = User.objects.create_user(
                     username="test_chauffeur", is_chauffeur=True
                 )
@@ -105,30 +104,33 @@ class ChauffeurLoginView(View):
 
         try:
             with transaction.atomic():
-                # Check if chauffeur already exists
-                try:
-                    chauffeur = Chauffeur.objects.get(license_plate=license_plate)
-                    # Verify taxi license matches
-                    if chauffeur.taxi_license_number != taxi_license_number:
-                        messages.error(
-                            request,
-                            "License plate and taxi license number do not match.",
-                        )
-                        return redirect("queueing:chauffeur_login")
-                except Chauffeur.DoesNotExist:
-                    # Create new user and chauffeur
-                    user = User.objects.create_user(
-                        username=f"chauffeur_{license_plate.lower().replace('-', '_')}",
-                        is_chauffeur=True,
-                    )
-                    chauffeur = Chauffeur.objects.create(
-                        user=user,
-                        license_plate=license_plate,
-                        taxi_license_number=taxi_license_number,
-                        location=None,  # Will be set when joining queue
-                    )
+                # Fetch all chauffeurs with the same license plate
+                matching_chauffeurs = Chauffeur.objects.filter(license_plate=license_plate)
+                # Get the chauffeur with matching RTX-number, if any
+                chauffeur = matching_chauffeurs.filter(taxi_license_number=taxi_license_number).first()
 
-                # Store chauffeur info in session for step 2
+                if not chauffeur:
+                    if matching_chauffeurs.exists():
+                        # Create new chauffeur with different RTX-number for the same vehicle.
+                        username = f"chauffeur_{license_plate.lower().replace('-', '_')}_{taxi_license_number.lower()}"
+                        user = User.objects.create_user(username=username, is_chauffeur=True)
+                        chauffeur = Chauffeur.objects.create(
+                            user=user,
+                            license_plate=license_plate,
+                            taxi_license_number=taxi_license_number,
+                            location=None,
+                        )
+                    else:
+                        # If no chauffeur with this license plate exists at all, create one normally.
+                        username = f"chauffeur_{license_plate.lower().replace('-', '_')}"
+                        user = User.objects.create_user(username=username, is_chauffeur=True)
+                        chauffeur = Chauffeur.objects.create(
+                            user=user,
+                            license_plate=license_plate,
+                            taxi_license_number=taxi_license_number,
+                            location=None,
+                        )
+
                 request.session["authenticated_chauffeur_id"] = chauffeur.id
                 return redirect("queueing:location_selection")
 
