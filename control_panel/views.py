@@ -138,7 +138,7 @@ class QueueMonitorView(LoginRequiredMixin, View):
         # Get chauffeurs in different states - FILTERED FOR TODAY
         waiting_entries = queue.get_waiting_entries_control().filter(
             created_at__gte=today_start_utc
-        )[:10]
+        )
 
         total_waiting_count = waiting_entries.count()
 
@@ -239,7 +239,7 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
                 .filter(created_at__gte=today_start_utc)
                 .values(
                     "id", "uuid", "chauffeur__license_plate", "created_at", "status"
-                )[:10]
+                )
             )
 
             total_waiting_count = (
