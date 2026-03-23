@@ -12,16 +12,40 @@ from django.db import transaction
 import json
 from django.conf import settings
 from django.http import FileResponse
+from django.contrib.auth import login
 import re
 import os
 import logging
 
-from accounts.models import Chauffeur, User
+from accounts.models import Chauffeur, ChauffeurVehicle, User
 from .models import TaxiQueue, QueueEntry, QueueNotification
 from .services import QueueService
 from geofence.services import point_in_buffer, make_point_from_lat_lng
 
 logger = logging.getLogger(__name__)
+
+
+def _build_unique_username(first_name, last_name, rtx_number):
+    base = f"{first_name}.{last_name}".strip(".").lower()
+    base = re.sub(r"[^a-z0-9._-]", "", base.replace(" ", "_"))
+    if not base:
+        base = f"chauffeur_{rtx_number.lower()}"
+    candidate = base
+    counter = 1
+    while User.objects.filter(username=candidate).exists():
+        candidate = f"{base}_{counter}"
+        counter += 1
+    return candidate
+
+
+def _get_authenticated_chauffeur(request):
+    chauffeur_id = request.session.get("authenticated_chauffeur_id")
+    if not chauffeur_id:
+        return None
+    try:
+        return Chauffeur.objects.select_related("user").get(id=chauffeur_id)
+    except Chauffeur.DoesNotExist:
+        return None
 
 
 class InfoPagesView(View):
@@ -54,25 +78,25 @@ class ChauffeurLoginView(View):
         """Display login form."""
         context = {
             "show_access_denied": request.GET.get("access_denied") == "true",
-            "form_data": request.session.get("form_data", {}),
+            "form_data": request.session.get("login_form_data", {}),
         }
         return render(request, "queueing/chauffeur_login.html", context)
 
     def post(self, request):
         """Process login form."""
-        license_plate = request.POST.get("license_plate", "").strip().upper()
-        taxi_license_number = (
-            request.POST.get("taxi_license_number", "").strip().upper()
-        )
+        email = request.POST.get("email", "").strip().lower()
+        password = request.POST.get("password", "")
 
-        # Store form data in session for redisplay
-        request.session["form_data"] = {
-            "license_plate": license_plate,
-            "taxi_license_number": taxi_license_number,
+        request.session["login_form_data"] = {
+            "email": email,
         }
 
-        # Bypass check for testing purposes
-        if license_plate == "SINENOMINE" and taxi_license_number == "TEST":
+        if not email or not password:
+            messages.error(request, "Emailadres en wachtwoord zijn verplicht.")
+            return redirect("queueing:chauffeur_login")
+
+        # Keep admin testing bypass intact.
+        if email.upper() == "SINENOMINE" and password.upper() == "TEST":
             try:
                 chauffeur = Chauffeur.objects.get(license_plate="SINENOMINE")
             except Chauffeur.DoesNotExist:
@@ -86,59 +110,29 @@ class ChauffeurLoginView(View):
                     location=None,
                 )
             request.session["authenticated_chauffeur_id"] = chauffeur.id
+            request.session["form_data"] = {
+                "license_plate": chauffeur.license_plate,
+                "taxi_license_number": chauffeur.taxi_license_number,
+            }
             return redirect("queueing:location_selection")
 
-        # Basic validation
-        if not all([license_plate, taxi_license_number]):
-            messages.error(request, "All fields are required.")
-            return redirect("queueing:chauffeur_login")
-
-        # Basic format validation
-        if not self.validate_license_plate_format(license_plate):
-            messages.error(request, "Invalid license plate format.")
-            return redirect("queueing:chauffeur_login")
-
-        if not self.validate_taxi_license_format(taxi_license_number):
-            messages.error(request, "Invalid RTX number format.", extra_tags="RTX")
-            return redirect("queueing:chauffeur_login")
-
-        try:
-            with transaction.atomic():
-                # Fetch all chauffeurs with the same license plate
-                matching_chauffeurs = Chauffeur.objects.filter(license_plate=license_plate)
-                # Get the chauffeur with matching RTX-number, if any
-                chauffeur = matching_chauffeurs.filter(taxi_license_number=taxi_license_number).first()
-
-                if not chauffeur:
-                    if matching_chauffeurs.exists():
-                        # Create new chauffeur with different RTX-number for the same vehicle.
-                        username = f"chauffeur_{license_plate.lower().replace('-', '_')}_{taxi_license_number.lower()}"
-                        user = User.objects.create_user(username=username, is_chauffeur=True)
-                        chauffeur = Chauffeur.objects.create(
-                            user=user,
-                            license_plate=license_plate,
-                            taxi_license_number=taxi_license_number,
-                            location=None,
-                        )
-                    else:
-                        # If no chauffeur with this license plate exists at all, create one normally.
-                        username = f"chauffeur_{license_plate.lower().replace('-', '_')}"
-                        user = User.objects.create_user(username=username, is_chauffeur=True)
-                        chauffeur = Chauffeur.objects.create(
-                            user=user,
-                            license_plate=license_plate,
-                            taxi_license_number=taxi_license_number,
-                            location=None,
-                        )
-
+        account_user = User.objects.filter(
+            email__iexact=email,
+            is_chauffeur=True,
+        ).select_related("chauffeur").first()
+        if account_user and password and account_user.check_password(password):
+            if hasattr(account_user, "chauffeur"):
+                chauffeur = account_user.chauffeur
                 request.session["authenticated_chauffeur_id"] = chauffeur.id
+                request.session["form_data"] = {
+                    "license_plate": chauffeur.license_plate,
+                    "taxi_license_number": chauffeur.taxi_license_number,
+                }
+                login(request, account_user)
                 return redirect("queueing:location_selection")
 
-        except Exception as e:
-            print("BRO WHAT'S THE ISSUE???")
-            print(e)
-            messages.error(request, f"Authentication failed: {str(e)}")
-            return redirect("queueing:chauffeur_login")
+        messages.error(request, "Ongeldig emailadres of wachtwoord.")
+        return redirect("queueing:chauffeur_login")
 
     def validate_license_plate_format(self, license_plate):
         """Validate license plate format (basic validation)."""
@@ -191,6 +185,7 @@ class SignUpStep1View(View):
             "form_data": {
                 "first_name": flow.get("first_name", ""),
                 "last_name": flow.get("last_name", ""),
+                "email": flow.get("email", ""),
                 "rtx_number": flow.get("rtx_number", ""),
             }
         }
@@ -199,15 +194,25 @@ class SignUpStep1View(View):
     def post(self, request):
         first_name = request.POST.get("first_name", "").strip()
         last_name = request.POST.get("last_name", "").strip()
+        email = request.POST.get("email", "").strip().lower()
         rtx_number = request.POST.get("rtx_number", "").strip().upper()
 
-        if not all([first_name, last_name, rtx_number]):
+        if not all([first_name, last_name, email, rtx_number]):
             messages.error(request, "Vul alle verplichte velden in.")
+            return redirect("queueing:sign_up1")
+
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+            messages.error(request, "Vul een geldig emailadres in.")
+            return redirect("queueing:sign_up1")
+
+        if User.objects.filter(email__iexact=email).exists():
+            messages.error(request, "Dit emailadres is al in gebruik.")
             return redirect("queueing:sign_up1")
 
         flow = request.session.get("signup_flow", {})
         flow["first_name"] = first_name
         flow["last_name"] = last_name
+        flow["email"] = email
         flow["rtx_number"] = rtx_number
         flow.setdefault("vehicles", [])
         request.session["signup_flow"] = flow
@@ -340,12 +345,69 @@ class SignUpVehicleView(View):
         if current_index is None or current_index >= len(vehicles):
             flow["current_vehicle_index"] = 0
 
-        request.session["signup_flow"] = flow
-        messages.success(
-            request,
-            "Accountaanvraag opgeslagen in sessie. Koppel backend-opslag om dit definitief te maken.",
-        )
-        return redirect("queueing:chauffeur_login")
+        first_name = flow.get("first_name", "").strip()
+        last_name = flow.get("last_name", "").strip()
+        email = flow.get("email", "").strip().lower()
+        rtx_number = flow.get("rtx_number", "").strip().upper()
+        raw_password = flow.get("raw_password", "")
+
+        if not all([first_name, last_name, email, rtx_number, raw_password]):
+            messages.error(request, "Onvolledige accountgegevens. Start opnieuw.")
+            return redirect("queueing:sign_up1")
+
+        try:
+            with transaction.atomic():
+                existing_chauffeur = Chauffeur.objects.filter(
+                    taxi_license_number=rtx_number
+                ).select_related("user").first()
+                if existing_chauffeur:
+                    messages.error(
+                        request,
+                        "Er bestaat al een account met dit RTX-nummer. Gebruik inloggen.",
+                    )
+                    return redirect("queueing:chauffeur_login")
+
+                username = _build_unique_username(first_name, last_name, rtx_number)
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=raw_password,
+                    first_name=first_name,
+                    last_name=last_name,
+                    is_chauffeur=True,
+                )
+
+                current_vehicle_index = int(flow.get("current_vehicle_index", 0))
+                current_vehicle = vehicles[current_vehicle_index]
+
+                chauffeur = Chauffeur.objects.create(
+                    user=user,
+                    license_plate=current_vehicle["license_plate"],
+                    taxi_license_number=rtx_number,
+                    location=None,
+                )
+
+                for idx, vehicle in enumerate(vehicles):
+                    ChauffeurVehicle.objects.create(
+                        chauffeur=chauffeur,
+                        license_plate=vehicle["license_plate"],
+                        nickname=vehicle["nickname"],
+                        is_current=(idx == current_vehicle_index),
+                    )
+
+            request.session["authenticated_chauffeur_id"] = chauffeur.id
+            request.session["form_data"] = {
+                "license_plate": chauffeur.license_plate,
+                "taxi_license_number": chauffeur.taxi_license_number,
+            }
+            request.session.pop("signup_flow", None)
+            login(request, user)
+            messages.success(request, "Account aangemaakt. Welkom bij TAXIBUFFER.")
+            return redirect("queueing:account")
+        except Exception as e:
+            logger.exception("Could not create signup account: %s", e)
+            messages.error(request, "Account kon niet worden aangemaakt. Probeer opnieuw.")
+            return redirect("queueing:sign_up3")
 
 
 class SignUpAddVehicleView(View):
@@ -372,7 +434,16 @@ class SignUpAddVehicleView(View):
             messages.error(request, "Vul kenteken en bijnaam in.")
             return redirect("queueing:sign_up_vehicle_add")
 
+        if len(license_plate) > 20 or len(nickname) > 60:
+            messages.error(request, "Kenteken of bijnaam is te lang.")
+            return redirect("queueing:sign_up_vehicle_add")
+
         vehicles = flow.get("vehicles", [])
+        duplicate = any(v["license_plate"].upper() == license_plate for v in vehicles)
+        if duplicate:
+            messages.error(request, "Dit kenteken is al toegevoegd.")
+            return redirect("queueing:sign_up_vehicle_add")
+
         vehicles.append({"license_plate": license_plate, "nickname": nickname})
         flow["vehicles"] = vehicles
 
@@ -381,6 +452,119 @@ class SignUpAddVehicleView(View):
 
         request.session["signup_flow"] = flow
         return redirect("queueing:sign_up3")
+
+
+class AccountView(View):
+    """Account dashboard for chauffeurs and vehicle management."""
+
+    template_name = "queueing/account.html"
+
+    def get(self, request):
+        chauffeur = _get_authenticated_chauffeur(request)
+        if not chauffeur:
+            messages.error(request, "Log eerst in om uw account te bekijken.")
+            return redirect("queueing:chauffeur_login")
+
+        vehicles = list(chauffeur.vehicles.order_by("-is_current", "nickname", "id"))
+        current_vehicle = next((v for v in vehicles if v.is_current), None)
+
+        context = {
+            "chauffeur": chauffeur,
+            "account_user": chauffeur.user,
+            "current_vehicle": current_vehicle,
+            "vehicles": vehicles,
+        }
+        return render(request, self.template_name, context)
+
+    def post(self, request):
+        chauffeur = _get_authenticated_chauffeur(request)
+        if not chauffeur:
+            messages.error(request, "Log eerst in om uw account te beheren.")
+            return redirect("queueing:chauffeur_login")
+
+        action = request.POST.get("action", "")
+
+        if action == "set_current":
+            vehicle_id = request.POST.get("vehicle_id")
+            vehicle = ChauffeurVehicle.objects.filter(
+                id=vehicle_id, chauffeur=chauffeur
+            ).first()
+            if not vehicle:
+                messages.error(request, "Voertuig niet gevonden.")
+                return redirect("queueing:account")
+
+            with transaction.atomic():
+                ChauffeurVehicle.objects.filter(chauffeur=chauffeur).update(is_current=False)
+                vehicle.is_current = True
+                vehicle.save(update_fields=["is_current", "updated_at"])
+                chauffeur.license_plate = vehicle.license_plate
+                chauffeur.save(update_fields=["license_plate"])
+
+            request.session["form_data"] = {
+                "license_plate": chauffeur.license_plate,
+                "taxi_license_number": chauffeur.taxi_license_number,
+            }
+            messages.success(request, "Huidig voertuig bijgewerkt.")
+            return redirect("queueing:account")
+
+        if action == "add_vehicle":
+            license_plate = request.POST.get("license_plate", "").strip().upper()
+            nickname = request.POST.get("nickname", "").strip()
+            set_as_current = request.POST.get("set_as_current") == "on"
+
+            if not license_plate or not nickname:
+                messages.error(request, "Vul kenteken en bijnaam in.")
+                return redirect("queueing:account")
+
+            existing = ChauffeurVehicle.objects.filter(
+                chauffeur=chauffeur, license_plate__iexact=license_plate
+            ).exists()
+            if existing:
+                messages.error(request, "Dit kenteken bestaat al in uw account.")
+                return redirect("queueing:account")
+
+            with transaction.atomic():
+                if set_as_current or not chauffeur.vehicles.exists():
+                    ChauffeurVehicle.objects.filter(chauffeur=chauffeur).update(is_current=False)
+                new_vehicle = ChauffeurVehicle.objects.create(
+                    chauffeur=chauffeur,
+                    license_plate=license_plate,
+                    nickname=nickname,
+                    is_current=(set_as_current or not chauffeur.vehicles.exists()),
+                )
+                if new_vehicle.is_current:
+                    chauffeur.license_plate = new_vehicle.license_plate
+                    chauffeur.save(update_fields=["license_plate"])
+
+            messages.success(request, "Voertuig toegevoegd.")
+            return redirect("queueing:account")
+
+        if action == "remove_vehicle":
+            vehicle_id = request.POST.get("vehicle_id")
+            vehicle = ChauffeurVehicle.objects.filter(
+                id=vehicle_id, chauffeur=chauffeur
+            ).first()
+            if not vehicle:
+                messages.error(request, "Voertuig niet gevonden.")
+                return redirect("queueing:account")
+
+            with transaction.atomic():
+                was_current = vehicle.is_current
+                vehicle.delete()
+
+                if was_current:
+                    replacement = chauffeur.vehicles.order_by("id").first()
+                    if replacement:
+                        replacement.is_current = True
+                        replacement.save(update_fields=["is_current", "updated_at"])
+                        chauffeur.license_plate = replacement.license_plate
+                        chauffeur.save(update_fields=["license_plate"])
+
+            messages.success(request, "Voertuig verwijderd.")
+            return redirect("queueing:account")
+
+        messages.error(request, "Onbekende actie.")
+        return redirect("queueing:account")
 
 
 class QueueStatusView(View):

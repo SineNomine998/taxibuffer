@@ -81,6 +81,20 @@
       font-weight: 700;
     }
 
+    .account-link {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      border-radius: 999px;
+      color: #1f1f1f;
+      background: rgba(255, 255, 255, 0.35);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      text-decoration: none;
+    }
+
     .logo-wrap {
       background: transparent;
       border-radius: 8px;
@@ -320,6 +334,7 @@
   <div class="app" role="main" aria-label="Taxibuffer app">
 
     <header class="header" role="banner">
+      <a class="account-link" href="{% url 'queueing:account' %}">Account</a>
       <div class="info-icon" id="helpBtn" aria-label="Help">i</div>
 
       <div class="brand">

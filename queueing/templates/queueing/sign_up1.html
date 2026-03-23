@@ -137,7 +137,8 @@
             display: block;
         }
 
-        input[type="text"] {
+        input[type="text"],
+        input[type="email"] {
             width: 100%;
             height: 42px;
             border-radius: 10px;
@@ -201,7 +202,8 @@
                 font-size: 17px;
             }
 
-            input[type="text"] {
+            input[type="text"],
+            input[type="email"] {
                 font-size: 17px;
             }
 
@@ -240,11 +242,15 @@
                 {% csrf_token %}
                 <div>
                     <label for="first_name">Voornaam*</label>
-                    <input type="text" id="first_name" name="first_name" value="{{ form_data.first_name|default:'' }}" placeholder="Jan" maxlength="80" required>
+                    <input type="text" id="first_name" name="first_name" value="{{ form_data.first_name|default:'' }}" placeholder="Harold" maxlength="80" required>
                 </div>
                 <div>
                     <label for="last_name">Achternaam*</label>
-                    <input type="text" id="last_name" name="last_name" value="{{ form_data.last_name|default:'' }}" placeholder="Jansen" maxlength="120" required>
+                    <input type="text" id="last_name" name="last_name" value="{{ form_data.last_name|default:'' }}" placeholder="Finch" maxlength="120" required>
+                </div>
+                <div>
+                    <label for="email">Emailadres*</label>
+                    <input type="email" id="email" name="email" value="{{ form_data.email|default:'' }}" placeholder="harold@email.com" maxlength="254" required>
                 </div>
                 <div>
                     <label for="rtx_number">RTX nummer*</label>

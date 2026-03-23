@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="nl">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    {% load static %}
+    <title>TAXIBUFFER - Account</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gold-1: #e0bd22;
+            --gold-2: #fef508;
+            --bg: #efeff3;
+            --text: #1a1a1a;
+            --card: #f6f6f8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            font-family: "DM Sans", Arial, sans-serif;
+            background: #eceff4;
+            min-height: 100vh;
+        }
+
+        .app {
+            width: 100%;
+            max-width: 420px;
+            min-height: 100vh;
+            margin: 0 auto;
+            background: var(--bg);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            height: 124px;
+            background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand img {
+            max-height: 20px;
+            width: auto;
+        }
+
+        .brand-text {
+            font-size: 37px;
+            letter-spacing: 4px;
+            font-weight: 800;
+            line-height: 1;
+            color: #000;
+        }
+
+        .top-link {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            color: #202020;
+            font-size: 12px;
+            text-decoration: none;
+            font-weight: 700;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            border-radius: 999px;
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.35);
+        }
+
+        .content {
+            padding: 24px 16px 90px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            flex: 1;
+        }
+
+        h1 {
+            color: var(--text);
+            font-size: 30px;
+            line-height: 1.05;
+            font-weight: 800;
+        }
+
+        .subtitle {
+            color: #313131;
+            font-size: 16px;
+            line-height: 1.2;
+            margin-top: -3px;
+        }
+
+        .message {
+            background: rgba(255, 255, 255, 0.65);
+            border-radius: 10px;
+            color: #5d1b1b;
+            padding: 10px 12px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid #c9ccd5;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        .card h2 {
+            font-size: 18px;
+            color: #222;
+            margin-bottom: 10px;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 4px 0;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .row .label {
+            color: #606060;
+            font-weight: 700;
+        }
+
+        .row .value {
+            color: #1d1d1d;
+            text-align: right;
+            font-weight: 600;
+            word-break: break-word;
+        }
+
+        .vehicle {
+            border: 1px solid #c7c9d2;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #fff;
+        }
+
+        .vehicle.current {
+            background: #ddbe26;
+            border: none;
+        }
+
+        .vehicle-name {
+            font-size: 17px;
+            font-weight: 800;
+            color: #1f1f1f;
+        }
+
+        .vehicle.current .vehicle-name {
+            color: #fff;
+        }
+
+        .vehicle-plate {
+            margin-top: 2px;
+            font-size: 15px;
+            color: #4a4a4a;
+            font-weight: 600;
+        }
+
+        .vehicle.current .vehicle-plate {
+            color: #fff;
+        }
+
+        .actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .btn-sm {
+            border: none;
+            border-radius: 999px;
+            background: #ececec;
+            color: #222;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 6px 10px;
+            cursor: pointer;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .form-grid label {
+            font-size: 14px;
+            font-weight: 700;
+            color: #222;
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .form-grid input[type="text"] {
+            width: 100%;
+            height: 40px;
+            border-radius: 10px;
+            border: 1px solid #a9acb9;
+            background: #f1f1f1;
+            padding: 0 12px;
+            font-size: 15px;
+            color: #222;
+            outline: none;
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #222;
+            font-weight: 600;
+        }
+
+        .checkbox-row input {
+            width: 18px;
+            height: 18px;
+        }
+
+        .btn {
+            width: 100%;
+            height: 46px;
+            border: none;
+            border-radius: 999px;
+            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+            color: #111;
+            font-size: 20px;
+            font-weight: 750;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+        }
+
+        .footer {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+            font-size: 12px;
+            font-style: italic;
+            color: #434343;
+            text-align: left;
+            padding: 12px 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <header class="header">
+            <a class="top-link" href="{% url 'queueing:location_selection' %}">Terug</a>
+            <div class="brand">
+                <img src="{% static 'queueing/assets/logo.svg' %}" alt="Taxibuffer logo">
+                <div class="brand-text">TAXIBUFFER</div>
+            </div>
+        </header>
+
+        <main class="content">
+            <h1>Account</h1>
+            <div class="subtitle">Beheer uw profiel en voertuigen</div>
+
+            {% if messages %}
+            {% for message in messages %}
+            <div class="message">{{ message }}</div>
+            {% endfor %}
+            {% endif %}
+
+            <section class="card">
+                <h2>Profielgegevens</h2>
+                <div class="row">
+                    <div class="label">Naam</div>
+                    <div class="value">{{ account_user.first_name }} {{ account_user.last_name }}</div>
+                </div>
+                <div class="row">
+                    <div class="label">RTX-nummer</div>
+                    <div class="value">{{ chauffeur.taxi_license_number }}</div>
+                </div>
+                <div class="row">
+                    <div class="label">Huidig voertuig</div>
+                    <div class="value">{{ chauffeur.license_plate }}</div>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>Mijn voertuigen</h2>
+                {% if vehicles %}
+                {% for vehicle in vehicles %}
+                <div class="vehicle {% if vehicle.is_current %}current{% endif %}">
+                    <div class="vehicle-name">{{ vehicle.nickname }}</div>
+                    <div class="vehicle-plate">{{ vehicle.license_plate }}</div>
+                    <div class="actions">
+                        {% if not vehicle.is_current %}
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="set_current">
+                            <input type="hidden" name="vehicle_id" value="{{ vehicle.id }}">
+                            <button class="btn-sm" type="submit">Maak huidig</button>
+                        </form>
+                        {% endif %}
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="remove_vehicle">
+                            <input type="hidden" name="vehicle_id" value="{{ vehicle.id }}">
+                            <button class="btn-sm" type="submit">Verwijder</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="message">Nog geen voertuigen toegevoegd.</div>
+                {% endif %}
+            </section>
+
+            <section class="card">
+                <h2>Voertuig toevoegen</h2>
+                <form method="post" class="form-grid">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="add_vehicle">
+                    <div>
+                        <label for="nickname">Geef een naam voor dit voertuig*</label>
+                        <input type="text" id="nickname" name="nickname" maxlength="60" placeholder="Taxi 1" required>
+                    </div>
+                    <div>
+                        <label for="license_plate">Kenteken*</label>
+                        <input type="text" id="license_plate" name="license_plate" maxlength="20" placeholder="38HTTS" required>
+                    </div>
+                    <label class="checkbox-row" for="set_as_current">
+                        <input type="checkbox" id="set_as_current" name="set_as_current">
+                        Maak dit mijn huidige voertuig
+                    </label>
+                    <button class="btn btn-primary" type="submit">Opslaan</button>
+                </form>
+            </section>
+        </main>
+
+        <footer class="footer">Coding the Curbs in samenwerking met gemeente Rotterdam</footer>
+    </div>
+</body>
+
+</html>

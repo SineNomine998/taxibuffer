@@ -52,6 +52,7 @@ urlpatterns = [
         views.SignUpAddVehicleView.as_view(),
         name="sign_up_vehicle_add",
     ),
+    path("account/", views.AccountView.as_view(), name="account"),
     # Push notification subscription
     path("api/push/subscribe/", push_views.push_subscribe, name="push_subscribe"),
     path("api/push/test/", push_views.test_push, name="push_test"),
