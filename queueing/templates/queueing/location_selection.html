@@ -511,28 +511,8 @@
         return;
       }
 
-      // Only after successful validation, ask for vehicle type
-      try {
-        const vehicleType = await showVehicleTypeDialog();
-        if (!vehicleType) {
-          if (clickedButton) {
-            clickedButton.disabled = false;
-            clickedButton.textContent = originalText;
-          }
-          return;
-        }
-        await setVehicleType(vehicleType);
-        console.log("Vehicle type set, submitting form.");
-        form.submit();
-      } catch (err) {
-        console.error("Error setting vehicle type:", err);
-        fireSwal("Fout", err || "Er is een fout opgetreden bij het instellen van het voertuigtype. Probeer het opnieuw.");
-      } finally {
-        if (clickedButton) {
-          clickedButton.disabled = false;
-          clickedButton.textContent = originalText;
-        }
-      }
+      // Geofence check passed: submit directly without extra vehicle-type prompt.
+      form.submit();
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -561,65 +541,6 @@
       }
     });
 
-    function showVehicleTypeDialog() {
-      return new Promise((resolve, reject) => {
-        const message = "Heb je een groot voertuig voor meer dan 3 personen, geef dat dan aan.";
-        Swal.fire({
-          title: 'Kies je voertuig',
-          html: `
-          <div style="text-align: center;">
-              <img src="{% static 'queueing/assets/warning-badge.svg' %}" alt="Warning" style="max-width:80px;max-height:80px;width:100%;height:auto;">
-          </div>
-          <div style="margin-top:8px; margin-bottom:32px">${message}</div>
-          <div style="display: flex; flex-direction: column; gap: 12px;">
-              <button id="confirmBtn" class="swal2-confirm" style="width: 100%;">Auto</button>
-              <button id="cancelBtn" class="swal2-cancel" style="width: 100%;">Busje</button>
-          </div>
-        `,
-          showConfirmButton: false,
-          showCancelButton: false,
-          allowOutsideClick: false,
-          customClass: {
-            popup: 'notification-popup',
-            confirmButton: 'notification-accept-btn',
-            cancelButton: 'notification-decline-btn'
-          },
-          didOpen: () => {
-            document.getElementById('confirmBtn').addEventListener('click', function () {
-              Swal.close();
-              resolve('auto');
-            });
-            document.getElementById('cancelBtn').addEventListener('click', function () {
-              Swal.close();
-              resolve('busje');
-            });
-          }
-        }).then(() => {
-          if (!Swal.isVisible()) resolve(null);
-        }).catch(err => {
-          reject(err);
-        });
-      });
-    }
-
-    function setVehicleType(vt) {
-      return fetch("{% url 'queueing:set_vehicle_type' %}", {
-        method: "POST",
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: JSON.stringify({ vehicle_type: vt })
-      }).then(r => r.json())
-        .then(j => {
-          if (j.success) {
-            console.log("Vehicle type set to:", vt);
-            return Promise.resolve();
-          } else {
-            return Promise.reject(j.error);
-          }
-        });
-    }
   </script>
 </body>
 

@@ -129,6 +129,18 @@
             outline: none;
         }
 
+        select {
+            width: 100%;
+            height: 42px;
+            border-radius: 10px;
+            border: 1px solid #a9acb9;
+            background: #f1f1f1;
+            padding: 0 16px;
+            font-size: 18px;
+            color: #222;
+            outline: none;
+        }
+
         .checkbox-row {
             display: flex;
             align-items: center;
@@ -211,6 +223,10 @@
                 font-size: 17px;
             }
 
+            select {
+                font-size: 17px;
+            }
+
             .checkbox-row {
                 font-size: 17px;
             }
@@ -255,6 +271,13 @@
                 <div>
                     <label for="license_plate">Kenteken*</label>
                     <input type="text" id="license_plate" name="license_plate" placeholder="38HTTS" maxlength="20" required>
+                </div>
+                <div>
+                    <label for="vehicle_type">Voertuigtype*</label>
+                    <select id="vehicle_type" name="vehicle_type" required>
+                        <option value="auto">Auto</option>
+                        <option value="busje">Busje</option>
+                    </select>
                 </div>
                 <label class="checkbox-row" for="set_as_favorite">
                     <input type="checkbox" id="set_as_favorite" name="set_as_favorite">

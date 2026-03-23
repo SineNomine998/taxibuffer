@@ -75,6 +75,13 @@ class QueueService:
             with transaction.atomic():
                 # Check if chauffeur is already in any active queue
                 queue = TaxiQueue.objects.select_for_update().get(id=queue.id)
+                current_vehicle = chauffeur.get_current_vehicle()
+                if not current_vehicle:
+                    return (
+                        False,
+                        "No current vehicle configured for this chauffeur.",
+                        None,
+                    )
 
                 existing_entry = QueueEntry.objects.filter(
                     chauffeur=chauffeur,
@@ -102,6 +109,7 @@ class QueueService:
                 entry = QueueEntry.objects.create(
                     queue=queue,
                     chauffeur=chauffeur,
+                    vehicle_type=current_vehicle.vehicle_type,
                     signup_location=signup_location,
                     status=QueueEntry.Status.WAITING,
                 )
@@ -175,8 +183,9 @@ class QueueService:
                         # Check if chauffeur is still in waiting status
                         if entry.status == QueueEntry.Status.WAITING:
                             notification = entry.notify()
+                            plate = entry.chauffeur.current_license_plate or "unknown"
                             logger.info(
-                                f"Notified chauffeur {entry.chauffeur.license_plate}"
+                                f"Notified chauffeur {plate}"
                             )
                             notified_count += 1
                             sequence_number = getattr(
@@ -211,12 +220,20 @@ class QueueService:
                                                 send_web_push(
                                                     s.subscription_info, payload
                                                 )
+                                                plate = (
+                                                    entry.chauffeur.current_license_plate
+                                                    or "unknown"
+                                                )
                                                 logger.info(
-                                                    f"Push notification sent to {entry.chauffeur.license_plate}"
+                                                    f"Push notification sent to {plate}"
                                                 )
                                         else:
+                                            plate = (
+                                                entry.chauffeur.current_license_plate
+                                                or "unknown"
+                                            )
                                             logger.warning(
-                                                f"No push subscriptions found for chauffeur {entry.chauffeur.license_plate}"
+                                                f"No push subscriptions found for chauffeur {plate}"
                                             )
 
                                     except ProgrammingError:
@@ -230,8 +247,9 @@ class QueueService:
                                     )
 
                 except Exception as e:
+                    plate = entry.chauffeur.current_license_plate or "unknown"
                     logger.error(
-                        f"Failed to notify chauffeur {entry.chauffeur.license_plate}: {e}"
+                        f"Failed to notify chauffeur {plate}: {e}"
                     )
                     continue
 
@@ -317,8 +335,12 @@ class QueueService:
                             # Mark the notification as timed out - this will also
                             # update the queue entry status back to WAITING
                             notification.respond(QueueNotification.ResponseType.TIMEOUT)
+                            plate = (
+                                notification.queue_entry.chauffeur.current_license_plate
+                                or "unknown"
+                            )
                             logger.info(
-                                f"Timed out notification for {notification.queue_entry.chauffeur.license_plate}"
+                                f"Timed out notification for {plate}"
                             )
                             timeout_count += 1
 

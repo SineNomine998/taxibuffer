@@ -17,7 +17,7 @@ import re
 import os
 import logging
 
-from accounts.models import Chauffeur, ChauffeurVehicle, User
+from accounts.models import Chauffeur, ChauffeurVehicle, User, VehicleType
 from .models import TaxiQueue, QueueEntry, QueueNotification
 from .services import QueueService
 from geofence.services import point_in_buffer, make_point_from_lat_lng
@@ -98,20 +98,29 @@ class ChauffeurLoginView(View):
         # Keep admin testing bypass intact.
         if email.upper() == "SINENOMINE" and password.upper() == "TEST":
             try:
-                chauffeur = Chauffeur.objects.get(license_plate="SINENOMINE")
-            except Chauffeur.DoesNotExist:
+                test_vehicle = ChauffeurVehicle.objects.select_related("chauffeur").get(
+                    license_plate="SINENOMINE", is_current=True
+                )
+                chauffeur = test_vehicle.chauffeur
+            except ChauffeurVehicle.DoesNotExist:
                 user = User.objects.create_user(
                     username="test_chauffeur", is_chauffeur=True
                 )
                 chauffeur = Chauffeur.objects.create(
                     user=user,
-                    license_plate="SINENOMINE",
                     taxi_license_number="TEST",
                     location=None,
                 )
+                ChauffeurVehicle.objects.create(
+                    chauffeur=chauffeur,
+                    license_plate="SINENOMINE",
+                    nickname="Test voertuig",
+                    vehicle_type=VehicleType.AUTO,
+                    is_current=True,
+                )
             request.session["authenticated_chauffeur_id"] = chauffeur.id
             request.session["form_data"] = {
-                "license_plate": chauffeur.license_plate,
+                "license_plate": chauffeur.current_license_plate,
                 "taxi_license_number": chauffeur.taxi_license_number,
             }
             return redirect("queueing:location_selection")
@@ -125,7 +134,7 @@ class ChauffeurLoginView(View):
                 chauffeur = account_user.chauffeur
                 request.session["authenticated_chauffeur_id"] = chauffeur.id
                 request.session["form_data"] = {
-                    "license_plate": chauffeur.license_plate,
+                    "license_plate": chauffeur.current_license_plate,
                     "taxi_license_number": chauffeur.taxi_license_number,
                 }
                 login(request, account_user)
@@ -382,7 +391,6 @@ class SignUpVehicleView(View):
 
                 chauffeur = Chauffeur.objects.create(
                     user=user,
-                    license_plate=current_vehicle["license_plate"],
                     taxi_license_number=rtx_number,
                     location=None,
                 )
@@ -392,12 +400,13 @@ class SignUpVehicleView(View):
                         chauffeur=chauffeur,
                         license_plate=vehicle["license_plate"],
                         nickname=vehicle["nickname"],
+                        vehicle_type=vehicle.get("vehicle_type", VehicleType.AUTO),
                         is_current=(idx == current_vehicle_index),
                     )
 
             request.session["authenticated_chauffeur_id"] = chauffeur.id
             request.session["form_data"] = {
-                "license_plate": chauffeur.license_plate,
+                "license_plate": chauffeur.current_license_plate,
                 "taxi_license_number": chauffeur.taxi_license_number,
             }
             request.session.pop("signup_flow", None)
@@ -428,6 +437,7 @@ class SignUpAddVehicleView(View):
 
         license_plate = request.POST.get("license_plate", "").strip().upper()
         nickname = request.POST.get("nickname", "").strip()
+        vehicle_type = request.POST.get("vehicle_type", VehicleType.AUTO)
         set_as_current = request.POST.get("set_as_current") == "on"
 
         if not license_plate or not nickname:
@@ -438,13 +448,23 @@ class SignUpAddVehicleView(View):
             messages.error(request, "Kenteken of bijnaam is te lang.")
             return redirect("queueing:sign_up_vehicle_add")
 
+        if vehicle_type not in [VehicleType.AUTO, VehicleType.BUSJE]:
+            messages.error(request, "Kies een geldig voertuigtype.")
+            return redirect("queueing:sign_up_vehicle_add")
+
         vehicles = flow.get("vehicles", [])
         duplicate = any(v["license_plate"].upper() == license_plate for v in vehicles)
         if duplicate:
             messages.error(request, "Dit kenteken is al toegevoegd.")
             return redirect("queueing:sign_up_vehicle_add")
 
-        vehicles.append({"license_plate": license_plate, "nickname": nickname})
+        vehicles.append(
+            {
+                "license_plate": license_plate,
+                "nickname": nickname,
+                "vehicle_type": vehicle_type,
+            }
+        )
         flow["vehicles"] = vehicles
 
         if set_as_current or len(vehicles) == 1:
@@ -473,6 +493,7 @@ class AccountView(View):
             "account_user": chauffeur.user,
             "current_vehicle": current_vehicle,
             "vehicles": vehicles,
+            "vehicle_type_choices": VehicleType.choices,
         }
         return render(request, self.template_name, context)
 
@@ -497,11 +518,9 @@ class AccountView(View):
                 ChauffeurVehicle.objects.filter(chauffeur=chauffeur).update(is_current=False)
                 vehicle.is_current = True
                 vehicle.save(update_fields=["is_current", "updated_at"])
-                chauffeur.license_plate = vehicle.license_plate
-                chauffeur.save(update_fields=["license_plate"])
 
             request.session["form_data"] = {
-                "license_plate": chauffeur.license_plate,
+                "license_plate": chauffeur.current_license_plate,
                 "taxi_license_number": chauffeur.taxi_license_number,
             }
             messages.success(request, "Huidig voertuig bijgewerkt.")
@@ -510,6 +529,7 @@ class AccountView(View):
         if action == "add_vehicle":
             license_plate = request.POST.get("license_plate", "").strip().upper()
             nickname = request.POST.get("nickname", "").strip()
+            vehicle_type = request.POST.get("vehicle_type", VehicleType.AUTO)
             set_as_current = request.POST.get("set_as_current") == "on"
 
             if not license_plate or not nickname:
@@ -523,6 +543,10 @@ class AccountView(View):
                 messages.error(request, "Dit kenteken bestaat al in uw account.")
                 return redirect("queueing:account")
 
+            if vehicle_type not in [VehicleType.AUTO, VehicleType.BUSJE]:
+                messages.error(request, "Kies een geldig voertuigtype.")
+                return redirect("queueing:account")
+
             with transaction.atomic():
                 if set_as_current or not chauffeur.vehicles.exists():
                     ChauffeurVehicle.objects.filter(chauffeur=chauffeur).update(is_current=False)
@@ -530,11 +554,9 @@ class AccountView(View):
                     chauffeur=chauffeur,
                     license_plate=license_plate,
                     nickname=nickname,
+                    vehicle_type=vehicle_type,
                     is_current=(set_as_current or not chauffeur.vehicles.exists()),
                 )
-                if new_vehicle.is_current:
-                    chauffeur.license_plate = new_vehicle.license_plate
-                    chauffeur.save(update_fields=["license_plate"])
 
             messages.success(request, "Voertuig toegevoegd.")
             return redirect("queueing:account")
@@ -557,8 +579,6 @@ class AccountView(View):
                     if replacement:
                         replacement.is_current = True
                         replacement.save(update_fields=["is_current", "updated_at"])
-                        chauffeur.license_plate = replacement.license_plate
-                        chauffeur.save(update_fields=["license_plate"])
 
             messages.success(request, "Voertuig verwijderd.")
             return redirect("queueing:account")
@@ -680,6 +700,13 @@ class LocationSelectionView(View):
 
         try:
             chauffeur = Chauffeur.objects.get(id=chauffeur_uuid)
+            current_vehicle = chauffeur.get_current_vehicle()
+            if not current_vehicle:
+                messages.error(
+                    request,
+                    "U heeft nog geen huidig voertuig. Voeg een voertuig toe in uw account.",
+                )
+                return redirect("queueing:account")
 
             # Check if chauffeur is already in an active queue
             active_entry = QueueEntry.objects.filter(
@@ -703,6 +730,8 @@ class LocationSelectionView(View):
             queue.waiting_count = queue.get_waiting_entries().count()
 
         form_data = request.session.get("form_data", {})
+        form_data["license_plate"] = current_vehicle.license_plate
+        request.session["form_data"] = form_data
         context = {
             "chauffeur": chauffeur,
             "queues": active_queues,
@@ -728,6 +757,14 @@ class LocationSelectionView(View):
         except (Chauffeur.DoesNotExist, TaxiQueue.DoesNotExist):
             logger.warning("Invalid selection. Please try again.")
             return redirect("queueing:location_selection")
+
+        current_vehicle = chauffeur.get_current_vehicle()
+        if not current_vehicle:
+            messages.error(
+                request,
+                "U kunt alleen aanmelden met een huidig voertuig. Stel eerst een huidig voertuig in.",
+            )
+            return redirect("queueing:account")
 
         latitude = request.POST.get("signup_lat")
         longitude = request.POST.get("signup_lng")
@@ -764,7 +801,7 @@ class LocationSelectionView(View):
             return redirect("queueing:location_selection")
         
 
-        admin_license_plate = request.session.get("form_data", {}).get("license_plate", "").upper()
+        admin_license_plate = (current_vehicle.license_plate or "").upper()
         buffer_zone = getattr(queue, "buffer_zone", None)
         if buffer_zone and getattr(buffer_zone, "zone", None):
             try:
@@ -891,9 +928,20 @@ class SetVehicleTypeView(View):
                         },
                         status=403,
                     )
-            print("BRO DO WE HAVE A PROPER CHAUFFEUR?\n", chauffeur)
-            chauffeur.vehicle_type = vt
-            chauffeur.save(update_fields=["vehicle_type"])
+                chauffeur = request.user.chauffeur
+
+            current_vehicle = chauffeur.get_current_vehicle()
+            if not current_vehicle:
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "error": "No current vehicle set for this chauffeur",
+                    },
+                    status=400,
+                )
+
+            current_vehicle.vehicle_type = vt
+            current_vehicle.save(update_fields=["vehicle_type", "updated_at"])
             return JsonResponse({"success": True, "vehicle_type": vt})
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)}, status=500)

@@ -398,7 +398,7 @@ class BypassBusjeView(View):
             queue = get_object_or_404(TaxiQueue, id=queue_id, active=True)
             busje_entry = (
                 queue.queueentry_set.filter(
-                    status=QueueEntry.Status.WAITING, chauffeur__vehicle_type="busje"
+                    status=QueueEntry.Status.WAITING, vehicle_type="busje"
                 )
                 .order_by("created_at")
                 .first()
@@ -426,12 +426,14 @@ class BypassBusjeView(View):
 
                             for s in subs:
                                 send_web_push(s.subscription_info, payload)
+                                plate = busje_entry.chauffeur.current_license_plate or "unknown"
                                 logger.info(
-                                    f"Push notification sent to {busje_entry.chauffeur.license_plate}"
+                                    f"Push notification sent to {plate}"
                                 )
                         else:
+                            plate = busje_entry.chauffeur.current_license_plate or "unknown"
                             logger.warning(
-                                f"No push subscriptions found for chauffeur {busje_entry.chauffeur.license_plate}"
+                                f"No push subscriptions found for chauffeur {plate}"
                             )
 
                     except ProgrammingError:

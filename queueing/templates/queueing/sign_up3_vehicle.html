@@ -299,6 +299,7 @@
             <div class="vehicle-card current">
                 <div class="vehicle-main">
                     <div class="vehicle-name">{{ current_vehicle.nickname }}</div>
+                    <div class="vehicle-plate">Type: {{ current_vehicle.vehicle_type|default:"auto"|title }}</div>
                 </div>
                 <div class="plate-badge" style="border-color:#f7e79a;color:#fff;background:transparent;">{{ current_vehicle.license_plate }}</div>
             </div>
@@ -309,6 +310,7 @@
             <div class="vehicle-card" style="margin-bottom:10px;">
                 <div class="vehicle-main">
                     <div class="vehicle-name" style="color: #000;">{{ item.vehicle.nickname }}</div>
+                    <div class="vehicle-plate">Type: {{ item.vehicle.vehicle_type|default:"auto"|title }}</div>
                 </div>
                 <div class="plate-badge">{{ item.vehicle.license_plate }}</div>
             </div>

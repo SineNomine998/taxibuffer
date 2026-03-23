@@ -232,6 +232,18 @@
             outline: none;
         }
 
+        .form-grid select {
+            width: 100%;
+            height: 40px;
+            border-radius: 10px;
+            border: 1px solid #a9acb9;
+            background: #f1f1f1;
+            padding: 0 12px;
+            font-size: 15px;
+            color: #222;
+            outline: none;
+        }
+
         .checkbox-row {
             display: flex;
             align-items: center;
@@ -309,7 +321,7 @@
                 </div>
                 <div class="row">
                     <div class="label">Huidig voertuig</div>
-                    <div class="value">{{ chauffeur.license_plate }}</div>
+                    <div class="value">{% if current_vehicle %}{{ current_vehicle.license_plate }}{% else %}Niet ingesteld{% endif %}</div>
                 </div>
             </section>
 
@@ -320,6 +332,7 @@
                 <div class="vehicle {% if vehicle.is_current %}current{% endif %}">
                     <div class="vehicle-name">{{ vehicle.nickname }}</div>
                     <div class="vehicle-plate">{{ vehicle.license_plate }}</div>
+                    <div class="vehicle-plate">Type: {{ vehicle.get_vehicle_type_display }}</div>
                     <div class="actions">
                         {% if not vehicle.is_current %}
                         <form method="post">
@@ -355,6 +368,14 @@
                     <div>
                         <label for="license_plate">Kenteken*</label>
                         <input type="text" id="license_plate" name="license_plate" maxlength="20" placeholder="38HTTS" required>
+                    </div>
+                    <div>
+                        <label for="vehicle_type">Voertuigtype*</label>
+                        <select id="vehicle_type" name="vehicle_type" required>
+                            {% for value, label in vehicle_type_choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <label class="checkbox-row" for="set_as_current">
                         <input type="checkbox" id="set_as_current" name="set_as_current">

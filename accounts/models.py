@@ -29,27 +29,30 @@ class Chauffeur(models.Model):
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="chauffeur"
     )
-    license_plate = models.CharField(max_length=10)
     taxi_license_number = models.CharField(max_length=100)  # RTX-nummer
-    vehicle_type = models.CharField(
-        max_length=10,
-        choices=VehicleType.choices,
-        default=VehicleType.AUTO,
-        help_text="Driver's vehicle type",
-    )
     sign_up_time = models.DateTimeField(auto_now_add=True)
     location = models.PointField(null=True, blank=True, srid=4326)
 
     def get_current_vehicle(self):
         return self.vehicles.filter(is_current=True).first()
 
-    def sync_vehicle_identity_fields(self):
+    @property
+    def current_license_plate(self):
         current_vehicle = self.get_current_vehicle()
         if current_vehicle:
-            self.license_plate = current_vehicle.license_plate
+            return current_vehicle.license_plate
+        return ""
+
+    @property
+    def current_vehicle_type(self):
+        current_vehicle = self.get_current_vehicle()
+        if current_vehicle:
+            return current_vehicle.vehicle_type
+        return None
 
     def __str__(self):
-        return f"License plate: {self.license_plate} (RTX-nummer: {self.taxi_license_number})"
+        plate = self.current_license_plate or "No current vehicle"
+        return f"License plate: {plate} (RTX-nummer: {self.taxi_license_number})"
 
 
 class Officer(models.Model):
@@ -70,6 +73,12 @@ class ChauffeurVehicle(models.Model):
     )
     license_plate = models.CharField(max_length=20)
     nickname = models.CharField(max_length=60)
+    vehicle_type = models.CharField(
+        max_length=10,
+        choices=VehicleType.choices,
+        default=VehicleType.AUTO,
+        help_text="Vehicle type for queue routing",
+    )
     is_current = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -97,9 +106,6 @@ class ChauffeurVehicle(models.Model):
             self.__class__.objects.filter(chauffeur=self.chauffeur).exclude(
                 pk=self.pk
             ).update(is_current=False)
-            Chauffeur.objects.filter(pk=self.chauffeur_id).update(
-                license_plate=self.license_plate
-            )
 
     def __str__(self):
         suffix = " (current)" if self.is_current else ""
