@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="nl">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    {% load static %}
+    <title>TAXIBUFFER - Sign Up Stap 3</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gold-1: #e0bd22;
+            --gold-2: #fef508;
+            --bg: #efeff3;
+            --card: #f2f2f2;
+            --text: #1a1a1a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            font-family: "DM Sans", Arial, sans-serif;
+            background: #eceff4;
+            min-height: 100vh;
+        }
+
+        .app {
+            width: 100%;
+            max-width: 420px;
+            min-height: 100vh;
+            margin: 0 auto;
+            background: var(--bg);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            height: 124px;
+            background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .info-icon {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #111;
+            color: #111;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            text-decoration: none;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand img {
+            max-height: 20px;
+            width: auto;
+        }
+
+        .brand-text {
+            font-size: 37px;
+            letter-spacing: 4px;
+            font-weight: 800;
+            line-height: 1;
+            color: #000;
+        }
+
+        .content {
+            padding: 30px 20px 96px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            flex: 1;
+        }
+
+        h1 {
+            color: var(--text);
+            font-size: 33px;
+            line-height: 1.05;
+            font-weight: 800;
+        }
+
+        .subtitle {
+            color: #313131;
+            font-size: 20px;
+            line-height: 1.2;
+            margin-top: -4px;
+        }
+
+        .label {
+            font-size: 21px;
+            font-weight: 700;
+            color: #222;
+            margin-top: 6px;
+            margin-bottom: 8px;
+        }
+
+        .vehicle-card {
+            background: var(--card);
+            border: 1px solid #c7c9d2;
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .vehicle-main {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .vehicle-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            padding: 10px;
+        }
+
+        .vehicle-plate {
+            font-size: 21px;
+            color: #4a4a4a;
+        }
+
+        .plate-badge {
+            border: 2px solid #6f6f6f;
+            border-radius: 7px;
+            min-width: 112px;
+            text-align: center;
+            padding: 6px 10px;
+            font-size: 18px;
+            font-weight: 700;
+            color: #484848;
+            background: #fff;
+        }
+
+        .current {
+            background: #ddbe26;
+            color: #fff;
+            border: none;
+        }
+
+        .small-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .small-actions button {
+            border: none;
+            border-radius: 999px;
+            background: #e0bd22;
+            color: #222;
+            font-size: 15px;
+            font-weight: 700;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .add-btn,
+        .next-btn {
+            width: 100%;
+            height: 50px;
+            border: none;
+            border-radius: 999px;
+            font-size: 23px;
+            font-weight: 750;
+            cursor: pointer;
+            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+        }
+
+        .add-btn {
+            margin-top: 16px;
+            background: linear-gradient(180deg, #f8f8f8 0%, #e7e7e7 100%);
+            color: #161616;
+        }
+
+        .next-btn {
+            margin-top: 12px;
+            background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+            color: #161616;
+        }
+
+        .message {
+            background: rgba(255, 255, 255, 0.65);
+            border-radius: 10px;
+            color: #5d1b1b;
+            padding: 10px 12px;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .footer {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+            font-size: 12px;
+            font-style: italic;
+            color: #434343;
+            text-align: left;
+            padding: 12px 14px;
+        }
+
+        @media (max-width: 420px) {
+            .brand-text {
+                font-size: 19px;
+                letter-spacing: 3px;
+            }
+
+            h1 {
+                font-size: 30px;
+            }
+
+            .subtitle {
+                font-size: 15px;
+            }
+
+            .label {
+                font-size: 17px;
+            }
+
+            .vehicle-name {
+                font-size: 18px;
+            }
+
+            .vehicle-plate,
+            .plate-badge {
+                font-size: 18px;
+            }
+
+            .vehicle-card {
+                padding: 15px;
+            }
+
+            .add-btn,
+            .next-btn {
+                font-size: 20px;
+                height: 40px;
+            }
+
+            .footer {
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <header class="header">
+            <a href="{% url 'queueing:info_pages' %}" class="info-icon" aria-label="Info">i</a>
+            <div class="brand">
+                <img src="{% static 'queueing/assets/logo.svg' %}" alt="Taxibuffer logo">
+                <div class="brand-text">TAXIBUFFER</div>
+            </div>
+        </header>
+
+        <main class="content">
+            <h1>Voertuig</h1>
+            <div class="subtitle">Maak hier een account aan.</div>
+
+            {% if messages %}
+            {% for message in messages %}
+            <div class="message">{{ message }}</div>
+            {% endfor %}
+            {% endif %}
+
+            {% if has_vehicles %}
+            <div class="label">Huidig voertuig</div>
+            <div class="vehicle-card current">
+                <div class="vehicle-main">
+                    <div class="vehicle-name">{{ current_vehicle.nickname }}</div>
+                </div>
+                <div class="plate-badge" style="border-color:#f7e79a;color:#fff;background:transparent;">{{ current_vehicle.license_plate }}</div>
+            </div>
+
+            {% if other_vehicles %}
+            <div class="label" style="margin-top:20px;">Andere voertuigen</div>
+            {% for item in other_vehicles %}
+            <div class="vehicle-card" style="margin-bottom:10px;">
+                <div class="vehicle-main">
+                    <div class="vehicle-name" style="color: #000;">{{ item.vehicle.nickname }}</div>
+                </div>
+                <div class="plate-badge">{{ item.vehicle.license_plate }}</div>
+            </div>
+            <div class="small-actions">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="set_current">
+                    <input type="hidden" name="vehicle_index" value="{{ item.index }}">
+                    <button type="submit">Maak huidig</button>
+                </form>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="remove_vehicle">
+                    <input type="hidden" name="vehicle_index" value="{{ item.index }}">
+                    <button type="submit">Verwijder</button>
+                </form>
+            </div>
+            {% endfor %}
+            {% endif %}
+            {% else %}
+            <div class="message">Nog geen voertuigen toegevoegd.</div>
+            {% endif %}
+
+            <a href="{% url 'queueing:sign_up_vehicle_add' %}" style="display:block; text-decoration:none;">
+                <button type="button" class="add-btn">+ Voertuig toevoegen</button>
+            </a>
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="finish">
+                <button type="submit" class="next-btn">Volgende</button>
+            </form>
+        </main>
+
+        <footer class="footer">Coding the Curbs in samenwerking met gemeente Rotterdam</footer>
+    </div>
+</body>
+
+</html>

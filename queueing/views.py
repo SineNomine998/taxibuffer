@@ -180,6 +180,209 @@ class LocationSelectionInfoView(View):
         return render(request, "queueing/location_selection_info.html")
 
 
+class SignUpStep1View(View):
+    """Signup step 1: collect profile basics."""
+
+    template_name = "queueing/sign_up1.html"
+
+    def get(self, request):
+        flow = request.session.get("signup_flow", {})
+        context = {
+            "form_data": {
+                "first_name": flow.get("first_name", ""),
+                "last_name": flow.get("last_name", ""),
+                "rtx_number": flow.get("rtx_number", ""),
+            }
+        }
+        return render(request, self.template_name, context)
+
+    def post(self, request):
+        first_name = request.POST.get("first_name", "").strip()
+        last_name = request.POST.get("last_name", "").strip()
+        rtx_number = request.POST.get("rtx_number", "").strip().upper()
+
+        if not all([first_name, last_name, rtx_number]):
+            messages.error(request, "Vul alle verplichte velden in.")
+            return redirect("queueing:sign_up1")
+
+        flow = request.session.get("signup_flow", {})
+        flow["first_name"] = first_name
+        flow["last_name"] = last_name
+        flow["rtx_number"] = rtx_number
+        flow.setdefault("vehicles", [])
+        request.session["signup_flow"] = flow
+
+        return redirect("queueing:sign_up2")
+
+
+class SignUpPasswordView(View):
+    """Signup step 2: set account password."""
+
+    template_name = "queueing/sign_up2_password.html"
+
+    def get(self, request):
+        flow = request.session.get("signup_flow", {})
+        if not flow.get("first_name"):
+            return redirect("queueing:sign_up1")
+        return render(request, self.template_name)
+
+    def post(self, request):
+        flow = request.session.get("signup_flow", {})
+        if not flow.get("first_name"):
+            return redirect("queueing:sign_up1")
+
+        password = request.POST.get("password", "")
+        password_repeat = request.POST.get("password_repeat", "")
+
+        if not password or not password_repeat:
+            messages.error(request, "Vul beide wachtwoordvelden in.")
+            return redirect("queueing:sign_up2")
+
+        if password != password_repeat:
+            messages.error(request, "Wachtwoorden komen niet overeen.")
+            return redirect("queueing:sign_up2")
+
+        if len(password) < 8:
+            messages.error(request, "Kies een wachtwoord van minimaal 8 tekens.")
+            return redirect("queueing:sign_up2")
+
+        flow["raw_password"] = password
+        request.session["signup_flow"] = flow
+
+        return redirect("queueing:sign_up3")
+
+
+class SignUpVehicleView(View):
+    """Signup step 3: select current vehicle and finish."""
+
+    template_name = "queueing/sign_up3_vehicle.html"
+
+    def get(self, request):
+        flow = request.session.get("signup_flow", {})
+        if not flow.get("first_name"):
+            return redirect("queueing:sign_up1")
+
+        vehicles = flow.get("vehicles", [])
+        current_index = flow.get("current_vehicle_index")
+        if current_index is None and vehicles:
+            current_index = 0
+            flow["current_vehicle_index"] = 0
+            request.session["signup_flow"] = flow
+
+        current_vehicle = None
+        other_vehicles = []
+        if vehicles and current_index is not None and 0 <= current_index < len(vehicles):
+            current_vehicle = vehicles[current_index]
+            other_vehicles = [
+                {"vehicle": v, "index": i}
+                for i, v in enumerate(vehicles)
+                if i != current_index
+            ]
+
+        context = {
+            "current_vehicle": current_vehicle,
+            "other_vehicles": other_vehicles,
+            "has_vehicles": len(vehicles) > 0,
+        }
+        return render(request, self.template_name, context)
+
+    def post(self, request):
+        flow = request.session.get("signup_flow", {})
+        if not flow.get("first_name"):
+            return redirect("queueing:sign_up1")
+
+        action = request.POST.get("action", "finish")
+        vehicles = flow.get("vehicles", [])
+
+        if action == "set_current":
+            index = request.POST.get("vehicle_index", "")
+            try:
+                index = int(index)
+            except (ValueError, TypeError):
+                messages.error(request, "Kon huidig voertuig niet instellen.")
+                return redirect("queueing:sign_up3")
+
+            if 0 <= index < len(vehicles):
+                flow["current_vehicle_index"] = index
+                request.session["signup_flow"] = flow
+            return redirect("queueing:sign_up3")
+
+        if action == "remove_vehicle":
+            index = request.POST.get("vehicle_index", "")
+            try:
+                index = int(index)
+            except (ValueError, TypeError):
+                messages.error(request, "Kon voertuig niet verwijderen.")
+                return redirect("queueing:sign_up3")
+
+            if 0 <= index < len(vehicles):
+                vehicles.pop(index)
+                flow["vehicles"] = vehicles
+
+                current_index = flow.get("current_vehicle_index")
+                if not vehicles:
+                    flow["current_vehicle_index"] = None
+                elif current_index is None:
+                    flow["current_vehicle_index"] = 0
+                elif current_index == index:
+                    flow["current_vehicle_index"] = 0
+                elif current_index > index:
+                    flow["current_vehicle_index"] = current_index - 1
+
+                request.session["signup_flow"] = flow
+            return redirect("queueing:sign_up3")
+
+        if not vehicles:
+            messages.error(request, "Voeg minimaal 1 voertuig toe om verder te gaan.")
+            return redirect("queueing:sign_up3")
+
+        current_index = flow.get("current_vehicle_index")
+        if current_index is None or current_index >= len(vehicles):
+            flow["current_vehicle_index"] = 0
+
+        request.session["signup_flow"] = flow
+        messages.success(
+            request,
+            "Accountaanvraag opgeslagen in sessie. Koppel backend-opslag om dit definitief te maken.",
+        )
+        return redirect("queueing:chauffeur_login")
+
+
+class SignUpAddVehicleView(View):
+    """Sub-step from step 3 for adding one vehicle."""
+
+    template_name = "queueing/sign_up_vehicle_add.html"
+
+    def get(self, request):
+        flow = request.session.get("signup_flow", {})
+        if not flow.get("first_name"):
+            return redirect("queueing:sign_up1")
+        return render(request, self.template_name)
+
+    def post(self, request):
+        flow = request.session.get("signup_flow", {})
+        if not flow.get("first_name"):
+            return redirect("queueing:sign_up1")
+
+        license_plate = request.POST.get("license_plate", "").strip().upper()
+        nickname = request.POST.get("nickname", "").strip()
+        set_as_current = request.POST.get("set_as_current") == "on"
+
+        if not license_plate or not nickname:
+            messages.error(request, "Vul kenteken en bijnaam in.")
+            return redirect("queueing:sign_up_vehicle_add")
+
+        vehicles = flow.get("vehicles", [])
+        vehicles.append({"license_plate": license_plate, "nickname": nickname})
+        flow["vehicles"] = vehicles
+
+        if set_as_current or len(vehicles) == 1:
+            flow["current_vehicle_index"] = len(vehicles) - 1
+
+        request.session["signup_flow"] = flow
+        return redirect("queueing:sign_up3")
+
+
 class QueueStatusView(View):
     """Display queue status for a specific chauffeur."""
 

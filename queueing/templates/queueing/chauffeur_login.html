@@ -20,12 +20,12 @@
         * {
             box-sizing: border-box;
             margin: 0;
-            padding: 0
+            padding: 0;
         }
 
         html,
         body {
-            height: 100%
+            height: 100%;
         }
 
         body {
@@ -153,6 +153,19 @@
             margin-top: 10px;
         }
 
+        .register-row {
+            margin-top: 25px;
+            text-align: center;
+            font-size: 20px;
+            color: #2a2a2a;
+        }
+
+        .register-row a {
+            color: #121212;
+            text-decoration: underline;
+            text-underline-offset: 4px;
+        }
+
         .footer {
             font-size: 12px;
             color: #595959;
@@ -210,11 +223,15 @@
             }
 
             .explain {
-                font-size: 13px;
+                font-size: 20px;
             }
 
             .btn-login {
                 width: 220px;
+            }
+
+            .register-row {
+                font-size: 20px;
             }
         }
     </style>
@@ -230,7 +247,7 @@
                     </div>
                     <div class="brand-text">TAXIBUFFER</div>
                 </div>
-                <div class="explain">Meldt je hieronder aan met je kenteken en je RTX nummer</div>
+                <div class="explain">Meld je hieronder aan met je account en wachtwoord</div>
             </div>
 
             {% if show_access_denied %}
@@ -245,18 +262,19 @@
                 <form method="post" style="width:100%; display:flex; flex-direction:column; align-items:center;">
                     {% csrf_token %}
                     <div class="input-wrap">
-                        <label for="license_plate">Kenteken</label>
+                        <label for="license_plate">Emailadres</label>
                         <input type="text" id="license_plate" name="license_plate" required placeholder="1-ABC-23"
                             value="{{ form_data.license_plate|default:'' }}" maxlength="10" />
                     </div>
                     <div class="input-wrap">
-                        <label for="taxi_license_number">RTX-nummer</label>
+                        <label for="taxi_license_number">Wachtwoord</label>
                         <input type="text" id="taxi_license_number" name="taxi_license_number" required
-                            placeholder="1234" value="{{ form_data.taxi_license_number|default:'' }}"
+                            placeholder="P12345" value="{{ form_data.taxi_license_number|default:'' }}"
                             maxlength="20" />
                     </div>
                     <button type="submit" class="btn-login">Login</button>
                 </form>
+                <div class="register-row">Geen account? <a href="{% url 'queueing:signup' %}">Maak er een aan</a></div>
             </div>
         </div>
 
@@ -275,7 +293,7 @@
                     html: `
                         <div style="text-align: center; margin-bottom: 15px;">
                             <div>
-                            <img src="../../../static/queueing/assets/pop-up-denied.svg" 
+                            <img src="{% static 'queueing/assets/pop-up-denied.svg' %}" 
                                 alt="Denied" 
                                 style="max-width:80px;max-height:80px;width:100%;height:auto;">
                             </div>
@@ -342,11 +360,11 @@
                 form.submit();
             });
             {% for message in messages %}
-            let title = "Toegang Geweigerd";
+            var title = "Toegang Geweigerd";
             {% if message.extra_tags == 'RTX' %}
-            let errorMessage = "Ongeldig RTX-nummer. Probeer het opnieuw.";
+            var errorMessage = "Ongeldig RTX-nummer. Probeer het opnieuw.";
             {% else %}
-            let errorMessage = "{{ message }}"; // just in case bro
+            var errorMessage = "{{ message }}"; // just in case bro
             {% endif %}
             fireSwal(title, errorMessage);
             {% endfor %}

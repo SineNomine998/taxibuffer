@@ -43,7 +43,15 @@ urlpatterns = [
         views.ManualTriggerView.as_view(),
         name="manual_trigger",
     ),
-    path("signup/", views.ChauffeurLoginView.as_view(), name="signup"),
+    path("signup/", views.SignUpStep1View.as_view(), name="signup"),
+    path("signup/step-1/", views.SignUpStep1View.as_view(), name="sign_up1"),
+    path("signup/step-2/", views.SignUpPasswordView.as_view(), name="sign_up2"),
+    path("signup/step-3/", views.SignUpVehicleView.as_view(), name="sign_up3"),
+    path(
+        "signup/vehicle/add/",
+        views.SignUpAddVehicleView.as_view(),
+        name="sign_up_vehicle_add",
+    ),
     # Push notification subscription
     path("api/push/subscribe/", push_views.push_subscribe, name="push_subscribe"),
     path("api/push/test/", push_views.test_push, name="push_test"),
