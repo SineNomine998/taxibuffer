@@ -20,12 +20,12 @@
         * {
             box-sizing: border-box;
             margin: 0;
-            padding: 0
+            padding: 0;
         }
 
         html,
         body {
-            height: 100%
+            height: 100%;
         }
 
         body {
@@ -124,7 +124,8 @@
             width: 100%;
         }
 
-        input[type="text"] {
+        input[type="text"],
+        input[type="password"] {
             width: 100%;
             padding: 14px;
             border-radius: 12px;
@@ -151,6 +152,19 @@
             box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
             cursor: pointer;
             margin-top: 10px;
+        }
+
+        .register-row {
+            margin-top: 25px;
+            text-align: center;
+            font-size: 20px;
+            color: #2a2a2a;
+        }
+
+        .register-row a {
+            color: #121212;
+            text-decoration: underline;
+            text-underline-offset: 4px;
         }
 
         .footer {
@@ -210,11 +224,15 @@
             }
 
             .explain {
-                font-size: 13px;
+                font-size: 20px;
             }
 
             .btn-login {
                 width: 220px;
+            }
+
+            .register-row {
+                font-size: 20px;
             }
         }
     </style>
@@ -230,7 +248,7 @@
                     </div>
                     <div class="brand-text">TAXIBUFFER</div>
                 </div>
-                <div class="explain">Meldt je hieronder aan met je kenteken en je RTX nummer</div>
+                <div class="explain">Meld je hieronder aan met je account en wachtwoord</div>
             </div>
 
             {% if show_access_denied %}
@@ -245,18 +263,18 @@
                 <form method="post" style="width:100%; display:flex; flex-direction:column; align-items:center;">
                     {% csrf_token %}
                     <div class="input-wrap">
-                        <label for="license_plate">Kenteken</label>
-                        <input type="text" id="license_plate" name="license_plate" required placeholder="1-ABC-23"
-                            value="{{ form_data.license_plate|default:'' }}" maxlength="10" />
+                        <label for="email">Emailadres</label>
+                        <input type="text" id="email" name="email" required placeholder="naam@email.nl"
+                            value="{{ form_data.email|default:'' }}" maxlength="254" />
                     </div>
                     <div class="input-wrap">
-                        <label for="taxi_license_number">RTX-nummer</label>
-                        <input type="text" id="taxi_license_number" name="taxi_license_number" required
-                            placeholder="1234" value="{{ form_data.taxi_license_number|default:'' }}"
-                            maxlength="20" />
+                        <label for="password">Wachtwoord</label>
+                        <input type="password" id="password" name="password" required
+                            placeholder="********" maxlength="128" />
                     </div>
                     <button type="submit" class="btn-login">Login</button>
                 </form>
+                <div class="register-row">Geen account? <a href="{% url 'queueing:signup' %}">Maak er een aan</a></div>
             </div>
         </div>
 
@@ -275,7 +293,7 @@
                     html: `
                         <div style="text-align: center; margin-bottom: 15px;">
                             <div>
-                            <img src="../../../static/queueing/assets/pop-up-denied.svg" 
+                            <img src="{% static 'queueing/assets/pop-up-denied.svg' %}" 
                                 alt="Denied" 
                                 style="max-width:80px;max-height:80px;width:100%;height:auto;">
                             </div>
@@ -289,65 +307,34 @@
 
             form.addEventListener('submit', function (event) {
                 event.preventDefault();
-                const licensePlateEl = document.getElementById('license_plate');
-                const taxiLicenseEl = document.getElementById('taxi_license_number');
-                const licensePlate = licensePlateEl.value.trim().toUpperCase();
-                const taxiLicense = taxiLicenseEl.value.trim().toUpperCase();
+                const emailEl = document.getElementById('email');
+                const passwordEl = document.getElementById('password');
+                const email = emailEl.value.trim();
+                const password = passwordEl.value.trim();
 
                 // Bypass validation for testing purposes
-                if (licensePlate === "SINENOMINE" && taxiLicense === "TEST") {
+                if (email.toUpperCase() === "SINENOMINE" && password.toUpperCase() === "TEST") {
                     form.submit();
                     return;
                 }
 
-                // A bit unnecessary, but just in case
-                if (!licensePlate) {
-                    title = "Kenteken vereist";
-                    message = "Vul uw kenteken in.";
+                if (!email) {
+                    title = "Emailadres vereist";
+                    message = "Vul uw emailadres in.";
                     fireSwal(title, message);
                     return;
-                } else if (!taxiLicense) {
-                    title = "RTX-nummer vereist";
-                    message = "Vul uw RTX-nummer in.";
+                } else if (!password) {
+                    title = "Wachtwoord vereist";
+                    message = "Vul uw wachtwoord in.";
                     fireSwal(title, message);
                     return;
                 }
 
-                // NOT DOING LICENSE PLATE CHECK ANYMORE AS THERE SEEMS TO BE TOO MANY VARIATIONS
-                // Basic Dutch license plate patterns
-                // const patterns = [
-                //     /^[A-Z]{2}-\d{2}-\d{2}$/,  // XX - 99 - 99
-                //     /^\d{2}-\d{2}-[A-Z]{2}$/,  // 99 - 99 - XX
-                //     /^[A-Z]{2}-\d{2}-[A-Z]{2}$/,  // XX - 99 - XX
-                //     /^\d{2}-[A-Z]{2}-\d{2}$/,  // 99 - XX - 99
-                //     /^[A-Z]{2}-[A-Z]{2}-\d{2}$/,  // XX - XX - 99
-                //     /^\d{2}-[A-Z]{2}-[A-Z]{2}$/,  // 99 - XX - XX
-                //     /^[A-Z]{1}-\d{3}-[A-Z]{2}$/,  // X - 999 - XX
-                //     /^[A-Z]{2}-\d{3}-[A-Z]{1}$/,  // XX - 999 - X
-                //     /^\d{3}-[A-Z]{2}-[A-Z]{1}$/,  // 999 - XX - X
-                //     /^\d{3}-[A-Z]{1}-[A-Z]{2}$/,  // 999 - X - XX
-                //     /^\d{1,2}-[A-Z]{2,3}-\d{1,2}$/,  // 1-ABC-23
-                //     /^\d{3}-[A-Z]{2}-\d{1,2}$/,  // 123-AB-1
-                //     /^[A-Z]{3}-\d{2}-\d{1,2}$/,  // ABC-12-3
-                // ];
-                // const validPlate = patterns.some((regex) => regex.test(licensePlate));
-
-                // if (!validPlate) {
-                //     title = "Ongeldig kenteken";
-                //     message = "Vul een geldig Nederlands kenteken in (bijv. 1-ABC-23).";
-                //     fireSwal(title, message);
-                //     return;
-                // }
-
                 form.submit();
             });
             {% for message in messages %}
-            let title = "Toegang Geweigerd";
-            {% if message.extra_tags == 'RTX' %}
-            let errorMessage = "Ongeldig RTX-nummer. Probeer het opnieuw.";
-            {% else %}
-            let errorMessage = "{{ message }}"; // just in case bro
-            {% endif %}
+            var title = "Toegang Geweigerd";
+            var errorMessage = "{{ message }}"; // just in case bro
             fireSwal(title, errorMessage);
             {% endfor %}
         });
