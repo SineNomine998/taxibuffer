@@ -82,30 +82,26 @@ class ChauffeurVehicle(models.Model):
     is_current = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
                 fields=["chauffeur", "license_plate"],
+                condition=Q(is_active=True),
                 name="unique_chauffeur_license_plate",
             ),
             models.UniqueConstraint(
                 fields=["chauffeur"],
-                condition=Q(is_current=True),
+                condition=Q(is_current=True, is_active=True),
                 name="unique_current_vehicle_per_chauffeur",
             ),
         ]
         indexes = [
             models.Index(fields=["chauffeur", "is_current"]),
             models.Index(fields=["license_plate"]),
+            models.Index(fields=["is_active"]),
         ]
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if self.is_current:
-            self.__class__.objects.filter(chauffeur=self.chauffeur).exclude(
-                pk=self.pk
-            ).update(is_current=False)
 
     def __str__(self):
         suffix = " (current)" if self.is_current else ""
