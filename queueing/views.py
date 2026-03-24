@@ -99,7 +99,7 @@ class ChauffeurLoginView(View):
         if email.upper() == "SINENOMINE" and password.upper() == "TEST":
             try:
                 test_vehicle = ChauffeurVehicle.objects.select_related("chauffeur").get(
-                    license_plate="SINENOMINE", is_current=True
+                    license_plate="SINENOMINE", is_current=True, is_active=True
                 )
                 chauffeur = test_vehicle.chauffeur
             except ChauffeurVehicle.DoesNotExist:
@@ -117,6 +117,7 @@ class ChauffeurLoginView(View):
                     nickname="Test voertuig",
                     vehicle_type=VehicleType.AUTO,
                     is_current=True,
+                    is_active=True,
                 )
             request.session["authenticated_chauffeur_id"] = chauffeur.id
             request.session["form_data"] = {
@@ -402,6 +403,7 @@ class SignUpVehicleView(View):
                         nickname=vehicle["nickname"],
                         vehicle_type=vehicle.get("vehicle_type", VehicleType.AUTO),
                         is_current=(idx == current_vehicle_index),
+                        is_active=True,
                     )
 
             request.session["authenticated_chauffeur_id"] = chauffeur.id
@@ -485,7 +487,7 @@ class AccountView(View):
             messages.error(request, "Log eerst in om uw account te bekijken.")
             return redirect("queueing:chauffeur_login")
 
-        vehicles = list(chauffeur.vehicles.order_by("-is_current", "nickname", "id"))
+        vehicles = list(chauffeur.vehicles.filter(is_active=True).order_by("-is_current", "nickname", "id"))
         current_vehicle = next((v for v in vehicles if v.is_current), None)
 
         context = {
@@ -508,14 +510,14 @@ class AccountView(View):
         if action == "set_current":
             vehicle_id = request.POST.get("vehicle_id")
             vehicle = ChauffeurVehicle.objects.filter(
-                id=vehicle_id, chauffeur=chauffeur
+                id=vehicle_id, chauffeur=chauffeur, is_active=True
             ).first()
             if not vehicle:
                 messages.error(request, "Voertuig niet gevonden.")
                 return redirect("queueing:account")
 
             with transaction.atomic():
-                ChauffeurVehicle.objects.filter(chauffeur=chauffeur).update(is_current=False)
+                ChauffeurVehicle.objects.filter(chauffeur=chauffeur, is_active=True).update(is_current=False)
                 vehicle.is_current = True
                 vehicle.save(update_fields=["is_current", "updated_at"])
 
@@ -537,7 +539,7 @@ class AccountView(View):
                 return redirect("queueing:account")
 
             existing = ChauffeurVehicle.objects.filter(
-                chauffeur=chauffeur, license_plate__iexact=license_plate
+                chauffeur=chauffeur, license_plate__iexact=license_plate, is_active=True
             ).exists()
             if existing:
                 messages.error(request, "Dit kenteken bestaat al in uw account.")
@@ -548,14 +550,14 @@ class AccountView(View):
                 return redirect("queueing:account")
 
             with transaction.atomic():
-                if set_as_current or not chauffeur.vehicles.exists():
-                    ChauffeurVehicle.objects.filter(chauffeur=chauffeur).update(is_current=False)
+                if set_as_current or not chauffeur.vehicles.filter(is_active=True).exists():
+                    ChauffeurVehicle.objects.filter(chauffeur=chauffeur, is_active=True).update(is_current=False)
                 new_vehicle = ChauffeurVehicle.objects.create(
                     chauffeur=chauffeur,
                     license_plate=license_plate,
                     nickname=nickname,
                     vehicle_type=vehicle_type,
-                    is_current=(set_as_current or not chauffeur.vehicles.exists()),
+                    is_current=(set_as_current or not chauffeur.vehicles.filter(is_active=True).exists()),
                 )
 
             messages.success(request, "Voertuig toegevoegd.")
@@ -564,7 +566,7 @@ class AccountView(View):
         if action == "remove_vehicle":
             vehicle_id = request.POST.get("vehicle_id")
             vehicle = ChauffeurVehicle.objects.filter(
-                id=vehicle_id, chauffeur=chauffeur
+                id=vehicle_id, chauffeur=chauffeur, is_active=True
             ).first()
             if not vehicle:
                 messages.error(request, "Voertuig niet gevonden.")
@@ -572,10 +574,13 @@ class AccountView(View):
 
             with transaction.atomic():
                 was_current = vehicle.is_current
-                vehicle.delete()
+                # vehicle.delete()  # Don't delete for data integrity, just mark as inactive
+                vehicle.is_active = False
+                vehicle.is_current = False
+                vehicle.save(update_fields=["is_active", "is_current", "updated_at"])
 
                 if was_current:
-                    replacement = chauffeur.vehicles.order_by("id").first()
+                    replacement = chauffeur.vehicles.filter(is_active=True).order_by("id").first()
                     if replacement:
                         replacement.is_current = True
                         replacement.save(update_fields=["is_current", "updated_at"])
@@ -904,6 +909,7 @@ class NotificationResponseView(View):
             return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
+# TODO: This view is currently unused, but could be useful if we want to allow chauffeurs to set their vehicle type before joining the queue (instead of having it fixed in their profile). For now, the vehicle type is determined by the current vehicle in their profile, and they can change that in their account settings if needed.
 class SetVehicleTypeView(View):
     def post(self, request):
         vt = request.POST.get("vehicle_type") or (
