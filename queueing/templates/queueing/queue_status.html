@@ -222,6 +222,62 @@
             line-height: 1;
         }
 
+        .waiting-list-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(2, 6, 23, 0.06);
+            padding: 14px;
+        }
+
+        .waiting-list-title {
+            font-size: 17px;
+            font-weight: 800;
+            color: #111827;
+            margin: 0 0 10px;
+        }
+
+        .waiting-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .waiting-person {
+            background: #f7f8fc;
+            border-radius: 10px;
+            padding: 10px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #eceef3;
+            color: #1f2937;
+            font-size: 14px;
+            gap: 10px;
+        }
+
+        .waiting-person.is-current {
+            border-color: rgba(224, 189, 34, 0.6);
+            background: rgba(254, 245, 8, 0.18);
+        }
+
+        .waiting-person-name {
+            font-weight: 700;
+        }
+
+        .waiting-person-plate {
+            font-weight: 600;
+            color: #4b5563;
+        }
+
+        .waiting-empty {
+            font-size: 14px;
+            color: #6b7280;
+            margin: 0;
+        }
+
         .leave-button {
             margin-top: 16px;
             width: 100%;
@@ -531,6 +587,22 @@
                 </div>
             </div>
 
+            <section class="waiting-list-card" aria-label="Wachtende chauffeurs">
+                <h2 class="waiting-list-title">Wachtenden in deze wachtrij</h2>
+                <div id="waiting-list" class="waiting-list" role="list" {% if not waiting_people %}style="display: none;"{% endif %}>
+                    {% for person in waiting_people %}
+                    <div class="waiting-person {% if person.is_current_chauffeur %}is-current{% endif %}" role="listitem">
+                        <span class="waiting-person-name">
+                            {{ person.first_name|default:"Onbekend" }}
+                            {% if person.is_current_chauffeur %}(u){% endif %}
+                        </span>
+                        <span class="waiting-person-plate">{{ person.license_plate|default:"-" }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                <p id="waiting-empty" class="waiting-empty" {% if waiting_people %}style="display: none;"{% endif %}>Er zijn momenteel geen wachtenden in deze wachtrij.</p>
+            </section>
+
             <div id="alert-container"></div>
             <div class="last-updated" id="last-updated">Last updated: --:--:--</div>
         </main>
@@ -539,7 +611,7 @@
             🔴 Disconnected
         </div>
 
-        <footer class="footer" role="contentinfo">Coding the Curbs® in samenwerking met Gemeente Rotterdam</footer>
+        {% include 'queueing/partials/bottom_nav.html' %}
     </div>
 
     <script src="{% static 'queueing/js/queue_status.js' %}"></script>

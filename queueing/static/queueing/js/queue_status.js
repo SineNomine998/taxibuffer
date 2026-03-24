@@ -29,8 +29,8 @@ async function registerSWAndSubscribe(vapidPublicKey, entryUuid) {
         const reg = await navigator.serviceWorker.register('/sw.js');
         console.log('Service worker registered', reg);
 
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
+        const permissionAfterRegister = await Notification.requestPermission();
+        if (permissionAfterRegister !== 'granted') {
             console.warn('Notification permission not granted');
             return null;
         }
@@ -74,7 +74,7 @@ class QueueManager {
             alignmentTimeout: null,
             isConnected: false,
             retryCount: 0,
-            initialUpdateDone: false // track inital update
+            initialUpdateDone: false, // track initial update
         };
 
         this.init(true);
@@ -295,6 +295,50 @@ class QueueManager {
         const pos = (data.position !== undefined ? data.position : '-');
         const posEl = document.getElementById('position-display');
         if (posEl) posEl.textContent = pos;
+
+        // Always reconcile the waiting list to avoid stale UI when the payload changes shape.
+        const waitingPeople = Array.isArray(data.waiting_people) ? data.waiting_people : [];
+        this.updateWaitingList(waitingPeople);
+    }
+
+    updateWaitingList(people) {
+        const container = document.getElementById('waiting-list') || document.querySelector('.waiting-list');
+        if (!container) return;
+
+        const emptyMessage = document.getElementById('waiting-empty');
+        const normalizedPeople = Array.isArray(people) ? people : [];
+
+        container.innerHTML = '';
+
+        if (!normalizedPeople.length) {
+            container.style.display = 'none';
+            if (emptyMessage) emptyMessage.style.display = 'block';
+            return;
+        }
+
+        container.style.display = 'flex';
+        if (emptyMessage) emptyMessage.style.display = 'none';
+
+        normalizedPeople.forEach(person => {
+            const div = document.createElement('div');
+
+            div.className = 'waiting-person';
+            if (person.is_current_chauffeur) {
+                div.classList.add('is-current');
+            }
+
+            div.innerHTML = `
+                <span class="waiting-person-name">
+                    ${person.first_name || 'Onbekend'}
+                    ${person.is_current_chauffeur ? '(u)' : ''}
+                </span>
+                <span class="waiting-person-plate">
+                    ${person.license_plate || '-'}
+                </span>
+            `;
+
+            container.appendChild(div);
+        });
     }
 
     handleNotification(data) {
