@@ -126,10 +126,14 @@ class ChauffeurLoginView(View):
             }
             return redirect("queueing:location_selection")
 
-        account_user = User.objects.filter(
-            email__iexact=email,
-            is_chauffeur=True,
-        ).select_related("chauffeur").first()
+        account_user = (
+            User.objects.filter(
+                email__iexact=email,
+                is_chauffeur=True,
+            )
+            .select_related("chauffeur")
+            .first()
+        )
         if account_user and password and account_user.check_password(password):
             if hasattr(account_user, "chauffeur"):
                 chauffeur = account_user.chauffeur
@@ -286,7 +290,11 @@ class SignUpVehicleView(View):
 
         current_vehicle = None
         other_vehicles = []
-        if vehicles and current_index is not None and 0 <= current_index < len(vehicles):
+        if (
+            vehicles
+            and current_index is not None
+            and 0 <= current_index < len(vehicles)
+        ):
             current_vehicle = vehicles[current_index]
             other_vehicles = [
                 {"vehicle": v, "index": i}
@@ -367,9 +375,11 @@ class SignUpVehicleView(View):
 
         try:
             with transaction.atomic():
-                existing_chauffeur = Chauffeur.objects.filter(
-                    taxi_license_number=rtx_number
-                ).select_related("user").first()
+                existing_chauffeur = (
+                    Chauffeur.objects.filter(taxi_license_number=rtx_number)
+                    .select_related("user")
+                    .first()
+                )
                 if existing_chauffeur:
                     messages.error(
                         request,
@@ -417,7 +427,9 @@ class SignUpVehicleView(View):
             return redirect("queueing:account")
         except Exception as e:
             logger.exception("Could not create signup account: %s", e)
-            messages.error(request, "Account kon niet worden aangemaakt. Probeer opnieuw.")
+            messages.error(
+                request, "Account kon niet worden aangemaakt. Probeer opnieuw."
+            )
             return redirect("queueing:sign_up3")
 
 
@@ -487,7 +499,11 @@ class AccountView(View):
             messages.error(request, "Log eerst in om uw account te bekijken.")
             return redirect("queueing:chauffeur_login")
 
-        vehicles = list(chauffeur.vehicles.filter(is_active=True).order_by("-is_current", "nickname", "id"))
+        vehicles = list(
+            chauffeur.vehicles.filter(is_active=True).order_by(
+                "-is_current", "nickname", "id"
+            )
+        )
         current_vehicle = next((v for v in vehicles if v.is_current), None)
 
         context = {
@@ -496,6 +512,7 @@ class AccountView(View):
             "current_vehicle": current_vehicle,
             "vehicles": vehicles,
             "vehicle_type_choices": VehicleType.choices,
+            "active_tab": "account",
         }
         return render(request, self.template_name, context)
 
@@ -517,7 +534,9 @@ class AccountView(View):
                 return redirect("queueing:account")
 
             with transaction.atomic():
-                ChauffeurVehicle.objects.filter(chauffeur=chauffeur, is_active=True).update(is_current=False)
+                ChauffeurVehicle.objects.filter(
+                    chauffeur=chauffeur, is_active=True
+                ).update(is_current=False)
                 vehicle.is_current = True
                 vehicle.save(update_fields=["is_current", "updated_at"])
 
@@ -550,14 +569,22 @@ class AccountView(View):
                 return redirect("queueing:account")
 
             with transaction.atomic():
-                if set_as_current or not chauffeur.vehicles.filter(is_active=True).exists():
-                    ChauffeurVehicle.objects.filter(chauffeur=chauffeur, is_active=True).update(is_current=False)
+                if (
+                    set_as_current
+                    or not chauffeur.vehicles.filter(is_active=True).exists()
+                ):
+                    ChauffeurVehicle.objects.filter(
+                        chauffeur=chauffeur, is_active=True
+                    ).update(is_current=False)
                 new_vehicle = ChauffeurVehicle.objects.create(
                     chauffeur=chauffeur,
                     license_plate=license_plate,
                     nickname=nickname,
                     vehicle_type=vehicle_type,
-                    is_current=(set_as_current or not chauffeur.vehicles.filter(is_active=True).exists()),
+                    is_current=(
+                        set_as_current
+                        or not chauffeur.vehicles.filter(is_active=True).exists()
+                    ),
                 )
 
             messages.success(request, "Voertuig toegevoegd.")
@@ -580,7 +607,9 @@ class AccountView(View):
                 vehicle.save(update_fields=["is_active", "is_current", "updated_at"])
 
                 if was_current:
-                    replacement = chauffeur.vehicles.filter(is_active=True).order_by("id").first()
+                    replacement = (
+                        chauffeur.vehicles.filter(is_active=True).order_by("id").first()
+                    )
                     if replacement:
                         replacement.is_current = True
                         replacement.save(update_fields=["is_current", "updated_at"])
@@ -603,10 +632,27 @@ class QueueStatusView(View):
             queue = entry.queue
             chauffeur = entry.chauffeur
 
+            waiting_entries = (
+                queue.get_waiting_entries()
+                .select_related("chauffeur__user")
+                .order_by("created_at")
+            )
+
+            waiting_people = [
+                {
+                    "first_name": waiting_entry.chauffeur.user.first_name,
+                    "license_plate": waiting_entry.chauffeur.current_license_plate,
+                    "is_current_chauffeur": waiting_entry.chauffeur_id == chauffeur.id,
+                }
+                for waiting_entry in waiting_entries
+            ]
+
             context = {
                 "queue": queue,
                 "chauffeur": chauffeur,
                 "entry": entry,
+                "active_tab": "queue",
+                "waiting_people": waiting_people,
                 "vapid_public_key": settings.WEBPUSH_SETTINGS["VAPID_PUBLIC_KEY"],
             }
             return render(request, "queueing/queue_status.html", context)
@@ -614,6 +660,31 @@ class QueueStatusView(View):
         except Exception as e:
             messages.error(request, f"Invalid queue entry: {str(e)}")
             return redirect("queueing:chauffeur_login")
+
+
+class QueueOverviewView(View):
+    """Route queue tab clicks to the active queue, if any."""
+
+    def get(self, request):
+        chauffeur = _get_authenticated_chauffeur(request)
+        if not chauffeur:
+            messages.error(request, "Log eerst in om uw wachtrij te bekijken.")
+            return redirect("queueing:chauffeur_login")
+
+        active_entry = (
+            QueueEntry.objects.filter(
+                chauffeur=chauffeur,
+                status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+        if active_entry:
+            return redirect("queueing:queue_status", entry_uuid=active_entry.uuid)
+
+        messages.info(request, "U staat momenteel in geen enkele wachtrij.")
+        return redirect("queueing:location_selection")
 
 
 class QueueStatusAPIView(View):
@@ -627,7 +698,9 @@ class QueueStatusAPIView(View):
 
             # Get queue position and waiting count
             position = entry.get_queue_position()
-            waiting_entries = queue.get_waiting_entries()
+            waiting_entries = queue.get_waiting_entries().select_related(
+                "chauffeur__user"
+            ).order_by("created_at")
             total_waiting = waiting_entries.count()
 
             # Get pending notifications
@@ -646,6 +719,15 @@ class QueueStatusAPIView(View):
                     "sequence_number": notification.sequence_number,
                 }
 
+            waiting_people = [
+                {
+                    "first_name": waiting_entry.chauffeur.user.first_name,
+                    "license_plate": waiting_entry.chauffeur.current_license_plate,
+                    "is_current_chauffeur": waiting_entry.chauffeur_id == entry.chauffeur_id,
+                }
+                for waiting_entry in waiting_entries
+            ]
+
             return JsonResponse(
                 {
                     "success": True,
@@ -655,8 +737,13 @@ class QueueStatusAPIView(View):
                     "total_waiting": total_waiting,
                     "has_notification": has_pending_notification,
                     "notification": notification_data,
-                    "sequence_number": notification_data.get("sequence_number") if notification_data else None,
+                    "sequence_number": (
+                        notification_data.get("sequence_number")
+                        if notification_data
+                        else None
+                    ),
                     "last_updated": timezone.now().isoformat(),
+                    "waiting_people": waiting_people,
                 }
             )
 
@@ -741,6 +828,7 @@ class LocationSelectionView(View):
             "chauffeur": chauffeur,
             "queues": active_queues,
             "form_data": form_data,
+            "active_tab": "locations",
         }
         return render(request, "queueing/location_selection.html", context)
 
@@ -804,14 +892,15 @@ class LocationSelectionView(View):
                 extra_tags="location",
             )
             return redirect("queueing:location_selection")
-        
 
         admin_license_plate = (current_vehicle.license_plate or "").upper()
         buffer_zone = getattr(queue, "buffer_zone", None)
         if buffer_zone and getattr(buffer_zone, "zone", None):
             try:
-                if 'point_in_buffer' in globals() and callable(point_in_buffer):
-                    inside = point_in_buffer(buffer_zone, signup_point.y, signup_point.x, inclusive=True)
+                if "point_in_buffer" in globals() and callable(point_in_buffer):
+                    inside = point_in_buffer(
+                        buffer_zone, signup_point.y, signup_point.x, inclusive=True
+                    )
                 else:
                     inside = buffer_zone.zone.intersects(signup_point)
             except Exception as e:
@@ -822,12 +911,16 @@ class LocationSelectionView(View):
             if not inside and admin_license_plate != "SINENOMINE":
                 messages.error(
                     request,
-                    mark_safe(f"U bevindt zich nog niet in de buurt van bufferzone <strong>{buffer_zone.name}</strong> en kunt u dus nog niet aanmelden voor de wachtrij."),
+                    mark_safe(
+                        f"U bevindt zich nog niet in de buurt van bufferzone <strong>{buffer_zone.name}</strong> en kunt u dus nog niet aanmelden voor de wachtrij."
+                    ),
                     extra_tags="geofence",
                 )
                 return redirect("queueing:location_selection")
         else:
-            logger.warning("Queue %s has no buffer zone defined; allowing join", queue.id)
+            logger.warning(
+                "Queue %s has no buffer zone defined; allowing join", queue.id
+            )
 
         try:
             queue_service = QueueService()
@@ -854,7 +947,10 @@ class LocationSelectionView(View):
                     return redirect("queueing:queue_status", entry_uuid=entry.uuid)
                 else:
                     logger.warning("Failed to retrieve queue entry.")
-                    messages.error(request, "Er is iets misgegaan. Neem contact op met de beheerder.")
+                    messages.error(
+                        request,
+                        "Er is iets misgegaan. Neem contact op met de beheerder.",
+                    )
                     return redirect("queueing:location_selection")
             else:
                 logger.debug(message)
@@ -863,7 +959,10 @@ class LocationSelectionView(View):
 
         except Exception as e:
             logger.error(f"Failed to join queue: {str(e)}")
-            messages.error(request, "Er is iets misgegaan bij het aanmelden. Probeer later opnieuw.")
+            messages.error(
+                request,
+                "Er is iets misgegaan bij het aanmelden. Probeer later opnieuw.",
+            )
             return redirect("queueing:location_selection")
 
 
@@ -905,50 +1004,6 @@ class NotificationResponseView(View):
 
             return JsonResponse({"success": True, "message": message})
 
-        except Exception as e:
-            return JsonResponse({"success": False, "error": str(e)}, status=500)
-
-
-# TODO: This view is currently unused, but could be useful if we want to allow chauffeurs to set their vehicle type before joining the queue (instead of having it fixed in their profile). For now, the vehicle type is determined by the current vehicle in their profile, and they can change that in their account settings if needed.
-class SetVehicleTypeView(View):
-    def post(self, request):
-        vt = request.POST.get("vehicle_type") or (
-            request.body and json.loads(request.body).get("vehicle_type")
-        )
-        if vt not in ("auto", "busje"):
-            return JsonResponse(
-                {"success": False, "error": "invalid vehicle_type"}, status=400
-            )
-        try:
-            chauffeur_id = request.session.get("authenticated_chauffeur_id")
-            if chauffeur_id:
-                chauffeur = Chauffeur.objects.get(id=chauffeur_id)
-            else:
-                if not request.user.is_authenticated or not hasattr(
-                    request.user, "chauffeur"
-                ):
-                    return JsonResponse(
-                        {
-                            "success": False,
-                            "error": "User not authenticated as chauffeur",
-                        },
-                        status=403,
-                    )
-                chauffeur = request.user.chauffeur
-
-            current_vehicle = chauffeur.get_current_vehicle()
-            if not current_vehicle:
-                return JsonResponse(
-                    {
-                        "success": False,
-                        "error": "No current vehicle set for this chauffeur",
-                    },
-                    status=400,
-                )
-
-            current_vehicle.vehicle_type = vt
-            current_vehicle.save(update_fields=["vehicle_type", "updated_at"])
-            return JsonResponse({"success": True, "vehicle_type": vt})
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)}, status=500)
 

@@ -16,6 +16,7 @@ urlpatterns = [
     path(
         "queue/<uuid:entry_uuid>/", views.QueueStatusView.as_view(), name="queue_status"
     ),
+    path("queue/", views.QueueOverviewView.as_view(), name="queue_overview"),
     # API endpoints
     path(
         "api/queue/<uuid:entry_uuid>/status/",
@@ -32,11 +33,6 @@ urlpatterns = [
         views.LeaveQueueBeforeNotificationAPIView.as_view(),
         name="leave_queue",
     ),
-    # path(
-    #     "ajax/set-vehicle-type/",
-    #     views.SetVehicleTypeView.as_view(),
-    #     name="set_vehicle_type",
-    # ),
     # Testing/Admin views
     path(
         "admin/queue/<int:queue_id>/trigger/",
