@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  {% load static %}
+  <title>TAXIBUFFER - Volledige Wachtrij - {{ queue.name }}</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --gold-1: #E0BD22;
+      --gold-2: #FEF508;
+      --bg: #F6F6FC;
+      --max-width: 420px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      -webkit-font-smoothing: antialiased;
+      background: #eceff4;
+      min-height: 100vh;
+    }
+
+    .app {
+      width: 100%;
+      max-width: var(--max-width);
+      min-height: 100vh;
+      background: var(--bg);
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .header {
+      background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 110px;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-wrap {
+      background: transparent;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-wrap img {
+      display: block;
+      width: auto;
+      max-height: 28px;
+    }
+
+    .brand-text {
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: #595959;
+      font-size: clamp(24px, 4vw, 24px);
+      white-space: nowrap;
+    }
+
+    .content {
+      padding: 18px;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      flex: 1;
+      padding-bottom: 84px;
+    }
+
+    .title-big {
+      font-size: 22px;
+      font-weight: 800;
+      color: #111827;
+      margin: 4px 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #6b7280;
+    }
+
+    .queue-summary {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(2, 6, 23, 0.06);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .queue-location {
+      font-size: 18px;
+      font-weight: 800;
+      color: #111827;
+    }
+
+    .queue-address {
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .position-pill {
+      margin-top: 4px;
+      align-self: flex-start;
+      border-radius: 999px;
+      background: rgba(224, 189, 34, 0.22);
+      border: 1px solid rgba(224, 189, 34, 0.55);
+      color: #2f2f2f;
+      font-weight: 700;
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+
+    .last-updated {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+
+    .waiting-list-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(2, 6, 23, 0.06);
+      padding: 14px;
+    }
+
+    .waiting-list-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: #111827;
+      margin: 0 0 10px;
+    }
+
+    .waiting-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .waiting-person {
+      background: #f7f8fc;
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid #eceef3;
+      color: #1f2937;
+      font-size: 14px;
+      gap: 10px;
+    }
+
+    .waiting-person.is-current {
+      border-color: rgba(224, 189, 34, 0.6);
+      background: rgba(254, 245, 8, 0.18);
+    }
+
+    .waiting-person-name {
+      font-weight: 700;
+    }
+
+    .waiting-person-plate {
+      font-weight: 600;
+      color: #4b5563;
+    }
+
+    .waiting-empty {
+      font-size: 14px;
+      color: #6b7280;
+      margin: 0;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: center;
+      margin-top: 2px;
+    }
+
+    .status-link {
+      text-decoration: none;
+      border-radius: 28px;
+      padding: 12px 18px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #2f2f2f;
+      border: 3px solid rgba(0, 0, 0, 0.12);
+      background: #fff;
+      box-shadow: 0 6px 12px rgba(2, 6, 23, 0.04) inset;
+      width: 100%;
+      max-width: 70%;
+      text-align: center;
+    }
+
+    .swal2-popup {
+      border-radius: 16px;
+      font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+    }
+
+    .swal2-title {
+      font-weight: 800;
+      font-size: 28px;
+      margin-bottom: 6px;
+    }
+
+    .swal2-html-container {
+      color: #4b4b4b;
+      font-size: 16px;
+      line-height: 1.35;
+    }
+
+    .swal2-confirm {
+      background: linear-gradient(92deg, #E0BD22 10%, #FEF508 100%) !important;
+      color: #222 !important;
+      border: none;
+      padding: 12px 28px;
+      border-radius: 28px;
+      font-weight: 800;
+      box-shadow: 0 8px 20px rgba(2, 6, 23, 0.06);
+      min-width: 150px;
+    }
+
+    .swal2-cancel {
+      background: #fff !important;
+      color: #5b5b5b !important;
+      border: 3px solid rgba(0, 0, 0, 0.08);
+      padding: 12px 28px;
+      border-radius: 28px;
+      font-weight: 700;
+      min-width: 150px;
+      box-shadow: 0 6px 12px rgba(2, 6, 23, 0.04) inset;
+    }
+
+    .swal2-icon {
+      width: 96px !important;
+      height: 96px !important;
+      border-radius: 999px;
+      margin: 0 auto 6px;
+      box-shadow: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app" role="application" aria-label="Taxibuffer wachtrij overzicht">
+    <header class="header" role="banner">
+      <div class="brand" aria-hidden="true">
+        <div class="logo-wrap">
+          <img src="{% static 'queueing/assets/logo.svg' %}" alt="Taxibuffer logo" onerror="this.style.display='none'">
+        </div>
+        <div class="brand-text">TAXIBUFFER</div>
+      </div>
+    </header>
+
+    <main class="content" role="main">
+      <section>
+        <div class="title-big">Volledige wachtrij</div>
+        <div class="subtitle">Hier ziet u alle chauffeurs die wachten op deze locatie.</div>
+      </section>
+
+      <section class="queue-summary" aria-label="Locatie overzicht">
+        <div class="queue-location">{{ queue.pickup_zone.name }}</div>
+        <div class="queue-address">{{ queue.pickup_zone.address|default:"Wilhelminakade 699, 3072 AP, Rotterdam" }}</div>
+        <div id="position-pill" class="position-pill">Uw huidige positie: {{ entry.get_queue_position|default:"-" }}</div>
+        <div id="last-updated" class="last-updated">Laatst bijgewerkt: --:--:--</div>
+      </section>
+
+      <section class="waiting-list-card" aria-label="Wachtende chauffeurs">
+        <h2 class="waiting-list-title">Wachtenden in deze wachtrij</h2>
+        <div id="waiting-list" class="waiting-list" role="list" {% if not waiting_people %}style="display: none;"{% endif %}>
+          {% for person in waiting_people %}
+          <div class="waiting-person {% if person.is_current_chauffeur %}is-current{% endif %}" role="listitem">
+            <span class="waiting-person-name">
+              {{ person.first_name|default:"Onbekend" }}
+              {% if person.is_current_chauffeur %}(u){% endif %}
+            </span>
+            <span class="waiting-person-plate">{{ person.license_plate|default:"-" }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <p id="waiting-empty" class="waiting-empty" {% if waiting_people %}style="display: none;"{% endif %}>Er zijn momenteel geen wachtenden in deze wachtrij.</p>
+      </section>
+
+      <div class="actions">
+        <a class="status-link" href="{% url 'queueing:queue_status' entry.uuid %}">Terug naar status</a>
+      </div>
+    </main>
+
+    {% include 'queueing/partials/bottom_nav.html' %}
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script>
+    (function () {
+      const entryUuid = "{{ entry.uuid|escapejs }}";
+      const endpoint = `/queueing/api/queue/${entryUuid}/status/`;
+      const respondEndpoint = '/queueing/api/notification/respond/';
+      const waitingList = document.getElementById('waiting-list');
+      const waitingEmpty = document.getElementById('waiting-empty');
+      const positionPill = document.getElementById('position-pill');
+      const lastUpdated = document.getElementById('last-updated');
+      const seenNotifications = new Set();
+
+      function getCsrfToken() {
+        const cookies = document.cookie.split(';').map((cookie) => cookie.trim());
+        const csrfCookie = cookies.find((cookie) => cookie.startsWith('csrftoken='));
+        return csrfCookie ? decodeURIComponent(csrfCookie.split('=')[1]) : '';
+      }
+
+      async function respondToNotification(notificationId, responseType) {
+        const response = await fetch(respondEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+          },
+          body: JSON.stringify({
+            notification_id: notificationId,
+            response: responseType
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Kon niet reageren op melding.');
+        }
+
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(data.error || 'Kon niet reageren op melding.');
+        }
+      }
+
+      async function showTurnNotification(notificationId, sequenceNumber) {
+        const result = await Swal.fire({
+          title: `U mag doorrijden\n#${sequenceNumber || '--'}`,
+          html: `
+            <div style="text-align: center; margin-bottom: 15px;">
+              <div>
+                <img src="{% static 'queueing/assets/pop-up-confirmed.svg' %}" 
+                  alt="Confirmed" 
+                  style="max-width:80px;max-height:80px;width:100%;height:auto;">
+              </div>
+              <div style="font-size: 16px; margin-top: 10px; color: #333;">
+                Rij door naar de ophaallocatie. Volg de borden en laat uw nummer zien.
+              </div>
+            </div>
+          `,
+          confirmButtonText: 'Begrepen',
+          confirmButtonColor: '#E0BD22',
+          allowOutsideClick: false,
+          backdrop: true,
+          customClass: {
+            popup: 'notification-popup',
+            confirmButton: 'notification-accept-btn',
+            cancelButton: 'notification-decline-btn'
+          }
+        });
+
+        if (result.isConfirmed) {
+          try {
+            await respondToNotification(notificationId, 'accepted');
+          } catch (error) {
+            console.warn('Responding to turn notification failed:', error);
+          }
+          window.location.href = '/queueing/locations/';
+        }
+      }
+
+      function renderWaitingList(people) {
+        waitingList.innerHTML = '';
+
+        if (!people || !people.length) {
+          waitingList.style.display = 'none';
+          waitingEmpty.style.display = 'block';
+          return;
+        }
+
+        waitingList.style.display = 'flex';
+        waitingEmpty.style.display = 'none';
+
+        people.forEach((person) => {
+          const row = document.createElement('div');
+          row.className = 'waiting-person';
+          if (person.is_current_chauffeur) {
+            row.classList.add('is-current');
+          }
+
+          const displayName = person.first_name || 'Onbekend';
+          const suffix = person.is_current_chauffeur ? '(u)' : '';
+          const plate = person.license_plate || '-';
+
+          row.innerHTML = `
+            <span class="waiting-person-name">${displayName} ${suffix}</span>
+            <span class="waiting-person-plate">${plate}</span>
+          `;
+          waitingList.appendChild(row);
+        });
+      }
+
+      function updateClock() {
+        const now = new Date();
+        lastUpdated.textContent = `Laatst bijgewerkt: ${now.toLocaleTimeString()}`;
+      }
+
+      async function pollQueueStatus() {
+        try {
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
+          });
+
+          if (!response.ok) {
+            return;
+          }
+
+          const data = await response.json();
+          if (!data.success) {
+            return;
+          }
+
+          const position = data.position === null || data.position === undefined ? '-' : data.position;
+          positionPill.textContent = `Uw huidige positie: ${position}`;
+          renderWaitingList(Array.isArray(data.waiting_people) ? data.waiting_people : []);
+
+          if (data.has_notification && data.notification && data.notification.id) {
+            const notificationId = data.notification.id;
+            if (!seenNotifications.has(notificationId)) {
+              seenNotifications.add(notificationId);
+              await showTurnNotification(notificationId, data.sequence_number);
+            }
+          }
+
+          updateClock();
+        } catch (error) {
+          console.warn('Queue refresh failed:', error);
+        }
+      }
+
+      pollQueueStatus();
+      window.setInterval(pollQueueStatus, 10000);
+    })();
+  </script>
+</body>
+
+</html>
