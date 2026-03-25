@@ -524,6 +524,58 @@ class AccountView(View):
 
         action = request.POST.get("action", "")
 
+        if action == "update_profile":
+            first_name = request.POST.get("first_name", "").strip()
+            last_name = request.POST.get("last_name", "").strip()
+            email = request.POST.get("email", "").strip().lower()
+            taxi_license_number = request.POST.get("taxi_license_number", "").strip().upper()
+
+            if not all([first_name, last_name, email, taxi_license_number]):
+                messages.error(request, "Vul naam, e-mail en RTX-nummer volledig in.")
+                return redirect("queueing:account")
+
+            if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+                messages.error(request, "Vul een geldig e-mailadres in.")
+                return redirect("queueing:account")
+
+            duplicate_email = User.objects.filter(email__iexact=email).exclude(
+                id=chauffeur.user_id
+            )
+            if duplicate_email.exists():
+                messages.error(request, "Dit e-mailadres is al in gebruik.")
+                return redirect("queueing:account")
+
+            # Allowed formats: DDDD, DDDDD, DDDD-XD
+            if not re.fullmatch(r"^(?:\d{4}|\d{5}|\d{4}-[A-Za-z]\d)$", taxi_license_number):
+                messages.error(
+                    request,
+                    "RTX-nummer heeft een ongeldig formaat. Gebruik 4 of 5 cijfers, of DDDD-XD.",
+                )
+                return redirect("queueing:account")
+
+            duplicate_rtx = Chauffeur.objects.filter(
+                taxi_license_number__iexact=taxi_license_number
+            ).exclude(id=chauffeur.id)
+            if duplicate_rtx.exists():
+                messages.error(request, "Dit RTX-nummer is al in gebruik.")
+                return redirect("queueing:account")
+
+            with transaction.atomic():
+                chauffeur.user.first_name = first_name
+                chauffeur.user.last_name = last_name
+                chauffeur.user.email = email
+                chauffeur.user.save(update_fields=["first_name", "last_name", "email"])
+
+                chauffeur.taxi_license_number = taxi_license_number
+                chauffeur.save(update_fields=["taxi_license_number", "updated_at"])
+
+            form_data = request.session.get("form_data", {})
+            form_data["taxi_license_number"] = chauffeur.taxi_license_number
+            request.session["form_data"] = form_data
+
+            messages.success(request, "Profielgegevens bijgewerkt.")
+            return redirect("queueing:account")
+
         if action == "set_current":
             vehicle_id = request.POST.get("vehicle_id")
             vehicle = ChauffeurVehicle.objects.filter(
@@ -531,6 +583,17 @@ class AccountView(View):
             ).first()
             if not vehicle:
                 messages.error(request, "Voertuig niet gevonden.")
+                return redirect("queueing:account")
+            
+            has_active_queue_entry = QueueEntry.objects.filter(
+                chauffeur=chauffeur,
+                status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
+            ).exists()
+            if has_active_queue_entry:
+                messages.error(
+                    request,
+                    "U kunt uw huidige voertuig niet veranderen terwijl u in de wachtrij staat. Verlaat eerst de wachtrij.",
+                )
                 return redirect("queueing:account")
 
             with transaction.atomic():
@@ -599,6 +662,18 @@ class AccountView(View):
                 messages.error(request, "Voertuig niet gevonden.")
                 return redirect("queueing:account")
 
+            if vehicle.is_current:
+                has_active_queue_entry = QueueEntry.objects.filter(
+                    chauffeur=chauffeur,
+                    status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
+                ).exists()
+                if has_active_queue_entry:
+                    messages.error(
+                        request,
+                        "U kunt uw huidige voertuig niet verwijderen terwijl u in de wachtrij staat. Verlaat eerst de wachtrij.",
+                    )
+                    return redirect("queueing:account")
+
             with transaction.atomic():
                 was_current = vehicle.is_current
                 # vehicle.delete()  # Don't delete for data integrity, just mark as inactive
@@ -663,7 +738,7 @@ class QueueStatusView(View):
 
 
 class QueueOverviewView(View):
-    """Route queue tab clicks to the active queue, if any."""
+    """Display the full queue page for the chauffeur's active queue."""
 
     def get(self, request):
         chauffeur = _get_authenticated_chauffeur(request)
@@ -681,7 +756,30 @@ class QueueOverviewView(View):
         )
 
         if active_entry:
-            return redirect("queueing:queue_status", entry_uuid=active_entry.uuid)
+            queue = active_entry.queue
+            waiting_entries = (
+                queue.get_waiting_entries()
+                .select_related("chauffeur__user")
+                .order_by("created_at")
+            )
+
+            waiting_people = [
+                {
+                    "first_name": waiting_entry.chauffeur.user.first_name,
+                    "license_plate": waiting_entry.chauffeur.current_license_plate,
+                    "is_current_chauffeur": waiting_entry.chauffeur_id == chauffeur.id,
+                }
+                for waiting_entry in waiting_entries
+            ]
+
+            context = {
+                "queue": queue,
+                "chauffeur": chauffeur,
+                "entry": active_entry,
+                "active_tab": "queue",
+                "waiting_people": waiting_people,
+            }
+            return render(request, "queueing/queue.html", context)
 
         messages.info(request, "U staat momenteel in geen enkele wachtrij.")
         return redirect("queueing:location_selection")

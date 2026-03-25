@@ -31,6 +31,8 @@ class Chauffeur(models.Model):
     )
     taxi_license_number = models.CharField(max_length=100)  # RTX-nummer
     sign_up_time = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     location = models.PointField(null=True, blank=True, srid=4326)
 
     def get_current_vehicle(self):
