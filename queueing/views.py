@@ -416,13 +416,18 @@ class SignUpVehicleView(View):
                         is_active=True,
                     )
 
+            # Log in the user FIRST
+            login(request, user)
+            
+            # Then set session variables and save explicitly
             request.session["authenticated_chauffeur_id"] = chauffeur.id
             request.session["form_data"] = {
                 "license_plate": chauffeur.current_license_plate,
                 "taxi_license_number": chauffeur.taxi_license_number,
             }
             request.session.pop("signup_flow", None)
-            login(request, user)
+            request.session.modified = True
+            
             messages.success(request, "Account aangemaakt. Welkom bij TAXIBUFFER.")
             return redirect("queueing:account")
         except Exception as e:
