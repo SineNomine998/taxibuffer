@@ -328,6 +328,7 @@ class QueueManager {
             }
 
             div.innerHTML = `
+                <span class="waiting-person-pos">${person.position || '-'}</span>
                 <span class="waiting-person-name">
                     ${person.first_name || 'Onbekend'}
                     ${person.is_current_chauffeur ? '(u)' : ''}
