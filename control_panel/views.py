@@ -8,7 +8,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import user_passes_test
 from django.utils.decorators import method_decorator
 from django.contrib.auth.mixins import LoginRequiredMixin
-from accounts.models import Officer, User
+from accounts.models import ChauffeurVehicle, Officer, User
 from queueing.models import QueueNotification, TaxiQueue, QueueEntry, PushSubscription
 from queueing.push_views import send_web_push
 from django.db.models import Subquery, OuterRef, IntegerField
@@ -149,13 +149,24 @@ class QueueMonitorView(LoginRequiredMixin, View):
             output_field=IntegerField(),
         )
 
+        current_plate_subquery = Subquery(
+            ChauffeurVehicle.objects.filter(
+                chauffeur=OuterRef("chauffeur"),
+                is_current=True,
+                is_active=True,
+            ).values("license_plate")[:1]
+        )
+
         notified_qs = (
             QueueEntry.objects.filter(
                 queue=queue,
                 status=QueueEntry.Status.NOTIFIED,
                 notified_at__gte=today_start_utc,
             )
-            .annotate(sequence_number=latest_notification_seq)
+            .annotate(
+                sequence_number=latest_notification_seq,
+                license_plate=current_plate_subquery,
+            )
             .order_by("-notified_at")
         )
 
@@ -163,7 +174,7 @@ class QueueMonitorView(LoginRequiredMixin, View):
             notified_qs.values(
                 "id",
                 "uuid",
-                "chauffeur__license_plate",
+                "license_plate",
                 "notified_at",
                 "status",
                 "sequence_number",
@@ -176,7 +187,7 @@ class QueueMonitorView(LoginRequiredMixin, View):
                 status=QueueEntry.Status.DEQUEUED,
                 dequeued_at__gte=today_start_utc,
             )
-            .annotate(sequence_number=latest_notification_seq)
+            .annotate(sequence_number=latest_notification_seq, license_plate=current_plate_subquery)
             .order_by("-dequeued_at")[:20]
         )
 
@@ -184,7 +195,7 @@ class QueueMonitorView(LoginRequiredMixin, View):
             dequeued_qs.values(
                 "id",
                 "uuid",
-                "chauffeur__license_plate",
+                "license_plate",
                 "dequeued_at",
                 "status",
                 "sequence_number",
@@ -233,14 +244,32 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
                 pytz.UTC
             )  # Convert back to UTC for DB query
 
+            current_plate_subquery = Subquery(
+                ChauffeurVehicle.objects.filter(
+                    chauffeur=OuterRef("chauffeur"),
+                    is_current=True,
+                    is_active=True,
+                ).values("license_plate")[:1]
+            )
+
             # Filter for today's entries only (important)
-            waiting_entries = list(
+            waiting_qs = (
                 queue.get_waiting_entries_control()
                 .filter(created_at__gte=today_start_utc)
-                .values(
-                    "id", "uuid", "chauffeur__license_plate", "created_at", "status"
-                )
+                .select_related("chauffeur__user")
+                .prefetch_related("chauffeur__vehicles")
             )
+
+            waiting_entries = [
+                {
+                    "id": entry.id,
+                    "uuid": str(entry.uuid),
+                    "license_plate": entry.chauffeur.current_license_plate,
+                    "created_at": entry.created_at,
+                    "status": entry.status,
+                }
+                for entry in waiting_qs
+            ]
 
             total_waiting_count = (
                 queue.get_waiting_entries_control()
@@ -261,7 +290,7 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
                     status=QueueEntry.Status.NOTIFIED,
                     notified_at__gte=today_start_utc,
                 )
-                .annotate(sequence_number=latest_notification_seq)
+                .annotate(sequence_number=latest_notification_seq, license_plate=current_plate_subquery)
                 .order_by("-notified_at")
             )
 
@@ -269,7 +298,7 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
                 notified_qs.values(
                     "id",
                     "uuid",
-                    "chauffeur__license_plate",
+                    "license_plate",
                     "notified_at",
                     "status",
                     "sequence_number",
@@ -282,7 +311,7 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
                     status=QueueEntry.Status.DEQUEUED,
                     dequeued_at__gte=today_start_utc,
                 )
-                .annotate(sequence_number=latest_notification_seq)
+                .annotate(sequence_number=latest_notification_seq, license_plate=current_plate_subquery)
                 .order_by("-dequeued_at")[:20]
             )
 
@@ -290,7 +319,7 @@ class QueueStatusAPIView(LoginRequiredMixin, View):
                 dequeued_qs.values(
                     "id",
                     "uuid",
-                    "chauffeur__license_plate",
+                    "license_plate",
                     "dequeued_at",
                     "status",
                     "sequence_number",
