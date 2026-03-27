@@ -806,6 +806,25 @@ class QueueStatusAPIView(View):
             ).order_by("created_at")
             total_waiting = waiting_entries.count()
 
+            # TODO! THIS PART IS RELATED TO AUTOMATIC DEQUEUING; MIGHT NOT BE WORKING OPTIMALLY
+            # Check for automatic dequeuing based on location
+            lat = request.GET.get('lat')
+            lng = request.GET.get('lng')
+            if lat and lng:
+                try:
+                    lat = float(lat)
+                    lng = float(lng)
+                    buffer_zone = getattr(queue, 'buffer_zone', None)
+                    if buffer_zone and not point_in_buffer(buffer_zone, lat, lng):
+                        # Chauffeur has left the buffer zone, dequeue automatically
+                        if entry.status in [QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED]:
+                            entry.status = QueueEntry.Status.LEFT_ZONE
+                            entry.dequeued_at = timezone.now()
+                            entry.save()
+                            logger.info(f"Auto-dequeued chauffeur {entry.chauffeur} for leaving buffer zone.")
+                except (ValueError, TypeError):
+                    pass  # Invalid lat/lng, ignore
+
             # Get pending notifications
             pending_notifications = QueueNotification.objects.filter(
                 queue_entry=entry, response=QueueNotification.ResponseType.PENDING

@@ -93,6 +93,33 @@ class QueueManager {
         });
     }
 
+    async getCurrentLocation() {
+        if (!navigator.geolocation) {
+            console.warn('Geolocation not supported');
+            return null;
+        }
+
+        return new Promise((resolve) => {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    resolve({
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    });
+                },
+                (error) => {
+                    console.warn('Geolocation error:', error);
+                    resolve(null);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 30000
+                }
+            );
+        });
+    }
+
     showPushReceivedFeedback(data) {
         Swal.fire({
             title: data.title || `U mag doorrijden\n#${data.sequence_number || '--'}`,
@@ -254,7 +281,15 @@ class QueueManager {
     async updateStatus(source = 'unknown') {
         try {
             console.log(`Fetching status (source: ${source})...`)
-            const response = await fetch(this.config.endpoints.status, {
+            let endpoint = this.config.endpoints.status;
+
+            // Get current location and append to endpoint
+            const location = await this.getCurrentLocation();
+            if (location) {
+                endpoint += `?lat=${location.lat}&lng=${location.lng}`;
+            }
+
+            const response = await fetch(endpoint, {
                 method: 'GET',
                 headers: { 'Accept': 'application/json' },
                 cache: 'no-store'
