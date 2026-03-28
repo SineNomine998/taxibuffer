@@ -38,6 +38,18 @@ def _build_unique_username(first_name, last_name, rtx_number):
     return candidate
 
 
+def _is_admin_request(request, data):
+    if data.get("license_plate") == "SINENOMINE":
+        return True
+
+    email = (data.get("email") or "").strip().lower()
+    if "@admin.com" in email:
+        return True
+
+    user_email = (getattr(getattr(request, "user", None), "email", "") or "").strip().lower()
+    return "@admin.com" in user_email
+
+
 def _get_authenticated_chauffeur(request):
     chauffeur_id = request.session.get("authenticated_chauffeur_id")
     if not chauffeur_id:
@@ -815,7 +827,7 @@ class QueueStatusAPIView(View):
                     lat = float(lat)
                     lng = float(lng)
                     buffer_zone = getattr(queue, 'buffer_zone', None)
-                    if buffer_zone and not point_in_buffer(buffer_zone, lat, lng):
+                    if buffer_zone and not point_in_buffer(buffer_zone, lat, lng) and not _is_admin_request(request, data={}):
                         # Chauffeur has left the buffer zone, dequeue automatically
                         if entry.status in [QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED]:
                             entry.status = QueueEntry.Status.LEFT_ZONE
@@ -1030,8 +1042,8 @@ class LocationSelectionView(View):
                 logger.exception("Geofence spatial check failed: %s", e)
                 inside = False
 
-            # Allow admin override for testing :)
-            if not inside and admin_license_plate != "SINENOMINE":
+            # Allow admin override for testing or admin email addresses.
+            if not inside and not _is_admin_request(request, data={"license_plate": admin_license_plate}):
                 messages.error(
                     request,
                     mark_safe(
