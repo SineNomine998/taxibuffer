@@ -100,6 +100,7 @@ class QueueEntry(models.Model):
     vehicle_type = models.CharField(
         max_length=10, choices=VehicleType.choices, null=True, blank=True
     )
+    license_plate = models.CharField(max_length=20, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     notified_at = models.DateTimeField(null=True, blank=True)
@@ -193,6 +194,10 @@ class QueueEntry(models.Model):
     def get_queue_position(self):
         """Get current position in queue (1-indexed)."""
         return self.queue.get_queue_position(self.chauffeur)
+
+    @property
+    def display_license_plate(self):
+        return self.license_plate or "unknown license plate in the queue entry"
 
     def get_status_display(self):
         """Get a human-readable status display."""

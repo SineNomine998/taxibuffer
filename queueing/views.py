@@ -733,7 +733,7 @@ class QueueStatusView(View):
             waiting_people = [
                 {
                     "first_name": waiting_entry.chauffeur.user.first_name,
-                    "license_plate": waiting_entry.chauffeur.current_license_plate,
+                    "license_plate": waiting_entry.display_license_plate,
                     "is_current_chauffeur": waiting_entry.chauffeur_id == chauffeur.id,
                 }
                 for waiting_entry in waiting_entries
@@ -783,7 +783,7 @@ class QueueOverviewView(View):
             waiting_people = [
                 {
                     "first_name": waiting_entry.chauffeur.user.first_name,
-                    "license_plate": waiting_entry.chauffeur.current_license_plate,
+                    "license_plate": waiting_entry.display_license_plate,
                     "is_current_chauffeur": waiting_entry.chauffeur_id == chauffeur.id,
                 }
                 for waiting_entry in waiting_entries
@@ -856,7 +856,7 @@ class QueueStatusAPIView(View):
             waiting_people = [
                 {
                     "first_name": waiting_entry.chauffeur.user.first_name,
-                    "license_plate": waiting_entry.chauffeur.current_license_plate,
+                    "license_plate": waiting_entry.display_license_plate,
                     "is_current_chauffeur": waiting_entry.chauffeur_id == entry.chauffeur_id,
                     "position": waiting_entry.get_queue_position(),
                 }

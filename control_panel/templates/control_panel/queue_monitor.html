@@ -12,61 +12,108 @@
             font-weight: bold;
         }
 
+        .status-section {
+            margin-bottom: 1.5rem;
+        }
+
         .status-card {
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-            margin-bottom: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+            margin-bottom: 24px;
+            border: none;
         }
 
         .status-card .card-header {
-            border-radius: 10px 10px 0 0;
-            font-weight: bold;
+            border-radius: 16px 16px 0 0;
+            font-weight: 700;
+            letter-spacing: 0.02em;
         }
 
-        .waiting .card-header {
-            background-color: #cfe2ff;
-            color: #084298;
+        .status-card.waiting .card-header {
+            background-color: #e7f1ff;
+            color: #0f3c78;
         }
 
-        .notified .card-header {
-            background-color: #fff3cd;
-            color: #664d03;
+        .status-card.notified .card-header {
+            background-color: #fff9db;
+            color: #8f5c00;
         }
 
-        .dequeued .card-header {
-            background-color: #d1e7dd;
+        .status-card.dequeued .card-header {
+            background-color: #dce9e0;
             color: #0f5132;
         }
 
         .license-plate {
             font-family: monospace;
-            font-weight: bold;
-            padding: 3px 8px;
-            background: #f8f9fa;
-            border-radius: 4px;
+            font-weight: 800;
+            padding: 6px 10px;
+            background: #ffffff;
+            border-radius: 8px;
+            display: inline-block;
         }
 
-        .status-badge {
-            display: inline-block;
-            padding: 0.25em 0.6em;
-            font-size: 0.75em;
+        .status-card.notified .license-plate {
+            font-size: 1.8rem;
+            letter-spacing: 0.04em;
+            padding: 10px 14px;
+            background: #fff8e1;
+        }
+
+        .status-card.dequeued .license-plate {
+            font-size: 1.3rem;
+            padding: 8px 12px;
+            background: #f8fff6;
+        }
+
+        .status-card.waiting .license-plate {
+            font-size: 1rem;
+            padding: 7px 11px;
+            background: #f5f7ff;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.1rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .sequence-number {
             font-weight: 700;
-            line-height: 1;
-            color: #fff;
-            text-align: center;
-            white-space: nowrap;
-            vertical-align: baseline;
-            border-radius: 0.25rem;
+            color: #495057;
         }
 
         .timestamp {
-            font-size: 0.8em;
+            font-size: 0.85rem;
             color: #6c757d;
+            white-space: nowrap;
         }
 
         #lastUpdated {
             font-size: 0.8em;
             color: #6c757d;
+        }
+
+        .status-card .card-body {
+            padding: 1rem;
+        }
+
+        .status-card .card-body p {
+            margin-bottom: 0;
+            color: #6c757d;
+        }
+
+        .queue-highlight {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #343a40;
         }
     </style>
 </head>
@@ -191,44 +238,19 @@
             }
         </script>
 
-        <div class="row mt-4">
-            <div class="col-md-4">
-                <div class="card status-card dequeued">
-                    <div class="card-header d-flex justify-content-between">
-                        <span>Dequeued</span>
-                        <span id="dequeuedCount" class="badge bg-success">{{ dequeued_count }}</span>
-                    </div>
-                    <div class="card-body">
-                        <div id="dequeuedList">
-                            {% for entry in dequeued_entries %}
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="license-plate">{{ entry.license_plate }}</span>
-                                {% if entry.sequence_number %}
-                                <span class="badge bg-secondary" style="margin-right: 140px;">#{{ entry.sequence_number }}</span>
-                                {% endif %}
-                                <small class="timestamp">{{ entry.dequeued_at|time:"H:i:s" }}</small>
-                            </div>
-                            {% empty %}
-                            <p class="text-muted">No chauffeurs dequeued</p>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
+        <div class="row mt-4 status-section">
+            <div class="col-12">
                 <div class="card status-card notified">
-                    <div class="card-header d-flex justify-content-between">
+                    <div class="card-header d-flex justify-content-between align-items-center">
                         <span>Notified</span>
                         <span id="notifiedCount" class="badge bg-warning text-dark">{{ notified_count }}</span>
                     </div>
                     <div class="card-body">
                         <div id="notifiedList">
                             {% for entry in notified_entries %}
-                            <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="status-item">
                                 <span class="license-plate">{{ entry.license_plate }}</span>
-                                {% if entry.sequence_number %}
-                                <span class="badge bg-secondary" style="margin-right: 140px;">#{{ entry.sequence_number }}</span>
-                                {% endif %}
+                                <span class="sequence-number">#{{ entry.sequence_number|default:'--' }}</span>
                                 <small class="timestamp">{{ entry.notified_at|time:"H:i:s" }}</small>
                             </div>
                             {% empty %}
@@ -239,22 +261,47 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card status-card waiting">
-                <div class="card-header d-flex justify-content-between">
-                    <span>Waiting</span>
-                    <span id="waitingCount" class="badge bg-primary">{{ waiting_count }}</span>
-                </div>
-                <div class="card-body">
-                    <div id="waitingList">
-                        {% for entry in waiting_entries %}
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="license-plate">{{ entry.license_plate }}</span>
-                            <small class="timestamp">{{ entry.created_at|time:"H:i:s" }}</small>
+        <div class="row status-section">
+            <div class="col-12">
+                <div class="card status-card dequeued">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Dequeued</span>
+                        <span id="dequeuedCount" class="badge bg-success">{{ dequeued_count }}</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="dequeuedList">
+                            {% for entry in dequeued_entries %}
+                            <div class="status-item">
+                                <span class="license-plate">{{ entry.license_plate }}</span>
+                                <span class="sequence-number">#{{ entry.sequence_number|default:'--' }}</span>
+                                <small class="timestamp">{{ entry.dequeued_at|time:"H:i:s" }}</small>
+                            </div>
+                            {% empty %}
+                            <p class="text-muted">No chauffeurs dequeued</p>
+                            {% endfor %}
                         </div>
-                        {% empty %}
-                        <p class="text-muted">No chauffeurs waiting</p>
-                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row status-section">
+            <div class="col-12">
+                <div class="card status-card waiting">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Waiting</span>
+                        <span id="waitingCount" class="badge bg-primary">{{ waiting_count }}</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="waitingList">
+                            {% for entry in waiting_entries %}
+                            <div class="status-item">
+                                <span class="license-plate">{{ entry.license_plate }}</span>
+                                <small class="timestamp">{{ entry.created_at|time:"H:i:s" }}</small>
+                            </div>
+                            {% empty %}
+                            <p class="text-muted">No chauffeurs waiting</p>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
             </div>

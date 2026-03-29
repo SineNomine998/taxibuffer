@@ -114,7 +114,7 @@ def test_push(request):
         # Get the entry and associated subscriptions
         try:
             entry = QueueEntry.objects.get(uuid=entry_uuid)
-            subs = PushSubscription.objects.filter(chauffeur=entry.chauffeur)
+            subs = PushSubscription.objects.filter(entry_uuid=entry.uuid)
 
             if not subs.exists():
                 return JsonResponse(
@@ -128,7 +128,7 @@ def test_push(request):
             # Send a test notification to all subscriptions
             success_count = 0
             for sub in subs:
-                plate = entry.chauffeur.current_license_plate or "unknown"
+                plate = entry.display_license_plate or "unknown"
                 payload = {
                     "title": "Test Notification",
                     "body": f"This is a test push from the server to {plate}",

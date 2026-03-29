@@ -2,7 +2,7 @@ from django.db.utils import ProgrammingError
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.gis.geos import Point
-from typing import Tuple
+from typing import Optional, Tuple
 from django.db.models import Avg, F
 import logging
 
@@ -64,12 +64,12 @@ class QueueService:
 
     def add_chauffeur_to_queue(
         self, chauffeur: Chauffeur, queue: TaxiQueue, signup_location: Point
-    ) -> Tuple[bool, str]:
+    ) -> Tuple[bool, str, Optional[str]]:
         """
         Add a chauffeur to the specified queue.
 
         Returns:
-            Tuple[bool, str]: (success, message)
+            Tuple[bool, str, Optional[str]]: (success, message, entry_uuid)
         """
         try:
             with transaction.atomic():
@@ -110,6 +110,7 @@ class QueueService:
                     queue=queue,
                     chauffeur=chauffeur,
                     vehicle_type=current_vehicle.vehicle_type,
+                    license_plate=current_vehicle.license_plate,
                     signup_location=signup_location,
                     status=QueueEntry.Status.WAITING,
                 )
@@ -183,7 +184,7 @@ class QueueService:
                         # Check if chauffeur is still in waiting status
                         if entry.status == QueueEntry.Status.WAITING:
                             notification = entry.notify()
-                            plate = entry.chauffeur.current_license_plate or "unknown"
+                            plate = entry.display_license_plate or "unknown"
                             logger.info(
                                 f"Notified chauffeur {plate}"
                             )
@@ -220,18 +221,12 @@ class QueueService:
                                                 send_web_push(
                                                     s.subscription_info, payload
                                                 )
-                                                plate = (
-                                                    entry.chauffeur.current_license_plate
-                                                    or "unknown"
-                                                )
+                                                plate = entry.display_license_plate or "unknown"
                                                 logger.info(
                                                     f"Push notification sent to {plate}"
                                                 )
                                         else:
-                                            plate = (
-                                                entry.chauffeur.current_license_plate
-                                                or "unknown"
-                                            )
+                                            plate = entry.display_license_plate or "unknown"
                                             logger.warning(
                                                 f"No push subscriptions found for chauffeur {plate}"
                                             )
@@ -247,7 +242,7 @@ class QueueService:
                                     )
 
                 except Exception as e:
-                    plate = entry.chauffeur.current_license_plate or "unknown"
+                    plate = entry.display_license_plate or "unknown"
                     logger.error(
                         f"Failed to notify chauffeur {plate}: {e}"
                     )
@@ -336,7 +331,7 @@ class QueueService:
                             # update the queue entry status back to WAITING
                             notification.respond(QueueNotification.ResponseType.TIMEOUT)
                             plate = (
-                                notification.queue_entry.chauffeur.current_license_plate
+                                notification.queue_entry.display_license_plate
                                 or "unknown"
                             )
                             logger.info(
@@ -349,6 +344,11 @@ class QueueService:
                             # (this avoids notifying the same person who just timed out)
                             queue = notification.queue_entry.queue
                             waiting_entries = queue.get_waiting_entries()
+
+                            plate = notification.queue_entry.display_license_plate or "unknown"
+                            logger.info(
+                                f"Timed out notification for {plate}"
+                            )
 
                             # Find the next entry that's not the one that just timed out
                             next_entries = [
