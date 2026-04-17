@@ -305,6 +305,14 @@ class QueueManager {
             if (!data.success) {
                 throw new Error(data.error || 'API returned unsuccessful');
             }
+            
+            if (data.status_code?.toLowerCase() === 'left_zone') {
+                this.showAlert('error', 'U bent buiten de bufferzone en uit de wachtrij gehaald.');
+                setTimeout(() => {
+                    window.location.href = '/queueing/locations/';
+                }, 1500);
+                return;
+            }
 
             this.state.retryCount = 0;
             this.setConnectionStatus(true);

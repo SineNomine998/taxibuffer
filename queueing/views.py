@@ -387,17 +387,23 @@ class SignUpVehicleView(View):
 
         try:
             with transaction.atomic():
-                existing_chauffeur = (
-                    Chauffeur.objects.filter(taxi_license_number=rtx_number)
-                    .select_related("user")
-                    .first()
-                )
-                if existing_chauffeur:
-                    messages.error(
-                        request,
-                        "Er bestaat al een account met dit RTX-nummer. Gebruik inloggen.",
-                    )
-                    return redirect("queueing:chauffeur_login")
+                # TODO:
+                # This piece of code that is commented out does the following:
+                #   - It checks existing chauffeurs with the same RTX number
+                #   - If found one, it shows an error message and redirects to login page instead of signup
+                # It was commented out because it caused issues when chauffeurs forgot their passwords.
+
+                # existing_chauffeur = (
+                #     Chauffeur.objects.filter(taxi_license_number=rtx_number)
+                #     .select_related("user")
+                #     .first()
+                # )
+                # if existing_chauffeur:
+                #     messages.error(
+                #         request,
+                #         "Er bestaat al een account met dit RTX-nummer. Gebruik inloggen.",
+                #     )
+                #     return redirect("queueing:chauffeur_login")
 
                 username = _build_unique_username(first_name, last_name, rtx_number)
                 user = User.objects.create_user(
@@ -555,12 +561,16 @@ class AccountView(View):
                 messages.error(request, "Vul een geldig e-mailadres in.")
                 return redirect("queueing:account")
 
-            duplicate_email = User.objects.filter(email__iexact=email).exclude(
-                id=chauffeur.user_id
-            )
-            if duplicate_email.exists():
-                messages.error(request, "Dit e-mailadres is al in gebruik.")
-                return redirect("queueing:account")
+            # TODO:
+            # This part is commented out to make sure chauffeurs are allowed to create multiple accounts
+            # with the same credentials if they ever forget their password.
+
+            # duplicate_email = User.objects.filter(email__iexact=email).exclude(
+            #     id=chauffeur.user_id
+            # )
+            # if duplicate_email.exists():
+            #     messages.error(request, "Dit e-mailadres is al in gebruik.")
+            #     return redirect("queueing:account")
 
             # Allowed formats: DDDD, DDDDD, DDDD-XD
             if not re.fullmatch(r"^(?:\d{4}|\d{5}|\d{4}-[A-Za-z]\d)$", taxi_license_number):
@@ -570,12 +580,17 @@ class AccountView(View):
                 )
                 return redirect("queueing:account")
 
-            duplicate_rtx = Chauffeur.objects.filter(
-                taxi_license_number__iexact=taxi_license_number
-            ).exclude(id=chauffeur.id)
-            if duplicate_rtx.exists():
-                messages.error(request, "Dit RTX-nummer is al in gebruik.")
-                return redirect("queueing:account")
+            # TODO:
+            # This part is commented out to make sure chauffeurs are allowed to create multiple accounts
+            # with the same credentials if they ever forget their password.
+            # It checks for duplicate RTX numbers and prevents saving if found.
+
+            # duplicate_rtx = Chauffeur.objects.filter(
+            #     taxi_license_number__iexact=taxi_license_number
+            # ).exclude(id=chauffeur.id)
+            # if duplicate_rtx.exists():
+            #     messages.error(request, "Dit RTX-nummer is al in gebruik.")
+            #     return redirect("queueing:account")
 
             with transaction.atomic():
                 chauffeur.user.first_name = first_name
@@ -810,14 +825,6 @@ class QueueStatusAPIView(View):
         try:
             entry = QueueEntry.objects.get(uuid=entry_uuid)
             queue = entry.queue
-
-            # Get queue position and waiting count
-            position = entry.get_queue_position()
-            waiting_entries = queue.get_waiting_entries().select_related(
-                "chauffeur__user"
-            ).order_by("created_at")
-            total_waiting = waiting_entries.count()
-
             # TODO! THIS PART IS RELATED TO AUTOMATIC DEQUEUING; MIGHT NOT BE WORKING OPTIMALLY
             # Check for automatic dequeuing based on location
             lat = request.GET.get('lat')
@@ -836,6 +843,14 @@ class QueueStatusAPIView(View):
                             logger.info(f"Auto-dequeued chauffeur {entry.chauffeur} for leaving buffer zone.")
                 except (ValueError, TypeError):
                     pass  # Invalid lat/lng, ignore
+
+            # Get queue position and waiting count
+            position = entry.get_queue_position()
+            waiting_entries = queue.get_waiting_entries().select_related(
+                "chauffeur__user"
+            ).order_by("created_at")
+            total_waiting = waiting_entries.count()
+
 
             # Get pending notifications
             pending_notifications = QueueNotification.objects.filter(
@@ -1037,7 +1052,7 @@ class LocationSelectionView(View):
                         buffer_zone, signup_point.y, signup_point.x, inclusive=True
                     )
                 else:
-                    inside = buffer_zone.zone.intersects(signup_point)
+                    inside = buffer_zone.zone.buffer(0.00005).intersects(signup_point)
             except Exception as e:
                 logger.exception("Geofence spatial check failed: %s", e)
                 inside = False

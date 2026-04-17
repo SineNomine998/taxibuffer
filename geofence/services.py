@@ -32,7 +32,7 @@ def point_in_buffer(buffer_zone, latitude: float, longitude: float, inclusive: b
 
     try:
         if inclusive:
-            return buffer_zone.zone.intersects(p)
+            return buffer_zone.zone.buffer(0.00005).intersects(p)
         else:
             return buffer_zone.zone.contains(p)
     except Exception:
