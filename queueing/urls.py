@@ -1,4 +1,4 @@
-from django.urls import path, reverse_lazy
+from django.urls import path
 from . import views
 from . import push_views
 
@@ -39,7 +39,6 @@ urlpatterns = [
         views.ManualTriggerView.as_view(),
         name="manual_trigger",
     ),
-    # Signup and account management
     path("signup/", views.SignUpStep1View.as_view(), name="signup"),
     path("signup/step-1/", views.SignUpStep1View.as_view(), name="sign_up1"),
     path("signup/step-2/", views.SignUpPasswordView.as_view(), name="sign_up2"),
@@ -48,46 +47,6 @@ urlpatterns = [
         "signup/vehicle/add/",
         views.SignUpAddVehicleView.as_view(),
         name="sign_up_vehicle_add",
-    ),
-    # Password reset views
-    path(
-        "password-reset/",
-        views.PasswordResetView.as_view(
-            template_name="queueing/password_reset_form.html",
-            email_template_name="queueing/password_reset_email.html",
-            subject_template_name="queueing/password_reset_subject.txt",
-            success_url=reverse_lazy("queueing:password_reset_done"),
-        ),
-        name="password_reset",
-    ),
-    path(
-        "password-reset/done/",
-        views.PasswordResetDoneView.as_view(
-            template_name="queueing/password_reset_done.html"
-        ),
-        name="password_reset_done",
-    ),
-    path(
-        "password-reset-confirm/<uidb64>/<token>/",
-        views.PasswordResetConfirmView.as_view(),
-        name="password_reset_confirm",
-    ),
-    path(
-        "password-reset-complete/",
-        views.PasswordResetCompleteView.as_view(
-            template_name="queueing/password_reset_complete.html"
-        ),
-        name="password_reset_complete",
-    ),
-    path(
-        "password-change/",
-        views.PasswordChangeView.as_view(),
-        name="password_change",
-    ),
-    path(
-        "password-change/done/",
-        views.PasswordChangeDoneView.as_view(),
-        name="password_change_done",
     ),
     path("account/", views.AccountView.as_view(), name="account"),
     # Push notification subscription
