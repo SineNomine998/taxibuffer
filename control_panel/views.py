@@ -357,14 +357,11 @@ def is_officer(user):
     return hasattr(user, "officer")
 
 
-# @method_decorator(user_passes_test(is_officer), name="dispatch")
+@method_decorator(user_passes_test(is_officer), name="dispatch")
 class PauseQueueView(View):
     """Toggle pause state for a specific queue"""
 
     def post(self, request, queue_id):
-        if not request.user.is_authenticated or not hasattr(request.user, "officer"):
-            return redirect("control_panel:login")
-
         queue = get_object_or_404(TaxiQueue, id=queue_id)
         action = request.POST.get("action")  # 'pause' or 'resume'
         if action == "pause":
@@ -382,14 +379,11 @@ class PauseQueueView(View):
         )
 
 
-# @method_decorator(user_passes_test(is_officer), name="dispatch")
+@method_decorator(user_passes_test(is_officer), name="dispatch")
 class ToggleQueueActivationView(View):
     """Activate or deactivate a specific queue"""
 
     def post(self, request, queue_id):
-        if not request.user.is_authenticated or not hasattr(request.user, "officer"):
-            return redirect("control_panel:login")
-
         queue = get_object_or_404(TaxiQueue, id=queue_id)
         action = request.POST.get("action")
         if action == "activate":
@@ -405,7 +399,7 @@ class ToggleQueueActivationView(View):
         return JsonResponse({"success": True, "active": queue.active})
 
 
-# @method_decorator(user_passes_test(is_officer), name="dispatch")
+@method_decorator(user_passes_test(is_officer), name="dispatch")
 class BypassBusjeView(View):
     """
     When an officer triggers this view, the first "busje" in the specified queue is popped
@@ -413,9 +407,6 @@ class BypassBusjeView(View):
     """
 
     def post(self, request, queue_id):
-        if not request.user.is_authenticated or not hasattr(request.user, "officer"):
-            return redirect("control_panel:login")
-
         try:
             queue = get_object_or_404(TaxiQueue, id=queue_id, active=True)
             busje_entry = (
