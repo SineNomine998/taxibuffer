@@ -357,10 +357,7 @@ def is_officer(user):
     return hasattr(user, "officer")
 
 
-@method_decorator(
-    user_passes_test(is_officer, login_url="/control/login/"), 
-    name="dispatch"
-)
+@method_decorator(user_passes_test(is_officer), name="dispatch")
 class PauseQueueView(View):
     """Toggle pause state for a specific queue"""
 
@@ -382,10 +379,7 @@ class PauseQueueView(View):
         )
 
 
-@method_decorator(
-    user_passes_test(is_officer, login_url="/control/login/"), 
-    name="dispatch"
-)
+@method_decorator(user_passes_test(is_officer), name="dispatch")
 class ToggleQueueActivationView(View):
     """Activate or deactivate a specific queue"""
 
@@ -405,10 +399,7 @@ class ToggleQueueActivationView(View):
         return JsonResponse({"success": True, "active": queue.active})
 
 
-@method_decorator(
-    user_passes_test(is_officer, login_url="/control/login/"), 
-    name="dispatch"
-)
+@method_decorator(user_passes_test(is_officer), name="dispatch")
 class BypassBusjeView(View):
     """
     When an officer triggers this view, the first "busje" in the specified queue is popped
