@@ -232,9 +232,6 @@ class PasswordResetDoneView(DjangoPasswordResetDoneView):
     template_name = "queueing/password_reset_done.html"
 
 
-from django.contrib.auth.views import PasswordResetConfirmView as DjangoPasswordResetConfirmView
-from django.urls import reverse_lazy
-
 class PasswordResetConfirmView(DjangoPasswordResetConfirmView):
     template_name = "queueing/password_reset_confirm.html"
     success_url = reverse_lazy("queueing:password_reset_complete")
