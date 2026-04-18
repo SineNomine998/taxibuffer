@@ -200,65 +200,65 @@ class ChauffeurLoginView(View):
         return bool(re.fullmatch(pattern, taxi_license))
 
 
-# class PasswordResetView(DjangoPasswordResetView):
-#     template_name = "queueing/password_reset_form.html"
-#     email_template_name = "queueing/password_reset_email.html"
-#     subject_template_name = "queueing/password_reset_subject.txt"
-#     success_url = reverse_lazy("queueing:password_reset_done")
+class PasswordResetView(DjangoPasswordResetView):
+    template_name = "queueing/password_reset_form.html"
+    email_template_name = "queueing/password_reset_email.html"
+    subject_template_name = "queueing/password_reset_subject.txt"
+    success_url = reverse_lazy("queueing:password_reset_done")
 
-#     def get_users(self, email):
-#         users = super().get_users(email)
-#         return users.filter(is_chauffeur=True)
+    def get_users(self, email):
+        users = super().get_users(email)
+        return users.filter(is_chauffeur=True)
 
-#     def get_email_context(self, context):
-#         context = super().get_email_context(context)
-#         context["domain"] = settings.MAIN_DOMAIN
-#         context["protocol"] = "http" if settings.DEBUG else "https"
-#         return context
+    def get_email_context(self, context):
+        context = super().get_email_context(context)
+        context["domain"] = settings.MAIN_DOMAIN
+        context["protocol"] = "http" if settings.DEBUG else "https"
+        return context
     
-#     def form_valid(self, form):
-#         form.save(
-#             domain_override=settings.MAIN_DOMAIN, 
-#             use_https=not settings.DEBUG,
-#             from_email=settings.DEFAULT_FROM_EMAIL,
-#             request=self.request,
-#             email_template_name=self.email_template_name,
-#             subject_template_name=self.subject_template_name,
-#         )
-#         return HttpResponseRedirect(self.get_success_url())
+    def form_valid(self, form):
+        form.save(
+            domain_override=settings.MAIN_DOMAIN, 
+            use_https=not settings.DEBUG,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            request=self.request,
+            email_template_name=self.email_template_name,
+            subject_template_name=self.subject_template_name,
+        )
+        return HttpResponseRedirect(self.get_success_url())
 
 
-# class PasswordResetDoneView(DjangoPasswordResetDoneView):
-#     template_name = "queueing/password_reset_done.html"
+class PasswordResetDoneView(DjangoPasswordResetDoneView):
+    template_name = "queueing/password_reset_done.html"
 
 
 from django.contrib.auth.views import PasswordResetConfirmView as DjangoPasswordResetConfirmView
 from django.urls import reverse_lazy
 
-# class PasswordResetConfirmView(DjangoPasswordResetConfirmView):
-#     template_name = "queueing/password_reset_confirm.html"
-#     success_url = reverse_lazy("queueing:password_reset_complete")
+class PasswordResetConfirmView(DjangoPasswordResetConfirmView):
+    template_name = "queueing/password_reset_confirm.html"
+    success_url = reverse_lazy("queueing:password_reset_complete")
 
-#     def form_valid(self, form):
-#         print("VALID ✅")
-#         return super().form_valid(form)
+    def form_valid(self, form):
+        print("VALID ✅")
+        return super().form_valid(form)
 
-#     def form_invalid(self, form):
-#         print("INVALID ❌", form.errors)
-#         return super().form_invalid(form)
-
-
-# class PasswordResetCompleteView(DjangoPasswordResetCompleteView):
-#     template_name = "queueing/password_reset_complete.html"
+    def form_invalid(self, form):
+        print("INVALID ❌", form.errors)
+        return super().form_invalid(form)
 
 
-# class PasswordChangeView(LoginRequiredMixin, DjangoPasswordChangeView):
-#     template_name = "queueing/password_change_form.html"
-#     success_url = reverse_lazy("queueing:password_change_done")
+class PasswordResetCompleteView(DjangoPasswordResetCompleteView):
+    template_name = "queueing/password_reset_complete.html"
 
 
-# class PasswordChangeDoneView(LoginRequiredMixin, DjangoPasswordChangeDoneView):
-#     template_name = "queueing/password_change_done.html"
+class PasswordChangeView(LoginRequiredMixin, DjangoPasswordChangeView):
+    template_name = "queueing/password_change_form.html"
+    success_url = reverse_lazy("queueing:password_change_done")
+
+
+class PasswordChangeDoneView(LoginRequiredMixin, DjangoPasswordChangeDoneView):
+    template_name = "queueing/password_change_done.html"
 
 
 class LocationSelectionInfoView(View):
