@@ -4,15 +4,24 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.views import View
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.contrib.gis.geos import Point
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.db import transaction
 import json
 from django.conf import settings
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponseRedirect
 from django.contrib.auth import login
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.views import (
+    PasswordChangeDoneView as DjangoPasswordChangeDoneView,
+    PasswordChangeView as DjangoPasswordChangeView,
+    PasswordResetCompleteView as DjangoPasswordResetCompleteView,
+    PasswordResetConfirmView as DjangoPasswordResetConfirmView,
+    PasswordResetDoneView as DjangoPasswordResetDoneView,
+    PasswordResetView as DjangoPasswordResetView,
+)
 import re
 import os
 import logging
@@ -172,14 +181,10 @@ class ChauffeurLoginView(View):
         #     r"^[A-Z]{2}-\d{2}-[A-Z]{2}$",  # XX-99-XX
         #     r"^\d{2}-[A-Z]{2}-\d{2}$",  # 99-XX-99
         #     r"^[A-Z]{2}-[A-Z]{2}-\d{2}$",  # XX-XX-99
-        #     r"^\d{2}-[A-Z]{2}-[A-Z]{2}$",  # 99-XX-XX
-        #     r"^[A-Z]{1}-\d{3}-[A-Z]{2}$",  # X-999-XX
-        #     r"^[A-Z]{2}-\d{3}-[A-Z]{1}$",  # XX-999-X
-        #     r"^\d{3}-[A-Z]{2}-[A-Z]{1}$",  # 999-XX-X
-        #     r"^\d{3}-[A-Z]{1}-[A-Z]{2}$",  # 999-X-XX
         #     r"^\d{1,2}-[A-Z]{2,3}-\d{1,2}$",  # 1-ABC-23
         #     r"^\d{3}-[A-Z]{2}-\d{1,2}$",  # 123-AB-1
         #     r"^[A-Z]{3}-\d{2}-\d{1,2}$",  # ABC-12-3
+        #     r"^\d{3}-[A-Z]{1}-[A-Z]{2}$",  # 999-X-XX
         # ]
         # return any(re.match(pattern, license_plate) for pattern in patterns)
 
@@ -193,6 +198,67 @@ class ChauffeurLoginView(View):
         """
         pattern = r"^(?:\d{4}|\d{5}|\d{4}-[A-Za-z]\d)$"
         return bool(re.fullmatch(pattern, taxi_license))
+
+
+class PasswordResetView(DjangoPasswordResetView):
+    template_name = "queueing/password_reset_form.html"
+    email_template_name = "queueing/password_reset_email.html"
+    subject_template_name = "queueing/password_reset_subject.txt"
+    success_url = reverse_lazy("queueing:password_reset_done")
+
+    def get_users(self, email):
+        users = super().get_users(email)
+        return users.filter(is_chauffeur=True)
+
+    def get_email_context(self, context):
+        context = super().get_email_context(context)
+        context["domain"] = settings.MAIN_DOMAIN
+        context["protocol"] = "http" if settings.DEBUG else "https"
+        return context
+    
+    def form_valid(self, form):
+        form.save(
+            domain_override=settings.MAIN_DOMAIN, 
+            use_https=not settings.DEBUG,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            request=self.request,
+            email_template_name=self.email_template_name,
+            subject_template_name=self.subject_template_name,
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class PasswordResetDoneView(DjangoPasswordResetDoneView):
+    template_name = "queueing/password_reset_done.html"
+
+
+from django.contrib.auth.views import PasswordResetConfirmView as DjangoPasswordResetConfirmView
+from django.urls import reverse_lazy
+
+class PasswordResetConfirmView(DjangoPasswordResetConfirmView):
+    template_name = "queueing/password_reset_confirm.html"
+    success_url = reverse_lazy("queueing:password_reset_complete")
+
+    def form_valid(self, form):
+        print("VALID ✅")
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        print("INVALID ❌", form.errors)
+        return super().form_invalid(form)
+
+
+class PasswordResetCompleteView(DjangoPasswordResetCompleteView):
+    template_name = "queueing/password_reset_complete.html"
+
+
+class PasswordChangeView(LoginRequiredMixin, DjangoPasswordChangeView):
+    template_name = "queueing/password_change_form.html"
+    success_url = reverse_lazy("queueing:password_change_done")
+
+
+class PasswordChangeDoneView(LoginRequiredMixin, DjangoPasswordChangeDoneView):
+    template_name = "queueing/password_change_done.html"
 
 
 class LocationSelectionInfoView(View):
@@ -561,16 +627,12 @@ class AccountView(View):
                 messages.error(request, "Vul een geldig e-mailadres in.")
                 return redirect("queueing:account")
 
-            # TODO:
-            # This part is commented out to make sure chauffeurs are allowed to create multiple accounts
-            # with the same credentials if they ever forget their password.
-
-            # duplicate_email = User.objects.filter(email__iexact=email).exclude(
-            #     id=chauffeur.user_id
-            # )
-            # if duplicate_email.exists():
-            #     messages.error(request, "Dit e-mailadres is al in gebruik.")
-            #     return redirect("queueing:account")
+            duplicate_email = User.objects.filter(email__iexact=email).exclude(
+                id=chauffeur.user_id
+            )
+            if duplicate_email.exists():
+                messages.error(request, "Dit e-mailadres is al in gebruik.")
+                return redirect("queueing:account")
 
             # Allowed formats: DDDD, DDDDD, DDDD-XD
             if not re.fullmatch(r"^(?:\d{4}|\d{5}|\d{4}-[A-Za-z]\d)$", taxi_license_number):
