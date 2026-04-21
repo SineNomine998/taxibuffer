@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.views import View
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.contrib.gis.geos import Point
 from django.utils import timezone
 from django.utils.safestring import mark_safe
@@ -12,7 +12,17 @@ from django.db import transaction
 import json
 from django.conf import settings
 from django.http import FileResponse
-from django.contrib.auth import login
+from django.contrib.auth import authenticate, login
+from django.http import FileResponse, HttpResponseRedirect
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.views import (
+    PasswordChangeDoneView as DjangoPasswordChangeDoneView,
+    PasswordChangeView as DjangoPasswordChangeView,
+    PasswordResetCompleteView as DjangoPasswordResetCompleteView,
+    PasswordResetConfirmView as DjangoPasswordResetConfirmView,
+    PasswordResetDoneView as DjangoPasswordResetDoneView,
+    PasswordResetView as DjangoPasswordResetView,
+)
 import re
 import os
 import logging
@@ -51,11 +61,11 @@ def _is_admin_request(request, data):
 
 
 def _get_authenticated_chauffeur(request):
-    chauffeur_id = request.session.get("authenticated_chauffeur_id")
-    if not chauffeur_id:
+    if not request.user.is_authenticated:
         return None
+
     try:
-        return Chauffeur.objects.select_related("user").get(id=chauffeur_id)
+        return request.user.chauffeur
     except Chauffeur.DoesNotExist:
         return None
 
@@ -114,9 +124,11 @@ class ChauffeurLoginView(View):
                     license_plate="SINENOMINE", is_current=True, is_active=True
                 )
                 chauffeur = test_vehicle.chauffeur
+                user = chauffeur.user
             except ChauffeurVehicle.DoesNotExist:
                 user = User.objects.create_user(
-                    username="test_chauffeur", is_chauffeur=True
+                    username="test_chauffeur",
+                    is_chauffeur=True,
                 )
                 chauffeur = Chauffeur.objects.create(
                     user=user,
@@ -131,31 +143,23 @@ class ChauffeurLoginView(View):
                     is_current=True,
                     is_active=True,
                 )
-            request.session["authenticated_chauffeur_id"] = chauffeur.id
+
+            login(request, user, backend="accounts.backends.EmailBackend")
             request.session["form_data"] = {
                 "license_plate": chauffeur.current_license_plate,
                 "taxi_license_number": chauffeur.taxi_license_number,
             }
             return redirect("queueing:location_selection")
 
-        account_user = (
-            User.objects.filter(
-                email__iexact=email,
-                is_chauffeur=True,
-            )
-            .select_related("chauffeur")
-            .first()
-        )
-        if account_user and password and account_user.check_password(password):
-            if hasattr(account_user, "chauffeur"):
-                chauffeur = account_user.chauffeur
-                request.session["authenticated_chauffeur_id"] = chauffeur.id
-                request.session["form_data"] = {
-                    "license_plate": chauffeur.current_license_plate,
-                    "taxi_license_number": chauffeur.taxi_license_number,
-                }
-                login(request, account_user)
-                return redirect("queueing:location_selection")
+        user = authenticate(request, username=email, password=password)
+        if user is not None and user.is_chauffeur and hasattr(user, "chauffeur"):
+            login(request, user)
+            chauffeur = user.chauffeur
+            request.session["form_data"] = {
+                "license_plate": chauffeur.current_license_plate,
+                "taxi_license_number": chauffeur.taxi_license_number,
+            }
+            return redirect("queueing:location_selection")
 
         messages.error(request, "Ongeldig emailadres of wachtwoord.")
         return redirect("queueing:chauffeur_login")
@@ -172,14 +176,10 @@ class ChauffeurLoginView(View):
         #     r"^[A-Z]{2}-\d{2}-[A-Z]{2}$",  # XX-99-XX
         #     r"^\d{2}-[A-Z]{2}-\d{2}$",  # 99-XX-99
         #     r"^[A-Z]{2}-[A-Z]{2}-\d{2}$",  # XX-XX-99
-        #     r"^\d{2}-[A-Z]{2}-[A-Z]{2}$",  # 99-XX-XX
-        #     r"^[A-Z]{1}-\d{3}-[A-Z]{2}$",  # X-999-XX
-        #     r"^[A-Z]{2}-\d{3}-[A-Z]{1}$",  # XX-999-X
-        #     r"^\d{3}-[A-Z]{2}-[A-Z]{1}$",  # 999-XX-X
-        #     r"^\d{3}-[A-Z]{1}-[A-Z]{2}$",  # 999-X-XX
         #     r"^\d{1,2}-[A-Z]{2,3}-\d{1,2}$",  # 1-ABC-23
         #     r"^\d{3}-[A-Z]{2}-\d{1,2}$",  # 123-AB-1
         #     r"^[A-Z]{3}-\d{2}-\d{1,2}$",  # ABC-12-3
+        #     r"^\d{3}-[A-Z]{1}-[A-Z]{2}$",  # 999-X-XX
         # ]
         # return any(re.match(pattern, license_plate) for pattern in patterns)
 
@@ -193,6 +193,64 @@ class ChauffeurLoginView(View):
         """
         pattern = r"^(?:\d{4}|\d{5}|\d{4}-[A-Za-z]\d)$"
         return bool(re.fullmatch(pattern, taxi_license))
+
+
+class PasswordResetView(DjangoPasswordResetView):
+    template_name = "queueing/password_reset_form.html"
+    email_template_name = "queueing/password_reset_email.html"
+    subject_template_name = "queueing/password_reset_subject.txt"
+    success_url = reverse_lazy("queueing:password_reset_done")
+
+    def get_users(self, email):
+        users = super().get_users(email)
+        return users.filter(is_chauffeur=True)
+
+    def get_email_context(self, context):
+        context = super().get_email_context(context)
+        context["domain"] = settings.MAIN_DOMAIN
+        context["protocol"] = "http" if settings.DEBUG else "https"
+        return context
+    
+    def form_valid(self, form):
+        form.save(
+            domain_override=settings.MAIN_DOMAIN, 
+            use_https=not settings.DEBUG,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            request=self.request,
+            email_template_name=self.email_template_name,
+            subject_template_name=self.subject_template_name,
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class PasswordResetDoneView(DjangoPasswordResetDoneView):
+    template_name = "queueing/password_reset_done.html"
+
+
+class PasswordResetConfirmView(DjangoPasswordResetConfirmView):
+    template_name = "queueing/password_reset_confirm.html"
+    success_url = reverse_lazy("queueing:password_reset_complete")
+
+    def form_valid(self, form):
+        print("VALID ✅")
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        print("INVALID ❌", form.errors)
+        return super().form_invalid(form)
+
+
+class PasswordResetCompleteView(DjangoPasswordResetCompleteView):
+    template_name = "queueing/password_reset_complete.html"
+
+
+class PasswordChangeView(LoginRequiredMixin, DjangoPasswordChangeView):
+    template_name = "queueing/password_change_form.html"
+    success_url = reverse_lazy("queueing:password_change_done")
+
+
+class PasswordChangeDoneView(LoginRequiredMixin, DjangoPasswordChangeDoneView):
+    template_name = "queueing/password_change_done.html"
 
 
 class LocationSelectionInfoView(View):
@@ -435,10 +493,9 @@ class SignUpVehicleView(View):
                     )
 
             # Log in the user FIRST
-            login(request, user)
+            login(request, user, backend="accounts.backends.EmailBackend")
             
             # Then set session variables and save explicitly
-            request.session["authenticated_chauffeur_id"] = chauffeur.id
             request.session["form_data"] = {
                 "license_plate": chauffeur.current_license_plate,
                 "taxi_license_number": chauffeur.taxi_license_number,
@@ -561,16 +618,12 @@ class AccountView(View):
                 messages.error(request, "Vul een geldig e-mailadres in.")
                 return redirect("queueing:account")
 
-            # TODO:
-            # This part is commented out to make sure chauffeurs are allowed to create multiple accounts
-            # with the same credentials if they ever forget their password.
-
-            # duplicate_email = User.objects.filter(email__iexact=email).exclude(
-            #     id=chauffeur.user_id
-            # )
-            # if duplicate_email.exists():
-            #     messages.error(request, "Dit e-mailadres is al in gebruik.")
-            #     return redirect("queueing:account")
+            duplicate_email = User.objects.filter(email__iexact=email).exclude(
+                id=chauffeur.user_id
+            )
+            if duplicate_email.exists():
+                messages.error(request, "Dit e-mailadres is al in gebruik.")
+                return redirect("queueing:account")
 
             # Allowed formats: DDDD, DDDDD, DDDD-XD
             if not re.fullmatch(r"^(?:\d{4}|\d{5}|\d{4}-[A-Za-z]\d)$", taxi_license_number):
@@ -934,35 +987,28 @@ class LocationSelectionView(View):
     """Handle location selection (Step 2)"""
 
     def get(self, request):
-        """Display location selection."""
-        chauffeur_uuid = request.session.get("authenticated_chauffeur_id")
-        if not chauffeur_uuid:
+        chauffeur = _get_authenticated_chauffeur(request)
+        if not chauffeur:
             logger.warning("Please authenticate first.")
             return redirect("queueing:chauffeur_login")
 
-        try:
-            chauffeur = Chauffeur.objects.get(id=chauffeur_uuid)
-            current_vehicle = chauffeur.get_current_vehicle()
-            if not current_vehicle:
-                messages.error(
-                    request,
-                    "U heeft nog geen huidig voertuig. Voeg een voertuig toe in uw account.",
-                )
-                return redirect("queueing:account")
+        current_vehicle = chauffeur.get_current_vehicle()
+        if not current_vehicle:
+            messages.error(
+                request,
+                "U heeft nog geen huidig voertuig. Voeg een voertuig toe in uw account.",
+            )
+            return redirect("queueing:account")
 
-            # Check if chauffeur is already in an active queue
-            active_entry = QueueEntry.objects.filter(
-                chauffeur=chauffeur,
-                status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
-            ).first()
+        # Check if chauffeur is already in an active queue
+        active_entry = QueueEntry.objects.filter(
+            chauffeur=chauffeur,
+            status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
+        ).first()
 
-            if active_entry:
-                # If they're already in a queue, redirect them to that queue's status page
-                return redirect("queueing:queue_status", entry_uuid=active_entry.uuid)
-
-        except Chauffeur.DoesNotExist:
-            logger.warning("Invalid session. Please authenticate again.")
-            return redirect("queueing:chauffeur_login")
+        if active_entry:
+            # If they're already in a queue, redirect them to that queue's status page
+            return redirect("queueing:queue_status", entry_uuid=active_entry.uuid)
 
         active_queues = TaxiQueue.objects.filter(active=True).select_related(
             "buffer_zone", "pickup_zone"
@@ -974,6 +1020,7 @@ class LocationSelectionView(View):
         form_data = request.session.get("form_data", {})
         form_data["license_plate"] = current_vehicle.license_plate
         request.session["form_data"] = form_data
+
         context = {
             "chauffeur": chauffeur,
             "queues": active_queues,
@@ -984,8 +1031,8 @@ class LocationSelectionView(View):
 
     def post(self, request):
         """Process location selection and join queue."""
-        chauffeur_id = request.session.get("authenticated_chauffeur_id")
-        if not chauffeur_id:
+        chauffeur = _get_authenticated_chauffeur(request)
+        if not chauffeur:
             logger.warning("Please authenticate first.")
             return redirect("queueing:chauffeur_login")
 
@@ -995,9 +1042,8 @@ class LocationSelectionView(View):
             return redirect("queueing:location_selection")
 
         try:
-            chauffeur = Chauffeur.objects.get(id=chauffeur_id)
             queue = TaxiQueue.objects.get(id=selected_queue_id, active=True)
-        except (Chauffeur.DoesNotExist, TaxiQueue.DoesNotExist):
+        except TaxiQueue.DoesNotExist:
             logger.warning("Invalid selection. Please try again.")
             return redirect("queueing:location_selection")
 
@@ -1020,15 +1066,11 @@ class LocationSelectionView(View):
                 signup_point = make_point_from_lat_lng(latitude, longitude, srid=4326)
             except ValueError:
                 logger.warning("Invalid latitude/longitude values.")
-                messages.error(
-                    request, "Invalid location coordinates.", extra_tags="location"
-                )
+                messages.error(request, "Invalid location coordinates.", extra_tags="location")
                 return redirect("queueing:location_selection")
         else:
             logger.warning("Missing latitude/longitude values.")
-            messages.error(
-                request, "Location coordinates are required.", extra_tags="location"
-            )
+            messages.error(request, "Location coordinates are required.", extra_tags="location")
             return redirect("queueing:location_selection")
 
         if signup_point is None and getattr(chauffeur, "location", None):
@@ -1047,7 +1089,7 @@ class LocationSelectionView(View):
         buffer_zone = getattr(queue, "buffer_zone", None)
         if buffer_zone and getattr(buffer_zone, "zone", None):
             try:
-                if "point_in_buffer" in globals() and callable(point_in_buffer):
+                if callable(point_in_buffer):
                     inside = point_in_buffer(
                         buffer_zone, signup_point.y, signup_point.x, inclusive=True
                     )
@@ -1058,7 +1100,9 @@ class LocationSelectionView(View):
                 inside = False
 
             # Allow admin override for testing or admin email addresses.
-            if not inside and not _is_admin_request(request, data={"license_plate": admin_license_plate}):
+            if not inside and not _is_admin_request(
+                request, data={"license_plate": admin_license_plate}
+            ):
                 messages.error(
                     request,
                     mark_safe(
@@ -1067,10 +1111,6 @@ class LocationSelectionView(View):
                     extra_tags="geofence",
                 )
                 return redirect("queueing:location_selection")
-        else:
-            logger.warning(
-                "Queue %s has no buffer zone defined; allowing join", queue.id
-            )
 
         try:
             queue_service = QueueService()
@@ -1093,19 +1133,16 @@ class LocationSelectionView(View):
                 )
 
                 if entry:
-                    logger.debug(message)
                     return redirect("queueing:queue_status", entry_uuid=entry.uuid)
-                else:
-                    logger.warning("Failed to retrieve queue entry.")
-                    messages.error(
-                        request,
-                        "Er is iets misgegaan. Neem contact op met de beheerder.",
-                    )
-                    return redirect("queueing:location_selection")
-            else:
-                logger.debug(message)
-                messages.error(request, message or "Kon niet aanmelden :(")
-                return redirect("queueing:queue_status", entry_uuid=entry_uuid)
+
+                messages.error(
+                    request,
+                    "Er is iets misgegaan. Neem contact op met de beheerder.",
+                )
+                return redirect("queueing:location_selection")
+
+            messages.error(request, message or "Kon niet aanmelden :(")
+            return redirect("queueing:queue_status", entry_uuid=entry_uuid)
 
         except Exception as e:
             logger.error(f"Failed to join queue: {str(e)}")

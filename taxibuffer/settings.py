@@ -31,17 +31,15 @@ DEBUG = True
 
 UNDER_CONSTRUCTION = False
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["taxibuffer.nl", "www.taxibuffer.nl", "localhost", "127.0.0.1"]
 
 SITE_ID = 1
 
 LOGIN_URL = "/queueing/login/"
 
-CONTROL_DOMAIN = "control.taxibuffer.com"
-MAIN_DOMAIN = "taxibuffer.com"
+MAIN_DOMAIN = "taxibuffer.nl"
 
 if DEBUG:
-    CONTROL_DOMAIN = "localhost:8000/control"
     MAIN_DOMAIN = "localhost:8000"
 
 
@@ -152,6 +150,11 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+AUTHENTICATION_BACKENDS = [
+    "accounts.backends.EmailBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -177,6 +180,17 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = config("EMAIL_HOST")
+EMAIL_PORT = config("EMAIL_PORT", cast=int, default=587)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", cast=bool, default=True)
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", cast=bool, default=False)
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default=EMAIL_HOST_USER)
+
+MAIN_DOMAIN = config("MAIN_DOMAIN", default="taxibuffer.nl")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

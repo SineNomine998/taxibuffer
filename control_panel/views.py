@@ -19,6 +19,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class ControlLoginRequiredMixin(LoginRequiredMixin):
+    """Custom mixin."""
+
+    login_url = "/control/login/"
+
+
 class OfficerLoginView(View):
     """Handle officer authentication"""
 
@@ -90,10 +96,8 @@ class OfficerLogoutView(View):
         return redirect("control_panel:login")
 
 
-class OfficerDashboardView(LoginRequiredMixin, View):
+class OfficerDashboardView(ControlLoginRequiredMixin, View):
     """Main dashboard for officers"""
-
-    login_url = "/control/login/"
 
     def get(self, request):
         if not hasattr(request.user, "officer"):
@@ -118,10 +122,8 @@ class OfficerDashboardView(LoginRequiredMixin, View):
         return render(request, "control_panel/control_dashboard.html", context)
 
 
-class QueueMonitorView(LoginRequiredMixin, View):
+class QueueMonitorView(ControlLoginRequiredMixin, View):
     """Display detailed queue status for a specific queue"""
-
-    login_url = "/control/login/"
 
     def get(self, request, queue_id):
         if not hasattr(request.user, "officer"):
@@ -213,10 +215,8 @@ class QueueMonitorView(LoginRequiredMixin, View):
         return render(request, "control_panel/queue_monitor.html", context)
 
 
-class QueueStatusAPIView(LoginRequiredMixin, View):
+class QueueStatusAPIView(ControlLoginRequiredMixin, View):
     """API endpoint for getting queue data"""
-
-    login_url = "/control/login/"
 
     def get(self, request, queue_id):
         if not hasattr(request.user, "officer"):
