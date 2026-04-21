@@ -87,7 +87,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "taxibuffer.middleware.DomainRedirectMiddleware",
+    # "taxibuffer.middleware.DomainRedirectMiddleware",  # this was initially added to handle different domains for control panel and main app, but currently we don't have a separate control panel domain.
 ]
 
 ROOT_URLCONF = "taxibuffer.urls"
