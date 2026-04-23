@@ -11,8 +11,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from accounts.models import ChauffeurVehicle, Officer, User
 from queueing.models import QueueNotification, TaxiQueue, QueueEntry, PushSubscription
 from queueing.push_views import send_web_push
-from django.db.models import Subquery, OuterRef, IntegerField
+from django.db.models import Subquery, OuterRef, IntegerField, Count, Q, Case, When, F, Value, CharField, DateTimeField
 from django.db.utils import ProgrammingError
+from queueing.constants import CONTROL_DASHBOARD_CALLED_STATUSES
 
 import logging
 
@@ -109,14 +110,30 @@ class OfficerDashboardView(ControlLoginRequiredMixin, View):
         today_start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
         today_start_utc = today_start_local.astimezone(pytz.UTC)
 
-        queues = TaxiQueue.objects.select_related("buffer_zone", "pickup_zone")
-
-        for queue in queues:
-            queue.dequeued_count = QueueEntry.objects.filter(
-                queue=queue,
-                status=QueueEntry.Status.DEQUEUED,
-                dequeued_at__gte=today_start_utc,
-            ).count()
+        queues = (
+            TaxiQueue.objects.select_related("buffer_zone", "pickup_zone")
+            .annotate(
+                waiting_count=Count(
+                    "queueentry",
+                    filter=Q(
+                        queueentry__status=QueueEntry.Status.WAITING,
+                        queueentry__created_at__gte=today_start_utc,
+                    ),
+                    distinct=True,
+                ),
+                called_count=Count(
+                    "queueentry",
+                    filter=(
+                        Q(queueentry__status__in=CONTROL_DASHBOARD_CALLED_STATUSES) &
+                        (
+                            Q(queueentry__notified_at__gte=today_start_utc) |
+                            Q(queueentry__dequeued_at__gte=today_start_utc)
+                        )
+                    ),
+                    distinct=True,
+                ),
+            )
+        )
 
         context = {"officer": request.user.officer, "queues": queues}
         return render(request, "control_panel/control_dashboard.html", context)
@@ -151,66 +168,50 @@ class QueueMonitorView(ControlLoginRequiredMixin, View):
             output_field=IntegerField(),
         )
 
-        notified_qs = (
+        called_qs = (
             QueueEntry.objects.filter(
                 queue=queue,
-                status=QueueEntry.Status.NOTIFIED,
-                notified_at__gte=today_start_utc,
+                status__in=CONTROL_DASHBOARD_CALLED_STATUSES,
+            )
+            .filter(
+                Q(notified_at__gte=today_start_utc) | Q(dequeued_at__gte=today_start_utc)
             )
             .annotate(
                 sequence_number=latest_notification_seq,
+                display_time=Case(
+                    When(status=QueueEntry.Status.DEQUEUED, then=F("dequeued_at")),
+                    default=F("notified_at"),
+                    output_field=DateTimeField(),
+                ),
+                display_status=Case(
+                    When(status=QueueEntry.Status.DEQUEUED, then=Value("Dequeued")),
+                    default=Value("Notified"),
+                    output_field=CharField(),
+                ),
             )
-            .order_by("-notified_at")
+            .order_by("-display_time")
         )
 
-        notified_entries = list(
-            notified_qs.values(
+        called_entries = list(
+            called_qs.values(
                 "id",
                 "uuid",
                 "license_plate",
-                "notified_at",
                 "status",
+                "display_status",
                 "sequence_number",
+                "display_time",
             )
         )
 
-        dequeued_qs = (
-            QueueEntry.objects.filter(
-                queue=queue,
-                status=QueueEntry.Status.DEQUEUED,
-                dequeued_at__gte=today_start_utc,
-            )
-            .annotate(
-                sequence_number=latest_notification_seq,
-            )
-            .order_by("-dequeued_at")[:20]
-        )
-
-        dequeued_entries = list(
-            dequeued_qs.values(
-                "id",
-                "uuid",
-                "license_plate",
-                "dequeued_at",
-                "status",
-                "sequence_number",
-            )
-        )
-
-        total_dequeued_count = QueueEntry.objects.filter(
-            queue=queue,
-            status=QueueEntry.Status.DEQUEUED,
-            dequeued_at__gte=today_start_utc,
-        ).count()
+        called_count = called_qs.count()
 
         context = {
             "queue": queue,
             "waiting_entries": waiting_entries,
-            "notified_entries": notified_entries,
-            "dequeued_entries": dequeued_entries,
+            "called_entries": called_entries,
             "waiting_count": total_waiting_count,
-            "notified_count": len(notified_entries),
-            "dequeued_count": total_dequeued_count,
+            "called_count": called_count,
         }
         return render(request, "control_panel/queue_monitor.html", context)
 
@@ -264,57 +265,40 @@ class QueueStatusAPIView(ControlLoginRequiredMixin, View):
             total_waiting_count = waiting_qs.count()
 
 
-            notified_qs = (
+            called_qs = (
                 QueueEntry.objects.filter(
                     queue=queue,
-                    status=QueueEntry.Status.NOTIFIED,
-                    notified_at__gte=today_start_utc,
+                    status__in=CONTROL_DASHBOARD_CALLED_STATUSES,
+                )
+                .filter(
+                    Q(notified_at__gte=today_start_utc) | Q(dequeued_at__gte=today_start_utc)
                 )
                 .annotate(
                     sequence_number=latest_notification_seq,
+                    display_time=Case(
+                        When(status=QueueEntry.Status.DEQUEUED, then=F("dequeued_at")),
+                        default=F("notified_at"),
+                        output_field=DateTimeField(),
+                    ),
+                    display_status=Case(
+                        When(status=QueueEntry.Status.DEQUEUED, then=Value("Dequeued")),
+                        default=Value("Notified"),
+                        output_field=CharField(),
+                    ),
                 )
-                .order_by("-notified_at")
+                .order_by("-display_time")
             )
 
-            notified_entries = list(
-                notified_qs.values(
+            called_entries = list(
+                called_qs.values(
                     "id",
                     "uuid",
                     "license_plate",
-                    "notified_at",
-                    "status",
                     "sequence_number",
+                    "display_status",
+                    "display_time",
                 )
             )
-
-            dequeued_qs = (
-                QueueEntry.objects.filter(
-                    queue=queue,
-                    status=QueueEntry.Status.DEQUEUED,
-                    dequeued_at__gte=today_start_utc,
-                )
-                .annotate(
-                    sequence_number=latest_notification_seq,
-                )
-                .order_by("-dequeued_at")[:20]
-            )
-
-            dequeued_entries = list(
-                dequeued_qs.values(
-                    "id",
-                    "uuid",
-                    "license_plate",
-                    "dequeued_at",
-                    "status",
-                    "sequence_number",
-                )
-            )
-
-            total_dequeued_count = QueueEntry.objects.filter(
-                queue=queue,
-                status=QueueEntry.Status.DEQUEUED,
-                dequeued_at__gte=today_start_utc,
-            ).count()
 
             # Format datetimes for display
             for entry in waiting_entries:
@@ -322,15 +306,10 @@ class QueueStatusAPIView(ControlLoginRequiredMixin, View):
                     local_time = entry["created_at"].astimezone(europe)
                     entry["created_at"] = local_time.strftime("%H:%M:%S")
 
-            for entry in notified_entries:
-                if entry["notified_at"]:
-                    local_time = entry["notified_at"].astimezone(europe)
-                    entry["notified_at"] = local_time.strftime("%H:%M:%S")
-
-            for entry in dequeued_entries:
-                if entry["dequeued_at"]:
-                    local_time = entry["dequeued_at"].astimezone(europe)
-                    entry["dequeued_at"] = local_time.strftime("%H:%M:%S")
+            for entry in called_entries:
+                if entry["display_time"]:
+                    local_time = entry["display_time"].astimezone(europe)
+                    entry["display_time"] = local_time.strftime("%H:%M:%S")
 
             last_updated_local = timezone.now().astimezone(europe)
 
@@ -338,11 +317,9 @@ class QueueStatusAPIView(ControlLoginRequiredMixin, View):
                 {
                     "success": True,
                     "waiting_entries": waiting_entries,
-                    "notified_entries": notified_entries,
-                    "dequeued_entries": dequeued_entries,
+                    "called_entries": called_entries,
                     "waiting_count": total_waiting_count,
-                    "notified_count": len(notified_entries),
-                    "dequeued_count": total_dequeued_count,
+                    "called_count": called_qs.count(),
                     "last_updated": last_updated_local.strftime("%H:%M:%S"),
                     "today_date": now_local.strftime("%d-%m-%Y"),
                 }

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  {% load static %}
+  <title>TAXIBUFFER - Mijn nummers</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --gold-1: #E0BD22;
+      --gold-2: #FEF508;
+      --bg: #F6F6FC;
+      --muted: #666666;
+      --max-width: 420px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      -webkit-font-smoothing: antialiased;
+      background: #eceff4;
+      min-height: 100vh;
+    }
+
+    .app {
+      width: 100%;
+      max-width: var(--max-width);
+      min-height: 100vh;
+      background: var(--bg);
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .header {
+      background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      min-height: 110px;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-wrap img {
+      display: block;
+      width: auto;
+      max-height: 28px;
+    }
+
+    .brand-text {
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: #333;
+      font-size: clamp(18px, 4vw, 20px);
+      white-space: nowrap;
+    }
+
+    .content {
+      padding: 18px;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      flex: 1;
+      padding-bottom: 84px;
+    }
+
+    .page-title {
+      font-size: clamp(20px, 5vw, 22px);
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 2px;
+    }
+
+    .page-subtitle {
+      font-size: clamp(13px, 3.5vw, 14px);
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+
+    .numbers-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .number-card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 6px 20px rgba(2, 6, 23, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .number-main {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .sequence-number {
+      font-size: 28px;
+      font-weight: 800;
+      color: #111827;
+      line-height: 1;
+    }
+
+    .queue-name {
+      font-size: 13px;
+      color: #6b7280;
+      word-break: break-word;
+    }
+
+    .number-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .time-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #374151;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .status-pending {
+      background: #fff7cc;
+      color: #8a6700;
+    }
+
+    .status-accepted {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .status-declined,
+    .status-timeout {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .empty-state {
+      background: #fff;
+      border-radius: 14px;
+      padding: 28px 20px;
+      text-align: center;
+      box-shadow: 0 6px 20px rgba(2, 6, 23, 0.06);
+    }
+
+    .empty-state-icon {
+      font-size: 40px;
+      margin-bottom: 10px;
+    }
+
+    .empty-state-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 6px;
+    }
+
+    .empty-state-text {
+      font-size: 14px;
+      color: #6b7280;
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app" role="main" aria-label="Taxibuffer app">
+    <header class="header" role="banner">
+      <div class="brand">
+        <div class="logo-wrap" aria-hidden="true">
+          <img src="{% static 'queueing/assets/logo.svg' %}" alt="Taxibuffer logo" onerror="this.style.display='none'">
+        </div>
+        <div class="brand-text">TAXIBUFFER</div>
+      </div>
+    </header>
+
+    <main class="content">
+      <section>
+        <div class="page-title">Mijn nummers</div>
+        <div class="page-subtitle">Ontvangen op {{ today_date }}</div>
+      </section>
+
+      {% if notifications %}
+      <div class="numbers-list">
+        {% for notification in notifications %}
+        <div class="number-card">
+          <div class="number-main">
+            <div class="sequence-number">#{{ notification.sequence_number }}</div>
+            <div class="queue-name">{{ notification.queue_entry.queue.pickup_zone.name }}</div>
+          </div>
+
+          <div class="number-meta">
+            <div class="time-label">{{ notification.local_time_str }}</div>
+
+            {% if notification.response == notification.ResponseType.PENDING %}
+              <div class="status-badge status-pending">Open</div>
+            {% elif notification.response == notification.ResponseType.ACCEPTED %}
+              <div class="status-badge status-accepted">Geaccepteerd</div>
+            {% elif notification.response == notification.ResponseType.TIMEOUT %}
+              <div class="status-badge status-timeout">Verlopen</div>
+            {% else %}
+              <div class="status-badge status-declined">Afgewezen</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon">#</div>
+        <div class="empty-state-title">Nog geen nummers vandaag</div>
+        <p class="empty-state-text">Zodra u een volgnummer ontvangt, verschijnt het hier.</p>
+      </div>
+      {% endif %}
+    </main>
+
+    {% include 'queueing/partials/bottom_nav.html' %}
+  </div>
+</body>
+
+</html>

@@ -11,6 +11,7 @@ from .push_views import send_web_push
 from accounts.models import Chauffeur
 from geofence.models import BufferZone
 from geofence.services import point_in_buffer
+from .constants import ACTIVE_QUEUE_STATUSES
 
 
 logger = logging.getLogger(__name__)
@@ -85,7 +86,7 @@ class QueueService:
 
                 existing_entry = QueueEntry.objects.filter(
                     chauffeur=chauffeur,
-                    status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
+                    status__in=ACTIVE_QUEUE_STATUSES,
                 ).first()
 
                 if existing_entry:

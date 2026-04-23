@@ -26,11 +26,13 @@ from django.contrib.auth.views import (
 import re
 import os
 import logging
+import pytz
 
 from accounts.models import Chauffeur, ChauffeurVehicle, User, VehicleType
 from .models import TaxiQueue, QueueEntry, QueueNotification
 from .services import QueueService
 from geofence.services import point_in_buffer, make_point_from_lat_lng
+from .constants import ACTIVE_QUEUE_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -672,7 +674,7 @@ class AccountView(View):
             
             has_active_queue_entry = QueueEntry.objects.filter(
                 chauffeur=chauffeur,
-                status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
+                status__in=ACTIVE_QUEUE_STATUSES,
             ).exists()
             if has_active_queue_entry:
                 messages.error(
@@ -750,7 +752,7 @@ class AccountView(View):
             if vehicle.is_current:
                 has_active_queue_entry = QueueEntry.objects.filter(
                     chauffeur=chauffeur,
-                    status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
+                    status__in=ACTIVE_QUEUE_STATUSES,
                 ).exists()
                 if has_active_queue_entry:
                     messages.error(
@@ -834,7 +836,7 @@ class QueueOverviewView(View):
         active_entry = (
             QueueEntry.objects.filter(
                 chauffeur=chauffeur,
-                status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
+                status__in=ACTIVE_QUEUE_STATUSES,
             )
             .order_by("-created_at")
             .first()
@@ -889,7 +891,7 @@ class QueueStatusAPIView(View):
                     buffer_zone = getattr(queue, 'buffer_zone', None)
                     if buffer_zone and not point_in_buffer(buffer_zone, lat, lng) and not _is_admin_request(request, data={}):
                         # Chauffeur has left the buffer zone, dequeue automatically
-                        if entry.status in [QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED]:
+                        if entry.status in ACTIVE_QUEUE_STATUSES:
                             entry.status = QueueEntry.Status.LEFT_ZONE
                             entry.dequeued_at = timezone.now()
                             entry.save()
@@ -966,7 +968,7 @@ class LeaveQueueBeforeNotificationAPIView(View):
             entry = get_object_or_404(QueueEntry, uuid=entry_uuid)
 
             # Check if entry is active (i.e. waiting or notified)
-            if entry.status in [QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED]:
+            if entry.status in ACTIVE_QUEUE_STATUSES:
                 entry.status = QueueEntry.Status.LEFT_ZONE
                 entry.dequeued_at = timezone.now()
                 entry.save()
@@ -1003,7 +1005,7 @@ class LocationSelectionView(View):
         # Check if chauffeur is already in an active queue
         active_entry = QueueEntry.objects.filter(
             chauffeur=chauffeur,
-            status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
+            status__in=ACTIVE_QUEUE_STATUSES,
         ).first()
 
         if active_entry:
@@ -1123,10 +1125,7 @@ class LocationSelectionView(View):
                     QueueEntry.objects.filter(
                         queue=queue,
                         chauffeur=chauffeur,
-                        status__in=[
-                            QueueEntry.Status.WAITING,
-                            QueueEntry.Status.NOTIFIED,
-                        ],
+                        status__in=ACTIVE_QUEUE_STATUSES,
                     )
                     .order_by("-created_at")
                     .first()
@@ -1193,6 +1192,44 @@ class NotificationResponseView(View):
 
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+
+class SequenceHistoryView(View):
+    template_name = "queueing/sequence_history.html"
+
+    def get(self, request):
+        chauffeur = _get_authenticated_chauffeur(request)
+        if not chauffeur:
+            messages.error(request, "Log eerst in om uw volgnummers te bekijken.")
+            return redirect("queueing:chauffeur_login")
+
+        europe = pytz.timezone("Europe/Amsterdam")
+        now_local = timezone.now().astimezone(europe)
+        today_start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start_utc = today_start_local.astimezone(pytz.UTC)
+
+        notifications = (
+            QueueNotification.objects.filter(
+                queue_entry__chauffeur=chauffeur,
+                notification_time__gte=today_start_utc,
+            )
+            .select_related("queue_entry", "queue_entry__queue")
+            .order_by("-notification_time")
+        )
+
+        # Format datetimes for display
+        for notification in notifications:
+            if notification.notification_time:
+                local_time = notification.notification_time.astimezone(europe)
+                notification.local_time_str = local_time.strftime("%H:%M")
+
+        context = {
+            "chauffeur": chauffeur,
+            "notifications": notifications,
+            "today_date": now_local.strftime("%d-%m-%Y"),
+            "active_tab": "sequence_history",
+        }
+        return render(request, self.template_name, context)
 
 
 # Manual trigger view for testing/admin purposes

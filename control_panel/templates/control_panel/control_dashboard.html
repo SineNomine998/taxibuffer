@@ -79,20 +79,12 @@
 
                         <div class="stats d-flex justify-content-between mb-3">
                             <div class="text-center">
-                                <span class="stat-number text-primary">{{ queue.get_waiting_entries.count }}</span>
+                                <span class="stat-number text-primary">{{ queue.waiting_count }}</span>
                                 <div class="stat-label">Waiting</div>
                             </div>
                             <div class="text-center">
-                                <span class="stat-number text-warning">
-                                    {{ queue.queueentry_set.filter.status.NOTIFIED.count }}
-                                </span>
-                                <div class="stat-label">Notified</div>
-                            </div>
-                            <div class="text-center">
-                                <span class="stat-number text-success">
-                                    {{ queue.dequeued_count }}
-                                </span>
-                                <div class="stat-label">Dequeued</div>
+                                <span class="stat-number text-warning">{{ queue.called_count }}</span>
+                                <div class="stat-label">Called</div>
                             </div>
                         </div>
 

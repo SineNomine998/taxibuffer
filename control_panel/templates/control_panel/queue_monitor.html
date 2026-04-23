@@ -240,44 +240,24 @@
 
         <div class="row mt-4 status-section">
             <div class="col-12">
-                <div class="card status-card notified">
+                <div class="card status-card called">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>Notified</span>
-                        <span id="notifiedCount" class="badge bg-warning text-dark">{{ notified_count }}</span>
+                        <span>Called</span>
+                        <span id="calledCount" class="badge bg-warning text-dark">{{ called_count }}</span>
                     </div>
                     <div class="card-body">
-                        <div id="notifiedList">
-                            {% for entry in notified_entries %}
+                        <div id="calledList">
+                            {% for entry in called_entries %}
                             <div class="status-item">
                                 <span class="license-plate">{{ entry.license_plate }}</span>
                                 <span class="sequence-number">#{{ entry.sequence_number|default:'--' }}</span>
-                                <small class="timestamp">{{ entry.notified_at|time:"H:i:s" }}</small>
+                                <div class="text-end">
+                                    <small class="timestamp">{{ entry.display_time|time:"H:i:s" }}</small><br>
+                                    <small class="text-muted">{{ entry.display_status }}</small>
+                                </div>
                             </div>
                             {% empty %}
-                            <p class="text-muted">No chauffeurs notified</p>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="row status-section">
-            <div class="col-12">
-                <div class="card status-card dequeued">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>Dequeued</span>
-                        <span id="dequeuedCount" class="badge bg-success">{{ dequeued_count }}</span>
-                    </div>
-                    <div class="card-body">
-                        <div id="dequeuedList">
-                            {% for entry in dequeued_entries %}
-                            <div class="status-item">
-                                <span class="license-plate">{{ entry.license_plate }}</span>
-                                <span class="sequence-number">#{{ entry.sequence_number|default:'--' }}</span>
-                                <small class="timestamp">{{ entry.dequeued_at|time:"H:i:s" }}</small>
-                            </div>
-                            {% empty %}
-                            <p class="text-muted">No chauffeurs dequeued</p>
+                            <p class="text-muted">No chauffeurs called</p>
                             {% endfor %}
                         </div>
                     </div>
@@ -343,26 +323,17 @@
                             `;
                         });
 
-                        // Update notified list
-                        document.getElementById('notifiedCount').textContent = data.notified_count;
-                        updateEntryList('notifiedList', data.notified_entries, entry => {
+                        // Update called list
+                        document.getElementById('calledCount').textContent = data.called_count;
+                        updateEntryList('calledList', data.called_entries, entry => {
                             return `
-                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="status-item">
                                     <span class="license-plate">${entry.license_plate}</span>
-                                    <span class="sequence-number" style="margin-right: 140px;">#${entry.sequence_number || '--'}</span>
-                                    <small class="timestamp">${entry.notified_at}</small>
-                                </div>
-                            `;
-                        });
-
-                        // Update dequeued list
-                        document.getElementById('dequeuedCount').textContent = data.dequeued_count;
-                        updateEntryList('dequeuedList', data.dequeued_entries, entry => {
-                            return `
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="license-plate">${entry.license_plate}</span>
-                                    <span class="sequence-number" style="margin-right: 140px;">#${entry.sequence_number || '--'}</span>
-                                    <small class="timestamp">${entry.dequeued_at}</small>
+                                    <span class="sequence-number">#${entry.sequence_number || '--'}</span>
+                                    <div class="text-end">
+                                        <small class="timestamp">${entry.display_time}</small><br>
+                                        <small class="text-muted">${entry.display_status}</small>
+                                    </div>
                                 </div>
                             `;
                         });

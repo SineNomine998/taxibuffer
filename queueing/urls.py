@@ -89,7 +89,10 @@ urlpatterns = [
         views.PasswordChangeDoneView.as_view(),
         name="password_change_done",
     ),
+    # Account management
     path("account/", views.AccountView.as_view(), name="account"),
+    # Sequence history for chauffeurs
+    path("sequence-history/", views.SequenceHistoryView.as_view(), name="sequence_history"),
     # Push notification subscription
     path("api/push/subscribe/", push_views.push_subscribe, name="push_subscribe"),
     path("api/push/test/", push_views.test_push, name="push_test"),
