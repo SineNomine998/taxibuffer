@@ -207,18 +207,18 @@ class PasswordResetView(DjangoPasswordResetView):
         users = super().get_users(email)
         return users.filter(is_chauffeur=True)
 
-    def get_email_context(self, context):
-        context = super().get_email_context(context)
-        context["domain"] = settings.MAIN_DOMAIN
-        context["protocol"] = "http" if settings.DEBUG else "https"
-        return context
+    # def get_email_context(self, context):
+    #     context = super().get_email_context(context)
+    #     context["domain"] = settings.MAIN_DOMAIN
+    #     context["protocol"] = "http" if settings.DEBUG else "https"
+    #     return context
     
     def form_valid(self, form):
         form.save(
-            domain_override=settings.MAIN_DOMAIN, 
-            use_https=not settings.DEBUG,
-            from_email=settings.DEFAULT_FROM_EMAIL,
             request=self.request,
+            use_https=not settings.DEBUG,
+            # domain_override=settings.MAIN_DOMAIN,
+            from_email=settings.DEFAULT_FROM_EMAIL,
             email_template_name=self.email_template_name,
             subject_template_name=self.subject_template_name,
         )
