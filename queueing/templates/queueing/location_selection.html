@@ -176,6 +176,16 @@
       box-shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
     }
 
+    .location-card-disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .location-card-disabled:hover {
+      transform: none;
+      box-shadow: 0 6px 20px rgba(2, 6, 23, 0.06);
+    }
+
     .location-image {
       width: 100%;
       min-height: 96px;
@@ -360,7 +370,7 @@
             <!-- license plate SINENOMINE bypass -->
             <input type="hidden" id="license_plate" value="{{ form_data.license_plate|default:'' }}">
             {% for queue in queues %}
-            <div class="location-card" data-queue-id="{{ queue.id }}">
+            <div class="location-card {% if not queue.active %}location-card-disabled{% endif %}" data-queue-id="{{ queue.id }}">
               <div class="location-image" aria-hidden="true">
                 {% if queue.pickup_zone.image %}
                 <img src="{{ queue.pickup_zone.image.url }}" alt="{{ queue.pickup_zone.name }}">
@@ -374,7 +384,15 @@
                 <div class="location-address">{{ queue.pickup_zone.address|default:"Wilhelminakade 699, 3072 AP, Rotterdam" }}
                 </div>
                 <div class="register-wrap">
-                  <button type="button" class="register-button" data-queue-id="{{ queue.id }}">Aanmelden</button>
+                  {% if queue.active %}
+                    <button type="button" class="register-button" data-queue-id="{{ queue.id }}">
+                      Aanmelden
+                    </button>
+                  {% else %}
+                    <button type="button" class="register-button" disabled>
+                      Gesloten
+                    </button>
+                  {% endif %}
                 </div>
               </div>
             </div>

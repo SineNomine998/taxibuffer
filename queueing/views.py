@@ -1012,9 +1012,9 @@ class LocationSelectionView(View):
             # If they're already in a queue, redirect them to that queue's status page
             return redirect("queueing:queue_status", entry_uuid=active_entry.uuid)
 
-        active_queues = TaxiQueue.objects.filter(active=True).select_related(
+        active_queues = TaxiQueue.objects.all().select_related(
             "buffer_zone", "pickup_zone"
-        )
+        ).order_by("pickup_zone__name")
 
         for queue in active_queues:
             queue.waiting_count = queue.get_waiting_entries().count()
@@ -1046,6 +1046,7 @@ class LocationSelectionView(View):
         try:
             queue = TaxiQueue.objects.get(id=selected_queue_id, active=True)
         except TaxiQueue.DoesNotExist:
+            messages.error(request, "Deze wachtrij is momenteel gesloten.")
             logger.warning("Invalid selection. Please try again.")
             return redirect("queueing:location_selection")
 
