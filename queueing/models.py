@@ -38,9 +38,20 @@ class TaxiQueue(models.Model):
         ]
 
     def save(self, *args, **kwargs):
+        was_active = None
+
+        if self.pk:
+            was_active = TaxiQueue.objects.filter(pk=self.pk).values_list(
+                "active", flat=True
+            ).first()
+
         if not self.name:
             self.name = f"{self.buffer_zone.name} --> {self.pickup_zone.name}"
+
         super().save(*args, **kwargs)
+
+        if was_active is True and self.active is False:
+            self.close_active_entries()
 
     def get_waiting_entries(self):
         """Get all queue entries that are waiting, ordered by sign-up time."""
@@ -73,6 +84,17 @@ class TaxiQueue(models.Model):
         except (QueueEntry.DoesNotExist, ValueError):
             return None
 
+    def close_active_entries(self):
+        return self.queueentry_set.filter(
+            status__in=[
+                QueueEntry.Status.WAITING,
+                QueueEntry.Status.NOTIFIED,
+            ]
+        ).update(
+            status=QueueEntry.Status.QUEUE_CLOSED,
+            updated_at=timezone.now(),
+        )
+
     def __str__(self):
         return self.name or f"Queue {self.uuid}"
 
@@ -89,6 +111,7 @@ class QueueEntry(models.Model):
         DEQUEUED = "dequeued", "Dequeued (Allowed to Pickup)"
         # DECLINED = "declined", "Declined Notification"
         # TIMEOUT = "timeout", "Notification Timeout"
+        QUEUE_CLOSED = "queue_closed", "Queue Closed"
         LEFT_ZONE = "left_zone", "Left Buffer Zone"
 
     uuid = models.UUIDField(default=uuid.uuid4, null=False, blank=False, editable=False)
