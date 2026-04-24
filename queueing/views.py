@@ -12,7 +12,7 @@ from django.db import transaction
 import json
 from django.conf import settings
 from django.http import FileResponse
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from django.http import FileResponse, HttpResponseRedirect
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import (
@@ -195,6 +195,14 @@ class ChauffeurLoginView(View):
         """
         pattern = r"^(?:\d{4}|\d{5}|\d{4}-[A-Za-z]\d)$"
         return bool(re.fullmatch(pattern, taxi_license))
+
+
+class ChauffeurLogoutView(LoginRequiredMixin, View):
+    """Handle chauffeur logout."""
+
+    def post(self, request):
+        logout(request)
+        return redirect("queueing:chauffeur_login")
 
 
 class PasswordResetView(DjangoPasswordResetView):

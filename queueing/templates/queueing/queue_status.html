@@ -8,6 +8,7 @@
     <title>TAXIBUFFER - Queue Status - {{ queue.name }}</title>
 
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'queueing/css/app_shell.css' %}">
 
     <style>
         :root {
@@ -45,45 +46,6 @@
             display: flex;
             flex-direction: column;
             position: relative;
-        }
-
-        .header {
-            background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
-            padding: 14px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            min-height: 110px;
-            flex-shrink: 0;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 12px
-        }
-
-        .logo-wrap {
-            background: transparent;
-            border-radius: 8px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .logo-wrap img {
-            display: block;
-            width: auto;
-            max-height: 28px;
-        }
-
-        .brand-text {
-            font-weight: 700;
-            letter-spacing: 3px;
-            color: #595959;
-            font-size: clamp(24px, 4vw, 24px);
-            white-space: nowrap;
         }
 
         .connection-status {
@@ -551,15 +513,7 @@
 
 <body>
     <div class="app" role="application" aria-label="Taxibuffer queue status">
-        <header class="header" role="banner" aria-hidden="false">
-            <div class="brand" aria-hidden="true">
-                <div class="logo-wrap">
-                    <img src="{% static 'queueing/assets/logo.svg' %}" alt="Taxibuffer logo"
-                        onerror="this.style.display='none'">
-                </div>
-                <div class="brand-text">TAXIBUFFER</div>
-            </div>
-        </header>
+        {% include 'queueing/partials/app_header.html' %}
 
         <main class="content" role="main">
             <div>

@@ -91,6 +91,7 @@ urlpatterns = [
     ),
     # Account management
     path("account/", views.AccountView.as_view(), name="account"),
+    path("logout/", views.ChauffeurLogoutView.as_view(), name="chauffeur_logout"),
     # Sequence history for chauffeurs
     path("sequence-history/", views.SequenceHistoryView.as_view(), name="sequence_history"),
     # Push notification subscription

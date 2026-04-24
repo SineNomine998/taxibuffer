@@ -7,6 +7,7 @@
     {% load static %}
     <title>TAXIBUFFER - Account</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'queueing/css/app_shell.css' %}">
     <style>
         :root {
             --gold-1: #e0bd22;
@@ -45,12 +46,13 @@
         }
 
         .header {
-            height: 124px;
             background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
+            padding: 14px 16px;
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
+            min-height: 110px;
             flex-shrink: 0;
         }
 
@@ -60,17 +62,26 @@
             gap: 12px;
         }
 
-        .brand img {
-            max-height: 20px;
+        .logo-wrap {
+            background: transparent;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-wrap img {
+            display: block;
             width: auto;
+            max-height: 28px;
         }
 
         .brand-text {
-            font-size: 37px;
-            letter-spacing: 4px;
-            font-weight: 800;
-            line-height: 1;
-            color: #000;
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: #333;
+            font-size: clamp(18px, 4vw, 20px);
+            white-space: nowrap;
         }
 
         .top-link {
@@ -107,6 +118,22 @@
             font-size: 16px;
             line-height: 1.2;
             margin-top: -3px;
+        }
+
+        .account-logout-form {
+            margin-top: 8px;
+        }
+
+        .account-logout-btn {
+            width: 100%;
+            height: 42px;
+            border-radius: 999px;
+            border: 1px solid #d1d5db;
+            background: #ffffff;
+            color: #7f1d1d;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
         }
 
         .message {
@@ -338,17 +365,60 @@
             text-align: left;
             padding: 12px 14px;
         }
+
+        .swal2-popup {
+            border-radius: 16px;
+            font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+        }
+
+        .swal2-title {
+            font-weight: 800;
+            font-size: 28px;
+            margin-bottom: 6px;
+        }
+
+        .swal2-html-container {
+            color: #4b4b4b;
+            font-size: 16px;
+            line-height: 1.35;
+        }
+
+        .swal2-confirm {
+            background: linear-gradient(92deg, #E0BD22 10%, #FEF508 100%) !important;
+            color: #222 !important;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 28px;
+            font-weight: 800;
+            box-shadow: 0 8px 20px rgba(2, 6, 23, 0.06);
+            min-width: 150px;
+        }
+
+        .swal2-cancel {
+            background: #fff !important;
+            color: #5b5b5b !important;
+            border: 3px solid rgba(0, 0, 0, 0.08);
+            padding: 12px 28px;
+            border-radius: 28px;
+            font-weight: 700;
+            min-width: 150px;
+            box-shadow: 0 6px 12px rgba(2, 6, 23, 0.04) inset;
+        }
+
+        .swal2-icon {
+            width: 96px !important;
+            height: 96px !important;
+            border-radius: 999px;
+            margin: 0 auto 6px;
+            box-shadow: none;
+        }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body>
     <div class="app">
-        <header class="header">
-            <div class="brand">
-                <img src="{% static 'queueing/assets/logo.svg' %}" alt="Taxibuffer logo">
-                <div class="brand-text">TAXIBUFFER</div>
-            </div>
-        </header>
+        {% include 'queueing/partials/app_header.html' %}
 
         <main class="content">
             <h1>Account</h1>
@@ -380,6 +450,11 @@
                 </div>
 
                 <button id="showProfileEdit" class="btn-secondary" type="button">Gegevens wijzigen</button>
+
+                <form method="post" action="{% url 'queueing:chauffeur_logout' %}" class="account-logout-form" id="logoutForm">
+                    {% csrf_token %}
+                    <button type="submit" class="account-logout-btn">Uitloggen</button>
+                </form>
 
                 <form id="profileEditForm" method="post" class="form-grid profile-edit-panel" hidden>
                     {% csrf_token %}
@@ -475,32 +550,74 @@
     </div>
 
     <script>
+        function showLogoutDialog() {
+            const iconHtml = `
+                <div>
+                    <img src="{% static 'queueing/assets/warning-badge.svg' %}" 
+                        alt="Waarschuwing" 
+                        style="max-width:80px;max-height:80px;width:100%;height:auto;">
+                </div>
+            `;
+
+            return Swal.fire({
+                title: 'Uitloggen',
+                html: iconHtml + `
+                    <div style="margin-top:8px">
+                        Weet u zeker dat u wilt uitloggen?
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Uitloggen',
+                cancelButtonText: 'Annuleren',
+                focusConfirm: false,
+                allowOutsideClick: false,
+                backdrop: true,
+                didOpen: () => {
+                    const swalIcon = document.querySelector('.swal2-icon');
+                    if (swalIcon) swalIcon.style.display = 'none';
+                }
+            }).then(result => {
+                return { confirmed: result.isConfirmed };
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             const showBtn = document.getElementById('showProfileEdit');
             const cancelBtn = document.getElementById('cancelProfileEdit');
             const saveBtn = document.getElementById('saveProfileBtn');
-            const form = document.getElementById('profileEditForm');
+            const profileForm = document.getElementById('profileEditForm');
+            const logoutForm = document.getElementById('logoutForm');
 
-            if (!showBtn || !form) {
-                return;
+            if (showBtn && profileForm) {
+                showBtn.addEventListener('click', function () {
+                    profileForm.hidden = false;
+                    showBtn.hidden = true;
+                });
             }
 
-            showBtn.addEventListener('click', function () {
-                form.hidden = false;
-                showBtn.hidden = true;
-            });
-
-            if (cancelBtn) {
+            if (cancelBtn && showBtn && profileForm) {
                 cancelBtn.addEventListener('click', function () {
-                    form.hidden = true;
+                    profileForm.hidden = true;
                     showBtn.hidden = false;
                 });
             }
 
-            if (saveBtn) {
+            if (saveBtn && showBtn && profileForm) {
                 saveBtn.addEventListener('click', function () {
-                    form.hidden = true;
+                    profileForm.hidden = true;
                     showBtn.hidden = false;
+                });
+            }
+
+            if (logoutForm) {
+                logoutForm.addEventListener('submit', async function (event) {
+                    event.preventDefault();
+
+                    const res = await showLogoutDialog();
+
+                    if (res.confirmed) {
+                        logoutForm.submit();
+                    }
                 });
             }
         });

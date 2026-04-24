@@ -7,6 +7,7 @@
     {% load static %}
     <title>TAXIBUFFER - Sign Up Stap 3</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'queueing/css/app_shell.css' %}">
     <style>
         :root {
             --gold-1: #e0bd22;
@@ -42,52 +43,6 @@
             position: relative;
             display: flex;
             flex-direction: column;
-        }
-
-        .header {
-            height: 124px;
-            background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            flex-shrink: 0;
-        }
-
-        .info-icon {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            border: 2px solid #111;
-            color: #111;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 14px;
-            text-decoration: none;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .brand img {
-            max-height: 20px;
-            width: auto;
-        }
-
-        .brand-text {
-            font-size: 37px;
-            letter-spacing: 4px;
-            font-weight: 800;
-            line-height: 1;
-            color: #000;
         }
 
         .content {
@@ -276,13 +231,7 @@
 
 <body>
     <div class="app">
-        <header class="header">
-            <a href="{% url 'queueing:info_pages' %}" class="info-icon" aria-label="Info">i</a>
-            <div class="brand">
-                <img src="{% static 'queueing/assets/logo.svg' %}" alt="Taxibuffer logo">
-                <div class="brand-text">TAXIBUFFER</div>
-            </div>
-        </header>
+        {% include 'queueing/partials/app_header.html' %}
 
         <main class="content">
             <h1>Voertuig</h1>

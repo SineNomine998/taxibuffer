@@ -7,6 +7,7 @@
     {% load static %}
     <title>TAXIBUFFER - Voertuig Toevoegen</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'queueing/css/app_shell.css' %}">
     <style>
         :root {
             --gold-1: #e0bd22;
@@ -29,46 +30,6 @@
             font-family: "DM Sans", Arial, sans-serif;
             background: #eceff4;
             min-height: 100vh;
-        }
-
-        .app {
-            width: 100%;
-            max-width: 420px;
-            min-height: 100vh;
-            margin: 0 auto;
-            background: var(--bg);
-            position: relative;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .header {
-            height: 124px;
-            background: linear-gradient(92.18deg, var(--gold-1) -4.05%, var(--gold-2) 116.02%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            flex-shrink: 0;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .brand img {
-            max-height: 20px;
-            width: auto;
-        }
-
-        .brand-text {
-            font-size: 37px;
-            letter-spacing: 4px;
-            font-weight: 800;
-            line-height: 1;
-            color: #000;
         }
 
         .content {
@@ -245,12 +206,7 @@
 
 <body>
     <div class="app">
-        <header class="header">
-            <div class="brand">
-                <img src="{% static 'queueing/assets/logo.svg' %}" alt="Taxibuffer logo">
-                <div class="brand-text">TAXIBUFFER</div>
-            </div>
-        </header>
+        {% include 'queueing/partials/app_header.html' %}
 
         <main class="content">
             <h1>Voertuig toevoegen</h1>

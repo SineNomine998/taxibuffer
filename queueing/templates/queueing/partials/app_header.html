@@ -1,0 +1,18 @@
+{% load static %}
+
+<header class="app-header" role="banner">
+    {% if show_help %}
+    <button class="app-header-help" id="helpBtn" type="button" aria-label="Help">i</button>
+    {% endif %}
+
+    <div class="app-brand">
+        <div class="app-logo-wrap" aria-hidden="true">
+            <img
+                src="{% static 'queueing/assets/logo.svg' %}"
+                alt="Taxibuffer logo"
+                onerror="this.style.display='none'"
+            >
+        </div>
+        <div class="app-brand-text">TAXIBUFFER</div>
+    </div>
+</header>
