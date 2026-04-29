@@ -131,20 +131,9 @@
       white-space: nowrap;
     }
 
-    .status-pending {
-      background: #fff7cc;
-      color: #8a6700;
-    }
-
-    .status-accepted {
+    .status-called {
       background: #dcfce7;
       color: #166534;
-    }
-
-    .status-declined,
-    .status-timeout {
-      background: #fee2e2;
-      color: #991b1b;
     }
 
     .empty-state {
@@ -197,15 +186,7 @@
           <div class="number-meta">
             <div class="time-label">{{ notification.local_time_str }}</div>
 
-            {% if notification.response == notification.ResponseType.PENDING %}
-              <div class="status-badge status-pending">Open</div>
-            {% elif notification.response == notification.ResponseType.ACCEPTED %}
-              <div class="status-badge status-accepted">Geaccepteerd</div>
-            {% elif notification.response == notification.ResponseType.TIMEOUT %}
-              <div class="status-badge status-timeout">Verlopen</div>
-            {% else %}
-              <div class="status-badge status-declined">Afgewezen</div>
-            {% endif %}
+              <div class="status-badge status-called">Opgeroepen</div>
           </div>
         </div>
         {% endfor %}
