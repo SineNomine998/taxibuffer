@@ -36,6 +36,7 @@ def send_notification_to_vehicle(vehicle_entry, is_busje=False):
                         logger.info(
                             f"Push notification sent to {plate}"
                         )
+                    # vehicle_entry.dequeue()
                 else:
                     plate = vehicle_entry.license_plate or "unknown"
                     logger.warning(

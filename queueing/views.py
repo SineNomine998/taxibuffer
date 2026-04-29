@@ -1186,6 +1186,14 @@ class LocationSelectionView(View):
                     "Er is iets misgegaan. Neem contact op met de beheerder.",
                 )
                 return redirect("queueing:location_selection")
+            elif message == "Notification missed.":
+                notification_missed_entry = QueueEntry.objects.filter(uuid=entry_uuid).first()
+                notification_missed_entry.dequeue()
+                messages.warning(
+                    request,
+                    "Er is blijkbaar iets misgegaan bij het aanmelden. Wilt u het opnieuw proberen?",
+                )
+                return redirect("queueing:location_selection")
 
             messages.error(request, message or "Kon niet aanmelden :(")
             return redirect("queueing:queue_status", entry_uuid=entry_uuid)
@@ -1234,6 +1242,8 @@ class NotificationResponseView(View):
             if response_type == "accepted":
                 notification.respond(QueueNotification.ResponseType.ACCEPTED)
                 message = "Drive safely :)"
+            elif response_type == "declined":
+                message = "Drive safely brother :peace:"
 
             return JsonResponse({"success": True, "message": message})
 

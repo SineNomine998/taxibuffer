@@ -89,11 +89,23 @@ class QueueService:
                     status__in=ACTIVE_QUEUE_STATUSES,
                 ).first()
 
+                notification_missed_entry = QueueEntry.objects.filter(
+                    chauffeur=chauffeur,
+                    status=QueueEntry.Status.NOTIFIED
+                ).first()
+
                 if existing_entry:
                     return (
                         False,
                         f"You are already in queue: {existing_entry.queue.name}",
                         existing_entry.uuid,
+                    )
+                
+                if notification_missed_entry:
+                    return (
+                        False,
+                        f"Notification missed.",
+                        notification_missed_entry.uuid,
                     )
 
                 # allowed, err_msg = self.geofence_check(
