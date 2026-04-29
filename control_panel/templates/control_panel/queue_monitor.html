@@ -115,6 +115,33 @@
             font-weight: 700;
             color: #343a40;
         }
+
+        .operator-actions {
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+        }
+
+        .operator-action-buttons {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .operator-action-btn {
+            min-width: 110px;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.85rem;
+        }
+
+        @media (min-width: 768px) {
+            .operator-action-btn {
+                min-width: 130px;
+                padding: 0.5rem 0.9rem;
+                font-size: 0.9rem;
+            }
+        }
     </style>
 </head>
 
@@ -155,25 +182,36 @@
             <span id="todayDate">{{ today_date }}</span>
         </p>
 
-        <button id="bypassBusjeBtn" data-queue-id="{{ queue.id }}">Busje Nodig</button>
-        <script>
-            document.getElementById('bypassBusjeBtn').addEventListener('click', function () {
-                const queueId = this.getAttribute('data-queue-id');
-                fetch(`/control/queue/${queueId}/busje/`, {
-                    method: "POST",
-                    headers: {
-                        'X-CSRFToken': '{{ csrf_token }}'
-                    }
-                }).then(r => r.json())
-                    .then(data => {
-                        if (data.success) {
-                            alert(data.message);
-                        } else {
-                            alert("Error: " + data.error);
-                        }
-                    });
-            });
-        </script>
+        <div class="operator-actions card mb-4">
+            <div class="card-body">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                    <div>
+                        <h5 class="mb-1">Oproep acties</h5>
+                        <p class="text-muted mb-0">Roep handmatig het volgende voertuig op.</p>
+                    </div>
+
+                    <div class="operator-action-buttons">
+                        <button
+                            type="button"
+                            id="callVehicleBtn"
+                            class="btn btn-primary operator-action-btn"
+                            data-queue-id="{{ queue.id }}"
+                        >
+                            Voertuig nodig
+                        </button>
+
+                        <button
+                            type="button"
+                            id="bypassBusjeBtn"
+                            class="btn btn-warning operator-action-btn"
+                            data-queue-id="{{ queue.id }}"
+                        >
+                            Busje nodig
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <form id="pauseForm{{ queue.id }}" class="pause-form" method="post" onsubmit="return false;">
             {% csrf_token %}
@@ -190,6 +228,67 @@
                 const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
                 return v ? v.pop() : '';
             }
+
+            async function callQueueAction(queueId, actionUrl, buttonElement, loadingText) {
+                const originalText = buttonElement.textContent;
+                buttonElement.disabled = true;
+                buttonElement.textContent = loadingText;
+
+                try {
+                    const response = await fetch(actionUrl, {
+                        method: "POST",
+                        headers: {
+                            "X-CSRFToken": getCookie("csrftoken"),
+                            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+                        }
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        alert(data.message || "Actie uitgevoerd.");
+                    } else {
+                        alert("Error: " + (data.error || "Onbekende fout."));
+                    }
+                } catch (err) {
+                    console.error("Queue action error:", err);
+                    alert("Kon de actie niet uitvoeren.");
+                } finally {
+                    buttonElement.disabled = false;
+                    buttonElement.textContent = originalText;
+                }
+            }
+
+            document.addEventListener("DOMContentLoaded", function () {
+                const callVehicleBtn = document.getElementById("callVehicleBtn");
+                const bypassBusjeBtn = document.getElementById("bypassBusjeBtn");
+
+                if (callVehicleBtn) {
+                    callVehicleBtn.addEventListener("click", function () {
+                        const queueId = this.dataset.queueId;
+
+                        callQueueAction(
+                            queueId,
+                            `/control/queue/${queueId}/voertuig/`,
+                            this,
+                            "Oproepen..."
+                        );
+                    });
+                }
+
+                if (bypassBusjeBtn) {
+                    bypassBusjeBtn.addEventListener("click", function () {
+                        const queueId = this.dataset.queueId;
+
+                        callQueueAction(
+                            queueId,
+                            `/control/queue/${queueId}/busje/`,
+                            this,
+                            "Busje oproepen..."
+                        );
+                    });
+                }
+            });
 
             async function togglePause(queueId) {
                 const btn = document.getElementById('pauseBtn' + queueId);

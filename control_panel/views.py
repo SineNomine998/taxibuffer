@@ -9,6 +9,7 @@ from django.contrib.auth.decorators import user_passes_test
 from django.utils.decorators import method_decorator
 from django.contrib.auth.mixins import LoginRequiredMixin
 from accounts.models import ChauffeurVehicle, Officer, User
+from control_panel.services import send_notification_to_vehicle
 from queueing.models import QueueNotification, TaxiQueue, QueueEntry, PushSubscription
 from queueing.push_views import send_web_push
 from django.db.models import Subquery, OuterRef, IntegerField, Count, Q, Case, When, F, Value, CharField, DateTimeField
@@ -394,52 +395,31 @@ class BypassBusjeView(View):
                 .first()
             )
 
-            if busje_entry:
-                busje_entry.notify()
-                try:
-                    try:
-                        subs = PushSubscription.objects.filter(
-                            chauffeur=busje_entry.chauffeur
-                        )
+            result = send_notification_to_vehicle(busje_entry, True)
+            return JsonResponse(result)
+        except Exception as e:
+            return JsonResponse({"success": False, "error": str(e)}, status=400)
 
-                        if subs.exists():
-                            payload = {
-                                "title": "U bent aan de beurt",
-                                "body": f"Ga naar ophaalzone: {busje_entry.queue.pickup_zone.name}",
-                                "url": f"/queueing/queue/{busje_entry.uuid}/",
-                                "tag": f"queue-{busje_entry.queue.id}",
-                                "vibrate": [300, 100, 300],
-                                "data": {
-                                    "url": f"/queueing/queue/{busje_entry.uuid}/",
-                                },
-                            }
 
-                            for s in subs:
-                                send_web_push(s.subscription_info, payload)
-                                plate = busje_entry.license_plate or "unknown"
-                                logger.info(
-                                    f"Push notification sent to {plate}"
-                                )
-                        else:
-                            plate = busje_entry.license_plate or "unknown"
-                            logger.warning(
-                                f"No push subscriptions found for chauffeur {plate}"
-                            )
+@method_decorator(user_passes_test(is_officer), name="dispatch")
+class BypassVehicleView(View):
+    """
+    When an officer triggers this view, the first vehicle ("voertuig") in the specified queue is popped
+    and notified immediately. (hopefully :crossed_fingers:)
+    """
 
-                    except ProgrammingError:
-                        logger.warning("PushSubscription table does not exist yet")
-
-                except Exception as push_exc:
-                    logger.exception(
-                        f"Failed to send web-push for busje_entry {busje_entry.id}: {push_exc}"
-                    )
-
-                return JsonResponse(
-                    {"success": True, "message": "Busje chauffeur notified!"}
+    def post(self, request, queue_id):
+        try:
+            queue = get_object_or_404(TaxiQueue, id=queue_id, active=True)
+            vehicle_entry = (
+                queue.queueentry_set.filter(
+                    status=QueueEntry.Status.WAITING,
                 )
-            else:
-                return JsonResponse(
-                    {"success": False, "error": "No busje chauffeur found in queue."}
-                )
+                .order_by("created_at")
+                .first()
+            )
+
+            result = send_notification_to_vehicle(vehicle_entry, False)
+            return JsonResponse(result)
         except Exception as e:
             return JsonResponse({"success": False, "error": str(e)}, status=400)
