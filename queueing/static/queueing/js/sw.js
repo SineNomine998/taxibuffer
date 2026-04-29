@@ -12,7 +12,11 @@ self.addEventListener('push', (event) => {
     const data = event.data.json();
     if (DEBUG) console.log('[Service Worker] Push data:', data);
 
-    
+    if (data.type === 'LOCATION_PING') {
+        event.waitUntil(handleLocationPing(data));
+        return; // do NOT show a notification
+    }
+
     let title = data.title || 'TaxiBuffer Bericht';
 
     const options = {
@@ -61,3 +65,68 @@ self.addEventListener('push', (event) => {
     console.error('[Service Worker] Error processing push event:', err);
   }
 });
+
+self.addEventListener('notificationclick', (event) => {
+  if (DEBUG) console.log('[Service Worker] Notification clicked:', event);
+
+  event.notification.close();
+
+  // Get the URL from notification data or use default
+  const urlToOpen = event.notification.data?.url || '/queueing/queue/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // If there's already a window open, focus it and navigate to the URL
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            client.navigate(urlToOpen);
+            return client.focus();
+          }
+        }
+        // Otherwise, open a new window
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen);
+        }
+      })
+  );
+});
+
+async function handleLocationPing(data) {
+    const entryUuid = data.entry_uuid;
+    if (!entryUuid) return;
+
+    try {
+        // Service Workers can use the Geolocation API via a client window
+        // They cannot call navigator.geolocation directly, so we ask a client to do it
+        const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+
+        if (clients.length > 0) {
+            // There's an open window/tab, ask it to send location
+            clients[0].postMessage({ type: 'SEND_LOCATION', entry_uuid: entryUuid });
+        } else {
+            // No open client, report to server without location
+            // Server will treat absence of GPS as "unknown", not dequeue
+            await reportLocationToServer(entryUuid, null, null);
+        }
+    } catch (e) {
+        console.error('[SW] Location ping failed:', e);
+    }
+}
+
+async function reportLocationToServer(entryUuid, lat, lng) {
+    let url = `/queueing/api/queue/${entryUuid}/location/`;
+    if (lat !== null && lng !== null) {
+        url += `?lat=${lat}&lng=${lng}`;
+    }
+    
+    try {
+        await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            // No CSRF needed if you exempt this endpoint, or pass token via URL param
+        });
+    } catch (e) {
+        console.error('[SW] Failed to report location:', e);
+    }
+}

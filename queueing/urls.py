@@ -11,7 +11,11 @@ urlpatterns = [
     path(
         "locations/", views.LocationSelectionView.as_view(), name="location_selection"
     ),
-    path("locations/info/", views.LocationSelectionInfoView.as_view(), name="location_selection_info"),
+    path(
+        "locations/info/",
+        views.LocationSelectionInfoView.as_view(),
+        name="location_selection_info",
+    ),
     # Queue status and management
     path(
         "queue/<uuid:entry_uuid>/", views.QueueStatusView.as_view(), name="queue_status"
@@ -32,6 +36,11 @@ urlpatterns = [
         "api/queue/<uuid:entry_uuid>/leave/",
         views.LeaveQueueBeforeNotificationAPIView.as_view(),
         name="leave_queue",
+    ),
+    path(
+        "api/queue/<uuid:entry_uuid>/location/",
+        views.ReportLocationView.as_view(),
+        name="report_location",
     ),
     # Testing/Admin views
     path(
@@ -93,7 +102,11 @@ urlpatterns = [
     path("account/", views.AccountView.as_view(), name="account"),
     path("logout/", views.ChauffeurLogoutView.as_view(), name="chauffeur_logout"),
     # Sequence history for chauffeurs
-    path("sequence-history/", views.SequenceHistoryView.as_view(), name="sequence_history"),
+    path(
+        "sequence-history/",
+        views.SequenceHistoryView.as_view(),
+        name="sequence_history",
+    ),
     # Push notification subscription
     path("api/push/subscribe/", push_views.push_subscribe, name="push_subscribe"),
     path("api/push/test/", push_views.test_push, name="push_test"),

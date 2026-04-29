@@ -72,6 +72,40 @@ def _get_authenticated_chauffeur(request):
         return None
 
 
+def _get_active_queue_entry(chauffeur):
+    """Get the active queue entry for a chauffeur if they're in queue."""
+    if not chauffeur:
+        return None
+    
+    return (
+        QueueEntry.objects.filter(
+            chauffeur=chauffeur,
+            status__in=ACTIVE_QUEUE_STATUSES,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+
+
+def _get_global_queue_context(chauffeur):
+    """
+    Build context variables needed for global push notification handling
+    and GPS tracking across all pages.
+    """
+    context = {
+        'taxibuffer_in_queue': False,
+        'taxibuffer_entry_uuid': None,
+        'taxibuffer_vapid_key': settings.WEBPUSH_SETTINGS.get("VAPID_PUBLIC_KEY", ""),
+    }
+    
+    active_entry = _get_active_queue_entry(chauffeur)
+    if active_entry:
+        context['taxibuffer_in_queue'] = True
+        context['taxibuffer_entry_uuid'] = str(active_entry.uuid)
+    
+    return context
+
+
 class InfoPagesView(View):
     """Serves informational pages regarding this taxi buffer system TaxiBuffer."""
 
@@ -604,6 +638,7 @@ class AccountView(View):
             "vehicle_type_choices": VehicleType.choices,
             "active_tab": "account",
         }
+        context.update(_get_global_queue_context(chauffeur))
         return render(request, self.template_name, context)
 
     def post(self, request):
@@ -825,6 +860,7 @@ class QueueStatusView(View):
                 "waiting_people": waiting_people,
                 "vapid_public_key": settings.WEBPUSH_SETTINGS["VAPID_PUBLIC_KEY"],
             }
+            context.update(_get_global_queue_context(chauffeur))
             return render(request, "queueing/queue_status.html", context)
 
         except Exception as e:
@@ -874,6 +910,7 @@ class QueueOverviewView(View):
                 "active_tab": "queue",
                 "waiting_people": waiting_people,
             }
+            context.update(_get_global_queue_context(chauffeur))
             return render(request, "queueing/queue.html", context)
 
         messages.info(request, "U staat momenteel in geen enkele wachtrij.")
@@ -1014,6 +1051,7 @@ class LocationSelectionView(View):
         active_entry = QueueEntry.objects.filter(
             chauffeur=chauffeur,
             status__in=ACTIVE_QUEUE_STATUSES,
+            # status__in=[QueueEntry.Status.WAITING, QueueEntry.Status.NOTIFIED],
         ).first()
 
         if active_entry:
@@ -1238,7 +1276,51 @@ class SequenceHistoryView(View):
             "today_date": now_local.strftime("%d-%m-%Y"),
             "active_tab": "sequence_history",
         }
+        context.update(_get_global_queue_context(chauffeur))
         return render(request, self.template_name, context)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ReportLocationView(View):
+    """Receive a GPS location report from a chauffeur and auto-dequeue if outside buffer."""
+
+    def post(self, request, entry_uuid):
+        try:
+            entry = get_object_or_404(QueueEntry, uuid=entry_uuid)
+
+            if entry.status not in ACTIVE_QUEUE_STATUSES:
+                return JsonResponse({'success': True, 'action': 'none'})
+
+            lat = request.GET.get('lat')
+            lng = request.GET.get('lng')
+
+            if not lat or not lng:
+                # No location provided, do not dequeue, just acknowledge
+                return JsonResponse({'success': True, 'action': 'no_location'})
+
+            try:
+                lat, lng = float(lat), float(lng)
+            except ValueError:
+                return JsonResponse({'success': False, 'error': 'Invalid coordinates'}, status=400)
+
+            buffer_zone = getattr(entry.queue, 'buffer_zone', None)
+            if not buffer_zone:
+                return JsonResponse({'success': True, 'action': 'no_buffer'})
+
+            inside = point_in_buffer(buffer_zone, lat, lng)
+            if not inside and not _is_admin_request(request, data={}):
+                entry.status = QueueEntry.Status.LEFT_ZONE
+                entry.dequeued_at = timezone.now()
+                entry.save(update_fields=['status', 'dequeued_at'])
+
+                logger.info(f"Auto-dequeued {entry.chauffeur} via location ping (outside buffer).")
+                return JsonResponse({'success': True, 'action': 'dequeued'})
+
+            return JsonResponse({'success': True, 'action': 'inside_buffer'})
+
+        except Exception as e:
+            logger.exception("Location report failed")
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 # Manual trigger view for testing/admin purposes

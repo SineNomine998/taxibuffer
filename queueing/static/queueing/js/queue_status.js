@@ -284,10 +284,10 @@ class QueueManager {
             let endpoint = this.config.endpoints.status;
 
             // Get current location and append to endpoint
-            const location = await this.getCurrentLocation();
-            if (location) {
-                endpoint += `?lat=${location.lat}&lng=${location.lng}`;
-            }
+            // const location = await this.getCurrentLocation();
+            // if (location) {
+            //     endpoint += `?lat=${location.lat}&lng=${location.lng}`;
+            // }
 
             const response = await fetch(endpoint, {
                 method: 'GET',

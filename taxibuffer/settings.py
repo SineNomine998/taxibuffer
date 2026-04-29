@@ -27,7 +27,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 UNDER_CONSTRUCTION = False
 
@@ -59,7 +59,16 @@ INSTALLED_APPS = [
     "queueing",
     "sensors",
     "control_panel",
+    "django_q",
 ]
+
+Q_CLUSTER = {
+    "name": "taxibuffer",
+    "workers": 4,
+    "retry": 120,
+    "timeout": 60,
+    "scheduler": "django_q.schedulers.Scheduler",
+}
 
 CORS_ALLOW_ALL_ORIGINS = True
 

@@ -622,6 +622,14 @@
             }
         });
     </script>
+    
+    <!-- Global TaxiBuffer JavaScript for push notifications and GPS tracking -->
+    <script>
+        window.TAXIBUFFER_ENTRY_UUID = '{{ taxibuffer_entry_uuid|default:'' }}';
+        window.TAXIBUFFER_VAPID_KEY = '{{ taxibuffer_vapid_key|default:'' }}';
+        window.TAXIBUFFER_IN_QUEUE = {{ taxibuffer_in_queue|yesno:'true,false' }};
+    </script>
+    <script src="{% static 'queueing/js/global.js' %}"></script>
 </body>
 
 </html>

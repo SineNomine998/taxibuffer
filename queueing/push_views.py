@@ -158,3 +158,28 @@ def test_push(request):
     except Exception as e:
         logger.error("Error occurred while testing push notification", exc_info=True)
         return JsonResponse({"success": False, "error": str(e)})
+
+
+def send_location_ping(queue_entry):
+    """
+    Send a silent push to the chauffeur's browser asking for their location.
+    This is invisible to the user, the SW handles it quietly.
+    """
+    subscription = PushSubscription.objects.filter(
+        entry_uuid=queue_entry.uuid
+    ).first()
+
+    if not subscription:
+        return
+
+    payload = {
+        "type": "LOCATION_PING",
+        "entry_uuid": str(queue_entry.uuid),
+    }
+
+    send_web_push(
+        subscription_info=subscription.subscription_info,
+        payload=payload,
+        ttl=0
+    )
+

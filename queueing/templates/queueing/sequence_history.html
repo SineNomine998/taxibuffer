@@ -161,7 +161,55 @@
       color: #6b7280;
       margin: 0;
     }
+
+    .swal2-popup {
+        border-radius: 16px;
+        font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+    }
+
+    .swal2-title {
+        font-weight: 800;
+        font-size: 28px;
+        margin-bottom: 6px;
+    }
+
+    .swal2-html-container {
+        color: #4b4b4b;
+        font-size: 16px;
+        line-height: 1.35;
+    }
+
+    .swal2-confirm {
+        background: linear-gradient(92deg, #E0BD22 10%, #FEF508 100%) !important;
+        color: #222 !important;
+        border: none;
+        padding: 12px 28px;
+        border-radius: 28px;
+        font-weight: 800;
+        box-shadow: 0 8px 20px rgba(2, 6, 23, 0.06);
+        min-width: 150px;
+    }
+
+    .swal2-cancel {
+        background: #fff !important;
+        color: #5b5b5b !important;
+        border: 3px solid rgba(0, 0, 0, 0.08);
+        padding: 12px 28px;
+        border-radius: 28px;
+        font-weight: 700;
+        min-width: 150px;
+        box-shadow: 0 6px 12px rgba(2, 6, 23, 0.04) inset;
+    }
+
+    .swal2-icon {
+        width: 96px !important;
+        height: 96px !important;
+        border-radius: 999px;
+        margin: 0 auto 6px;
+        box-shadow: none;
+    }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body>
@@ -202,6 +250,14 @@
 
     {% include 'queueing/partials/bottom_nav.html' %}
   </div>
+  
+  <!-- Global TaxiBuffer JavaScript for push notifications and GPS tracking -->
+  <script>
+      window.TAXIBUFFER_ENTRY_UUID = '{{ taxibuffer_entry_uuid|default:'' }}';
+      window.TAXIBUFFER_VAPID_KEY = '{{ taxibuffer_vapid_key|default:'' }}';
+      window.TAXIBUFFER_IN_QUEUE = {{ taxibuffer_in_queue|yesno:'true,false' }};
+  </script>
+  <script src="{% static 'queueing/js/global.js' %}"></script>
 </body>
 
 </html>
