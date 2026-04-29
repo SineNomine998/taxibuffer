@@ -67,7 +67,7 @@ Q_CLUSTER = {
     "workers": 4,
     "retry": 120,
     "timeout": 60,
-    "scheduler": "django_q.schedulers.Scheduler",
+    "scheduler": "django_q2.schedulers.Scheduler",
 }
 
 CORS_ALLOW_ALL_ORIGINS = True
