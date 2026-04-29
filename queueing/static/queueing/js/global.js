@@ -14,6 +14,7 @@
     let isInQueue = false;
     let gpsInterval = null;
     let watchId = null;
+    let notificationPopupShown = false;
 
     /**
      * Initialize the global notification handler
@@ -26,45 +27,30 @@
 
         if (DEBUG) console.log('[Global] Initializing with entryUuid:', entryUuid, 'isInQueue:', isInQueue);
 
-        // Set up Service Worker message listener
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data?.type === 'REFRESH_STATUS') {
+                    showNotificationPopup(event.data.data);
+                    return;
+                }
+                if (event.data?.type === 'SEND_LOCATION') {
+                    const uuid = event.data.entry_uuid;
+                    navigator.geolocation.getCurrentPosition(
+                        async (pos) => {
+                            await fetch(
+                                `/queueing/api/queue/${uuid}/location/?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`,
+                                { method: 'POST', headers: { 'X-CSRFToken': getCsrfToken() } }
+                            );
+                        },
+                        () => { fetch(`/queueing/api/queue/${uuid}/location/`, { method: 'POST' }); },
+                        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+                    );
+                }
+            });
         }
 
-        // Start GPS tracking if user is in queue
-        if (isInQueue && entryUuid) {
-            startGpsTracking();
-        }
-
-        // Try to register service worker for push notifications
+        if (isInQueue && entryUuid) startGpsTracking();
         registerServiceWorker();
-
-        navigator.serviceWorker.addEventListener('message', (event) => {
-            // existing REFRESH_STATUS handler
-            if (event.data?.type === 'REFRESH_STATUS') {
-                showNotificationPopup(event.data.data);
-                return;
-            }
-            
-            // NEW: SW is asking us to send location
-            if (event.data?.type === 'SEND_LOCATION') {
-                const uuid = event.data.entry_uuid;
-                navigator.geolocation.getCurrentPosition(
-                    async (pos) => {
-                        await fetch(
-                            `/queueing/api/queue/${uuid}/location/` +
-                            `?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`,
-                            { method: 'POST', headers: { 'X-CSRFToken': getCsrfToken() } }
-                        );
-                    },
-                    () => {
-                        // GPS denied or failed, report without coordinates
-                        fetch(`/queueing/api/queue/${uuid}/location/`, { method: 'POST' });
-                    },
-                    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-                );
-            }
-        });
     }
 
     /**
@@ -122,24 +108,14 @@
     }
 
     /**
-     * Handle messages from Service Worker
-     */
-    function handleServiceWorkerMessage(event) {
-        if (DEBUG) console.log('[Global] Service worker message:', event.data);
-
-        if (event.data && event.data.type === 'REFRESH_STATUS') {
-            const data = event.data.data;
-            
-            // Show the notification popup
-            showNotificationPopup(data);
-        }
-    }
-
-    /**
      * Show the "Begrepen" notification popup
      * This is the same popup as in queue_status.js
      */
     function showNotificationPopup(data) {
+        if(notificationPopupShown) return;
+
+        notificationPopupShown = true;
+
         // Check if Swal (SweetAlert2) is available
         if (typeof Swal === 'undefined') {
             if (DEBUG) console.log('[Global] Swal not available, showing native notification');
@@ -176,6 +152,7 @@
                 cancelButton: 'notification-decline-btn'
             }
         }).then((result) => {
+            notificationPopupShown = false;
             if (result.isConfirmed) {
                 respondToNotification('accepted').then(() => {
                     if (DEBUG) console.log('[Global] Notification accepted, redirecting...');
@@ -247,93 +224,50 @@
     }
 
     /**
-     * Send GPS location to server for automatic dequeueing
+     * Called by watchPosition whenever the device reports a new position.
+     * Posts to the dedicated location endpoint (which handles dequeue logic).
      */
-    async function sendGpsLocation() {
-        if (!entryUuid || !navigator.geolocation) {
-            return;
-        }
+    async function checkLocationAgainstBuffer(position) {
+        if (!entryUuid) return;
 
         try {
-            const position = await getCurrentPosition();
-            if (!position) return;
-
-            const csrfToken = getCsrfToken();
-            const endpoint = `/queueing/api/queue/${entryUuid}/status/?lat=${position.lat}&lng=${position.lng}`;
-
-            const res = await fetch(endpoint, {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' },
-                cache: 'no-store'
-            });
-
+            const res = await fetch(
+                `/queueing/api/queue/${entryUuid}/location/?lat=${position.lat}&lng=${position.lng}`,
+                { method: 'POST', headers: { 'X-CSRFToken': getCsrfToken() } }
+            );
             const data = await res.json();
-            
-            if (DEBUG) console.log('[Global] GPS update response:', data);
 
-            // Check if user was auto-dequeued
-            if (data.status_code?.toLowerCase() === 'left_zone') {
-                // Show alert and redirect
+            if (DEBUG) console.log('[Global] Location check response:', data);
+
+            if (data.action === 'dequeued') {
                 if (typeof Swal !== 'undefined') {
                     Swal.fire({
                         title: 'U bent buiten de bufferzone',
                         text: 'U bent uit de wachtrij gehaald.',
                         icon: 'warning',
                         confirmButtonText: 'OK'
-                    }).then(() => {
-                        window.location.href = '/queueing/locations/';
-                    });
+                    }).then(() => { window.location.href = '/queueing/locations/'; });
                 } else {
                     alert('U bent buiten de bufferzone en uit de wachtrij gehaald.');
                     window.location.href = '/queueing/locations/';
                 }
             }
-
-            let notificationPopupShown = false;
-
-            // Check if there's a pending notification
-            if (data.has_notification && !notificationPopupShown) {
-                notificationPopupShown = true;
-                showNotificationPopup({
-                    title: 'U bent aan de beurt',
-                    body: 'Ga naar ophaalzone',
-                    sequence_number: data.sequence_number
-                });
-            }
-
         } catch (e) {
-            if (DEBUG) console.error('[Global] GPS update failed:', e);
+            if (DEBUG) console.error('[Global] Location check failed:', e);
         }
     }
 
-    /**
-     * Get current GPS position
-     */
-    function getCurrentPosition() {
-        return new Promise((resolve) => {
-            if (!navigator.geolocation) {
-                resolve(null);
-                return;
-            }
+    async function sendGpsLocation() {
+        if (!entryUuid || !navigator.geolocation) return;
 
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    resolve({
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    });
-                },
-                (error) => {
-                    if (DEBUG) console.warn('[Global] Geolocation error:', error);
-                    resolve(null);
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 30000
-                }
-            );
-        });
+        navigator.geolocation.getCurrentPosition(
+            (pos) => checkLocationAgainstBuffer({ 
+                lat: pos.coords.latitude, 
+                lng: pos.coords.longitude 
+            }),
+            (err) => { if (DEBUG) console.warn('[Global] One-shot GPS error:', err); },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
     }
 
     /**
