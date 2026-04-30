@@ -1060,7 +1060,7 @@ class LocationSelectionView(View):
 
         active_queues = TaxiQueue.objects.all().select_related(
             "buffer_zone", "pickup_zone"
-        ).order_by("pickup_zone__name")
+        ).order_by("pickup_zone__created_at")
 
         for queue in active_queues:
             queue.waiting_count = queue.get_waiting_entries().count()
