@@ -525,7 +525,7 @@
                 <div class="status-card" id="status-card" role="region" aria-label="Queue status card">
                     <!-- Left image column -->
                     <div class="left-image" aria-hidden="true">
-                        {% if queue.pickup_zone.image %}
+                        {% if queue.pickup_zone.image_url %}
                         <img src="{{ queue.pickup_zone.image.url }}" alt="{{ queue.pickup_zone.name }}">
                         {% else %}
                         <img src="{% static 'queueing/assets/cruise-terminal.png' %}" alt="Location image">
