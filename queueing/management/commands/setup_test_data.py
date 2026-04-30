@@ -55,7 +55,9 @@ class Command(BaseCommand):
             defaults={
                 'total_sensors': 7,
                 'num_of_occupied_sensors': 0,
-                'active': True
+                'active': True,
+                'address': 'Wilhelminakade 699, 3072 AP, Rotterdam',
+                'image_url': '/static/queueing/assets/cruise-terminal.png',
             }
         )
         

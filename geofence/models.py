@@ -24,11 +24,18 @@ class PickupZone(models.Model):
     """Represents a geographical pickup zone."""
     uuid = models.UUIDField(default=uuid.uuid4, null=False, blank=False, editable=False)
     name = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    address = models.CharField(max_length=255, null=True, blank=True)
+    image_url = models.CharField(max_length=500, null=True, blank=True)
     total_sensors = models.PositiveIntegerField(default=0)
     num_of_occupied_sensors = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=True)
+
+    @property
+    def image(self):
+        """Allow templates to query pickup_zone.image for backward compatibility."""
+        return self.image_url
 
     def get_available_slots(self) -> int:
         """Get the number of total slots in the pickup zone."""

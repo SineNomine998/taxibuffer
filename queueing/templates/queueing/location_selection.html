@@ -293,8 +293,8 @@
             {% for queue in queues %}
             <div class="location-card {% if not queue.active %}location-card-disabled{% endif %}" data-queue-id="{{ queue.id }}">
               <div class="location-image" aria-hidden="true">
-                {% if queue.pickup_zone.image %}
-                <img src="{{ queue.pickup_zone.image.url }}" alt="{{ queue.pickup_zone.name }}">
+                {% if queue.pickup_zone.image_url %}
+                <img src="{{ queue.pickup_zone.image_url }}" alt="{{ queue.pickup_zone.name }}">
                 {% else %}
                 <img src="{% static 'queueing/assets/cruise-terminal.png' %}" alt="Default location">
                 {% endif %}
