@@ -58,22 +58,22 @@ class OfficerLoginView(View):
             officer = Officer.objects.filter(credentials=credential).first()
 
             # TODO: Handle authentication properly if needed in the future
-            # if not officer:
-            #     messages.error(request, "Invalid credentials.")
-            #     return redirect("control_panel:login")
-
             if not officer:
-                messages.info(request, "Officer not found. Creating new officer.")
-                Officer.objects.create(
-                    user=User.objects.create_user(
-                        username=credential,
-                        first_name=first_name,
-                        last_name=last_name,
-                        password="password",  # TODO: default password, change this later to handle authentication properly
-                        is_officer=True,
-                    ),
-                    credentials=credential,
-                )
+                messages.error(request, "Invalid credentials.")
+                return redirect("control_panel:login")
+
+            # if not officer:
+            #     messages.info(request, "Officer not found. Creating new officer.")
+            #     Officer.objects.create(
+            #         user=User.objects.create_user(
+            #             username=credential,
+            #             first_name=first_name,
+            #             last_name=last_name,
+            #             password="password",  # TODO: default password, change this later to handle authentication properly
+            #             is_officer=True,
+            #         ),
+            #         credentials=credential,
+            #     )
 
             # Try to authenticate with the associated user
             user = authenticate(username=officer.user.username, password="password")
