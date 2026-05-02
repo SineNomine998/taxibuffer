@@ -1284,7 +1284,7 @@ class SequenceHistoryView(View):
             "chauffeur": chauffeur,
             "notifications": notifications,
             "today_date": now_local.strftime("%d-%m-%Y"),
-            "active_tab": "sequence_history",
+            "active_tab": "numbers",
         }
         context.update(_get_global_queue_context(chauffeur))
         return render(request, self.template_name, context)
