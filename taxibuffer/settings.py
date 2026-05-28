@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "queueing",
     "sensors",
     "control_panel",
+    "dashboard",
     "django_q",
 ]
 
