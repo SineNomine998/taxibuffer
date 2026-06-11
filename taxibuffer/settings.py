@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "sensors",
     "control_panel",
     "dashboard",
+    "mobile_api",
     "django_q",
 ]
 
