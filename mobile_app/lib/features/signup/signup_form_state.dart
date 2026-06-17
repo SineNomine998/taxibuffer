@@ -1,0 +1,93 @@
+import 'package:flutter/foundation.dart';
+import 'screens/vehicle_model.dart';
+import 'package:collection/collection.dart';
+
+/// Accumulates data across all signup steps. Created once above the
+/// signup route subtree and read/written by each step screen.
+/// Submitted as a single payload to mobile_api only on final confirmation.
+class SignupFormState extends ChangeNotifier {
+  // Step 1 — personal details
+  String firstName = '';
+  String lastName = '';
+  String email = '';
+  String rtxNumber = '';
+
+  // Step 2 — credentials
+  String password = '';
+
+  // Step 3 — vehicles
+  final List<Vehicle> vehicles = [];
+
+  void setPersonalDetails({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String rtxNumber,
+  }) {
+    this.firstName = firstName;
+    this.lastName = lastName;
+    this.email = email;
+    this.rtxNumber = rtxNumber;
+    notifyListeners();
+  }
+
+  void setPassword(String password) {
+    this.password = password;
+    notifyListeners();
+  }
+
+  void addVehicle(Vehicle vehicle) {
+    if (vehicle.isCurrent) {
+      for (var i = 0; i < vehicles.length; i++) {
+        final v = vehicles[i];
+        // make it no more current
+        if (v.isCurrent) {
+          vehicles[i] = Vehicle(
+            nickname: v.nickname,
+            licensePlate: v.licensePlate,
+            vehicleType: v.vehicleType,
+            isCurrent: false,
+          );
+        }
+      }
+    }
+    vehicles.add(vehicle);
+    notifyListeners();
+  }
+
+  void removeVehicle(Vehicle vehicle) {
+    vehicles.remove(vehicle);
+    notifyListeners();
+  }
+
+  void setCurrentVehicle(Vehicle target) {
+    for (var i = 0; i < vehicles.length; i++) {
+      final v = vehicles[i];
+      vehicles[i] = Vehicle(
+        nickname: v.nickname,
+        licensePlate: v.licensePlate,
+        vehicleType: v.vehicleType,
+        isCurrent: v == target,
+      );
+    }
+    notifyListeners();
+  }
+
+  Vehicle? get currentVehicle =>
+      vehicles.where((v) => v.isCurrent).cast<Vehicle?>().firstOrNull;
+
+  List<Vehicle> get otherVehicles =>
+      vehicles.where((v) => !v.isCurrent).toList();
+
+  /// Resets everything — call after a successful signup submission
+  /// or if the user abandons the flow.
+  void reset() {
+    firstName = '';
+    lastName = '';
+    email = '';
+    rtxNumber = '';
+    password = '';
+    vehicles.clear();
+    notifyListeners();
+  }
+}
