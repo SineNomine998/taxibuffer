@@ -8,7 +8,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 
 class MobileLoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
+    email = serializers.CharField()
     password = serializers.CharField(write_only=True)
 
 
@@ -19,14 +19,14 @@ class MobileLoginView(APIView):
         serializer = MobileLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        username = serializer.validated_data["username"]
+        email = serializer.validated_data["email"]
         password = serializer.validated_data["password"]
 
-        user = authenticate(request, username=username, password=password)
+        user = authenticate(request, username=email, password=password)
 
         if user is None:
             return Response(
-                {"detail": "Invalid username or password."},
+                {"detail": "Invalid email address or password."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
@@ -44,7 +44,6 @@ class MobileLoginView(APIView):
                 "refresh": str(refresh),
                 "user": {
                     "id": user.id,
-                    "username": user.get_username(),
                     "first_name": user.first_name,
                     "last_name": user.last_name,
                     "email": user.email,
@@ -95,5 +94,7 @@ class MobileMeView(APIView):
                 "last_name": user.last_name,
                 "email": user.email,
                 "is_active": user.is_active,
+                "taxi_license_number": user.chauffeur.taxi_license_number,
+                "current_vehicle": user.chauffeur.current_license_plate,
             }
         )
