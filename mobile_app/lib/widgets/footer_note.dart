@@ -7,7 +7,7 @@ class FooterNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Text(
-      'Coding the Curbs® in samenwerking met gemeente Rotterdam',
+      'Coding the Curbs® in samenwerking met Gemeente Rotterdam',
       style: AppTextStyles.footer,
       textAlign: TextAlign.center,
     );

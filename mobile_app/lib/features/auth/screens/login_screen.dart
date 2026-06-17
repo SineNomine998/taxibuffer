@@ -4,7 +4,7 @@ import 'package:mobile_app/core/dialogs.dart';
 import 'package:mobile_app/core/theme.dart';
 import 'package:mobile_app/widgets/app_logo_row.dart';
 import 'package:mobile_app/widgets/footer_note.dart';
-import 'package:mobile_app/widgets/pill_button.dart';
+import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +17,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _authService = AuthService();
+
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -34,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
         context: context,
         title: 'Emailadres vereist',
         message: 'Vul uw emailadres in.',
-        svgAsset: 'assets/warning-badge.svg'
+        svgAsset: 'assets/warning-badge.svg',
       );
       return;
     }
@@ -43,19 +46,39 @@ class _LoginScreenState extends State<LoginScreen> {
         context: context,
         title: 'Wachtwoord vereist',
         message: 'Vul uw wachtwoord in.',
-        svgAsset: 'assets/warning-badge.svg'
+        svgAsset: 'assets/warning-badge.svg',
       );
       return;
     }
 
-    // TODO: call AuthService.login(email, password)
-    // on failure:
-    // await showAppAlert(
-    //   context: context,
-    //   title: 'Toegang Geweigerd',
-    //   message: 'Ongeldige inloggegevens.',
-    //   svgAsset: 'assets/pop-up-denied.svg',
-    // );
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _authService.login(email: email, password: password);
+
+      if (!mounted) return;
+
+      // Navigate after successful login
+      context.go('/home');
+    } catch (e) {
+      if (!mounted) return;
+
+      // on failure:
+      await showAppAlert(
+        context: context,
+        title: 'Toegang Geweigerd',
+        message: 'Ongeldige inloggegevens.',
+        svgAsset: 'assets/pop-up-denied.svg',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -98,7 +121,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         : null,
                   ),
                   const SizedBox(height: 24),
-                  PillButton(label: 'Login', onPressed: _submit),
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : _submit,
+                    child: _isLoading
+                        ? CircularProgressIndicator()
+                        : Text('Inloggen'),
+                  ),
                   const SizedBox(height: 25),
                   GestureDetector(
                     onTap: () => context.go('/signup'),
