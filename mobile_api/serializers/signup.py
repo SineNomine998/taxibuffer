@@ -1,0 +1,83 @@
+import re
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+
+from accounts.models import VehicleType
+
+User = get_user_model()
+
+
+def normalize_license_plate(value: str) -> str:
+    return re.sub(r"[^A-Z0-9]", "", value.upper().strip())
+
+
+class MobileVehicleSignUpSerializer(serializers.Serializer):
+    license_plate = serializers.CharField(max_length=20)
+    nickname = serializers.CharField(max_length=60)
+    vehicle_type = serializers.ChoiceField(
+        choices=[VehicleType.AUTO, VehicleType.BUSJE],
+        default=VehicleType.AUTO,
+    )
+    is_current = serializers.BooleanField(default=False)
+
+    def validate_license_plate(self, value):
+        normalized = normalize_license_plate(value)
+
+        if len(normalized) < 5 or len(normalized) > 8:
+            raise serializers.ValidationError("Vul een geldig kenteken in.")
+
+        return normalized
+
+
+class MobileSignUpSerializer(serializers.Serializer):
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    taxi_license_number = serializers.CharField(max_length=100)
+    password = serializers.CharField(write_only=True, min_length=8)
+    password_confirm = serializers.CharField(write_only=True)
+    vehicles = MobileVehicleSignUpSerializer()
+
+    def validate_email(self, value):
+        value = value.lower().strip()
+
+        if User.objects.filter(self.email__iexact == value).exists():
+            raise serializers.ValidationError(
+                "Er bestaat al een account met dit e-mailadres."
+            )
+
+        return value
+
+    def validate_taxi_license_number(self, value):
+        # Commented out for now as we don't check the validity/reliability of any user's RTX-number
+        # May be added back in the future depending on the situation
+        # if User.objects.filter(taxi_license_number=attrs["taxi_license_number"]).exists():
+        #     raise serializers.ValidationError({"taxi_license_number": "Dit RTX-nummer is al geregistreerd."})
+
+        return value.strip().upper()
+
+    def validate(self, attrs):
+        if attrs["password"] != attrs["password_confirm"]:
+            raise serializers.ValidationError(
+                {"password_confirm": "Wachtwoorden komen niet overeen."}
+            )
+
+        vehicles = attrs.get("vehicles", [])
+        if not vehicles:
+            raise serializers.ValidationError(
+                {"vehicles": "Voeg minimaal 1 voertuig toe om verder te gaan."}
+            )
+
+        plates = [v["license_plate"].upper() for v in vehicles]
+        if len(plates) != len(set(plates)):
+            raise serializers.ValidationError(
+                {"vehicles": "Een kenteken is dubbel toegevoegd."}
+            )
+
+        current_count = sum(1 for v in vehicles if v.get("is_current"))
+        if current_count > 1:
+            raise serializers.ValidationError(
+                {"vehicles": "Er mag maar één huidig voertuig zijn."}
+            )
+
+        return attrs

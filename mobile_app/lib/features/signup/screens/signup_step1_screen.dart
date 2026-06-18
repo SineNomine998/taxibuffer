@@ -39,7 +39,7 @@ class _SignupStep1ScreenState extends State<SignupStep1Screen> {
       firstName: _firstNameController.text.trim(),
       lastName: _lastNameController.text.trim(),
       email: _emailController.text.trim(),
-      rtxNumber: _rtxController.text.trim(),
+      taxiLicenseNumber: _rtxController.text.trim(),
     );
     context.push('/signup/password');
   }

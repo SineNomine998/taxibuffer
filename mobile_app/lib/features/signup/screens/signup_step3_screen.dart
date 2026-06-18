@@ -233,7 +233,7 @@ class _VehicleCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(7),
             ),
             child: Text(
-              vehicle.licensePlate,
+              normalizeLicensePlate(vehicle.licensePlate),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'DM Sans',
@@ -251,3 +251,7 @@ class _VehicleCard extends StatelessWidget {
 
 String _capitalize(String s) =>
     s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
+
+String normalizeLicensePlate(String value) {
+  return value.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+}

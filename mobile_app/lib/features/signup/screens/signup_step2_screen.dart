@@ -84,8 +84,9 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                 obscure: true,
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Verplicht veld';
-                  if (v != _passwordController.text)
+                  if (v != _passwordController.text) {
                     return 'Wachtwoorden komen niet overeen';
+                  }
                   return null;
                 },
               ),

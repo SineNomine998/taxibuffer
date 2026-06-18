@@ -10,7 +10,7 @@ class SignupFormState extends ChangeNotifier {
   String firstName = '';
   String lastName = '';
   String email = '';
-  String rtxNumber = '';
+  String taxiLicenseNumber = '';
 
   // Step 2 — credentials
   String password = '';
@@ -22,12 +22,12 @@ class SignupFormState extends ChangeNotifier {
     required String firstName,
     required String lastName,
     required String email,
-    required String rtxNumber,
+    required String taxiLicenseNumber,
   }) {
     this.firstName = firstName;
     this.lastName = lastName;
     this.email = email;
-    this.rtxNumber = rtxNumber;
+    this.taxiLicenseNumber = taxiLicenseNumber;
     notifyListeners();
   }
 
@@ -85,7 +85,7 @@ class SignupFormState extends ChangeNotifier {
     firstName = '';
     lastName = '';
     email = '';
-    rtxNumber = '';
+    taxiLicenseNumber = '';
     password = '';
     vehicles.clear();
     notifyListeners();
