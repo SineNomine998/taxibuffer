@@ -21,7 +21,7 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
   final _authService = AuthService();
   bool _isLoading = false;
 
-  void _finish() async {
+  Future<void> _finish() async {
     final SignupFormState signupFormState = context.read<SignupFormState>();
     final firstName = signupFormState.firstName;
     final lastName = signupFormState.lastName;
@@ -203,7 +203,11 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
               onPressed: () => context.push('/signup/vehicle/add'),
             ),
             const SizedBox(height: 12),
-            PrimaryPillButton(label: 'Volgende', onPressed: _finish),
+            PrimaryPillButton(
+              label: 'Volgende',
+              isLoading: _isLoading,
+              onPressed: _isLoading ? null : _finish,
+            ),
             const SizedBox(height: 24),
             const FooterNote(),
           ],

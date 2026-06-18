@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_app/core/dialogs.dart';
+import 'package:mobile_app/features/auth/services/auth_service.dart';
 import 'package:mobile_app/features/auth/signup/signup_form_state.dart';
 import 'package:provider/provider.dart';
 import 'package:email_validator/email_validator.dart';
@@ -22,8 +24,11 @@ class _SignupStep1ScreenState extends State<SignupStep1Screen> {
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _rtxController = TextEditingController();
+  final _authService = new AuthService();
 
   String? _serverError; // populate from API error response
+
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -34,15 +39,45 @@ class _SignupStep1ScreenState extends State<SignupStep1Screen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    context.read<SignupFormState>().setPersonalDetails(
-      firstName: _firstNameController.text.trim(),
-      lastName: _lastNameController.text.trim(),
-      email: _emailController.text.trim(),
-      taxiLicenseNumber: _rtxController.text.trim(),
-    );
-    context.push('/signup/password');
+
+    setState(() => _isLoading = true);
+    try {
+      final available = await _authService.isEmailAvailable(
+        _emailController.text.trim(),
+      );
+      if (!available) {
+        if (!mounted) return;
+        await showAppAlert(
+          context: context,
+          title: 'Emailadres al in gebruik.',
+          message:
+              'Dit emailadres is al geregistreerd. Log in of gebruik een ander adres.',
+          svgAsset: 'asssets/warning-badge.svg',
+        );
+        return;
+      }
+
+      if (!mounted) return;
+
+      context.read<SignupFormState>().setPersonalDetails(
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        email: _emailController.text.trim(),
+        taxiLicenseNumber: _rtxController.text.trim(),
+      );
+      context.push('/signup/password');
+    } catch (e) {
+      if (!mounted) return;
+      await showAppAlert(
+        context: context,
+        title: 'Oeps, foutje opgetreden',
+        message: e.toString(),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -116,7 +151,11 @@ class _SignupStep1ScreenState extends State<SignupStep1Screen> {
                     (v == null || v.trim().isEmpty) ? 'Verplicht veld' : null,
               ),
               const SizedBox(height: 30),
-              PrimaryPillButton(label: 'Volgende', onPressed: _submit),
+              PrimaryPillButton(
+                label: 'Volgende',
+                isLoading: _isLoading,
+                onPressed: _isLoading ? null : _submit,
+              ),
               const SizedBox(height: 24),
               const FooterNote(),
             ],
