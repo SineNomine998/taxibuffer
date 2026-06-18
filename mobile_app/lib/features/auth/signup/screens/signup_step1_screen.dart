@@ -24,7 +24,7 @@ class _SignupStep1ScreenState extends State<SignupStep1Screen> {
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _rtxController = TextEditingController();
-  final _authService = new AuthService();
+  final _authService = AuthService();
 
   String? _serverError; // populate from API error response
 
