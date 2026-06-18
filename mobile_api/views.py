@@ -1,3 +1,4 @@
+import logging
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.contrib.auth import authenticate
@@ -8,9 +9,15 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from mobile_api.serializers import MobileLoginSerializer, MobileSignUpSerializer, normalize_license_plate
+from mobile_api.serializers import (
+    MobileLoginSerializer,
+    MobileSignUpSerializer,
+    normalize_license_plate,
+)
 from accounts.models import Chauffeur, ChauffeurVehicle, VehicleType
 from queueing.views import _build_unique_username
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -105,12 +112,26 @@ class MobileMeView(APIView):
         )
 
 
+class MobileCheckEmailView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email", "")
+        exists = User.objects.filter(email__iexact=email.strip()).exists()
+        return Response({"available": not exists})
+
+
 class MobileSignUpView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = MobileSignUpSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # when debugging is needed, uncomment:
+        # if not serializer.is_valid():
+        #     logger.warning("Mobile signup validation failed: %s", serializer.errors)
+        #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
         data = serializer.validated_data
 
         vehicles = data["vehicles"]
@@ -125,7 +146,7 @@ class MobileSignUpView(APIView):
                 username = _build_unique_username(
                     data["first_name"],
                     data["last_name"],
-                    data["rtx_number"],
+                    data["taxi_license_number"],
                 )
 
                 user = User.objects.create_user(
@@ -139,7 +160,7 @@ class MobileSignUpView(APIView):
 
                 chauffeur = Chauffeur.objects.create(
                     user=user,
-                    taxi_license_number=data["rtx_number"],
+                    taxi_license_number=data["taxi_license_number"],
                     location=None,
                 )
 

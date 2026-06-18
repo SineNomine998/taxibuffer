@@ -36,12 +36,12 @@ class MobileSignUpSerializer(serializers.Serializer):
     taxi_license_number = serializers.CharField(max_length=100)
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True)
-    vehicles = MobileVehicleSignUpSerializer()
+    vehicles = MobileVehicleSignUpSerializer(many=True)
 
     def validate_email(self, value):
         value = value.lower().strip()
 
-        if User.objects.filter(self.email__iexact == value).exists():
+        if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError(
                 "Er bestaat al een account met dit e-mailadres."
             )

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mobile_app/features/signup/signup_form_state.dart';
+import 'package:mobile_app/features/auth/signup/signup_form_state.dart';
 import 'package:provider/provider.dart';
-import '../../../widgets/app_shell_scaffold.dart';
-import '../../../widgets/shell_text_field.dart';
-import '../../../widgets/secondary_pill_button.dart';
-import '../../../widgets/footer_note.dart';
-import '../../../widgets/inline_error_banner.dart';
+import '../../../../widgets/app_shell_scaffold.dart';
+import '../../../../widgets/shell_text_field.dart';
+import '../../../../widgets/secondary_pill_button.dart';
+import '../../../../widgets/footer_note.dart';
+import '../../../../widgets/inline_error_banner.dart';
 
 class SignupStep2Screen extends StatefulWidget {
   const SignupStep2Screen({super.key});
@@ -30,13 +30,14 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    context.read<SignupFormState>().setPassword(_passwordController.text);
+    context.read<SignupFormState>().setPassword(_passwordController.text, _repeatController.text);
     context.push('/signup/vehicle');
   }
 
   @override
   Widget build(BuildContext context) {
     return AppShellScaffold(
+      showBack: true,
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 30, 20, 32),
         child: Form(

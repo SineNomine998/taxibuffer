@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mobile_app/features/signup/screens/vehicle_model.dart';
-import 'package:mobile_app/features/signup/signup_form_state.dart';
+import 'package:mobile_app/features/auth/signup/screens/vehicle_model.dart';
+import 'package:mobile_app/features/auth/signup/signup_form_state.dart';
 import 'package:provider/provider.dart';
-import '../../../widgets/app_shell_scaffold.dart';
-import '../../../widgets/shell_text_field.dart';
-import '../../../widgets/primary_pill_button.dart';
-import '../../../widgets/secondary_pill_button.dart';
-import '../../../widgets/footer_note.dart';
-import '../../../widgets/inline_error_banner.dart';
+import '../../../../widgets/app_shell_scaffold.dart';
+import '../../../../widgets/shell_text_field.dart';
+import '../../../../widgets/primary_pill_button.dart';
+import '../../../../widgets/secondary_pill_button.dart';
+import '../../../../widgets/footer_note.dart';
+import '../../../../widgets/inline_error_banner.dart';
 
 class VehicleAddScreen extends StatefulWidget {
   const VehicleAddScreen({super.key});
@@ -22,7 +22,7 @@ class _VehicleAddScreenState extends State<VehicleAddScreen> {
   final _nicknameController = TextEditingController();
   final _plateController = TextEditingController();
   String _vehicleType = 'auto';
-  bool _setAsFavorite = false;
+  bool _setAsCurrent = false;
   String? _serverError;
 
   @override
@@ -39,6 +39,7 @@ class _VehicleAddScreenState extends State<VehicleAddScreen> {
         nickname: _nicknameController.text.trim(),
         licensePlate: _plateController.text.trim(),
         vehicleType: _vehicleType,
+        isCurrent: true,
       ),
     );
     context.pop();
@@ -47,6 +48,7 @@ class _VehicleAddScreenState extends State<VehicleAddScreen> {
   @override
   Widget build(BuildContext context) {
     return AppShellScaffold(
+      showBack: true,
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 30, 20, 32),
         child: Form(
@@ -141,9 +143,9 @@ class _VehicleAddScreenState extends State<VehicleAddScreen> {
               Row(
                 children: [
                   Checkbox(
-                    value: _setAsFavorite,
+                    value: _setAsCurrent,
                     onChanged: (v) =>
-                        setState(() => _setAsFavorite = v ?? false),
+                        setState(() => _setAsCurrent = v ?? false),
                     activeColor: const Color(0xFFE0BD22),
                   ),
                   const Expanded(

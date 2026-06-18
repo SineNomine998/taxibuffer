@@ -6,16 +6,17 @@ import 'package:collection/collection.dart';
 /// signup route subtree and read/written by each step screen.
 /// Submitted as a single payload to mobile_api only on final confirmation.
 class SignupFormState extends ChangeNotifier {
-  // Step 1 — personal details
+  // Step 1 - personal details
   String firstName = '';
   String lastName = '';
   String email = '';
   String taxiLicenseNumber = '';
 
-  // Step 2 — credentials
+  // Step 2 - credentials
   String password = '';
+  String passwordConfirm = '';
 
-  // Step 3 — vehicles
+  // Step 3 - vehicles
   final List<Vehicle> vehicles = [];
 
   void setPersonalDetails({
@@ -31,8 +32,9 @@ class SignupFormState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setPassword(String password) {
+  void setPassword(String password, String passwordConfirm) {
     this.password = password;
+    this.passwordConfirm = passwordConfirm;
     notifyListeners();
   }
 
@@ -79,7 +81,7 @@ class SignupFormState extends ChangeNotifier {
   List<Vehicle> get otherVehicles =>
       vehicles.where((v) => !v.isCurrent).toList();
 
-  /// Resets everything — call after a successful signup submission
+  /// Resets everything - call after a successful signup submission
   /// or if the user abandons the flow.
   void reset() {
     firstName = '';
@@ -87,6 +89,7 @@ class SignupFormState extends ChangeNotifier {
     email = '';
     taxiLicenseNumber = '';
     password = '';
+    passwordConfirm = '';
     vehicles.clear();
     notifyListeners();
   }

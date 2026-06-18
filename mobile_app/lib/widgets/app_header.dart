@@ -5,8 +5,16 @@ import '../core/theme.dart';
 class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   final bool showHelp;
   final VoidCallback? onHelpTap;
+  final bool showBack;
+  final VoidCallback? onBackTap;
 
-  const AppHeader({super.key, this.showHelp = false, this.onHelpTap});
+  const AppHeader({
+    super.key,
+    this.showHelp = false,
+    this.onHelpTap,
+    this.showBack = false,
+    this.onBackTap,
+  });
 
   @override
   Size get preferredSize => const Size.fromHeight(110);
@@ -37,6 +45,23 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               ),
             ],
           ),
+          if (showBack)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: GestureDetector(
+                onTap: onBackTap ?? () => Navigator.of(context).maybePop(),
+                child: const SizedBox(
+                  width: 36,
+                  child: Icon(
+                    Icons.arrow_back_ios_new,
+                    size: 18,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+              ),
+            ),
           if (showHelp)
             Positioned(
               right: 0,

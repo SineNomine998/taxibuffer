@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mobile_app/features/signup/signup_form_state.dart';
+import 'package:mobile_app/features/auth/signup/signup_form_state.dart';
 import 'package:provider/provider.dart';
-import '../../../widgets/app_shell_scaffold.dart';
-import '../../../widgets/shell_text_field.dart';
-import '../../../widgets/primary_pill_button.dart';
-import '../../../widgets/footer_note.dart';
-import '../../../widgets/inline_error_banner.dart';
+import 'package:email_validator/email_validator.dart';
+import '../../../../widgets/app_shell_scaffold.dart';
+import '../../../../widgets/shell_text_field.dart';
+import '../../../../widgets/primary_pill_button.dart';
+import '../../../../widgets/footer_note.dart';
+import '../../../../widgets/inline_error_banner.dart';
 
 class SignupStep1Screen extends StatefulWidget {
   const SignupStep1Screen({super.key});
@@ -47,6 +48,10 @@ class _SignupStep1ScreenState extends State<SignupStep1Screen> {
   @override
   Widget build(BuildContext context) {
     return AppShellScaffold(
+      showBack: true,
+      onBackTap: () {
+        context.go('/login');
+      },
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 30, 20, 32),
         child: Form(
@@ -98,7 +103,7 @@ class _SignupStep1ScreenState extends State<SignupStep1Screen> {
                 keyboardType: TextInputType.emailAddress,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Verplicht veld';
-                  if (!v.contains('@')) return 'Ongeldig emailadres';
+                  if (!EmailValidator.validate(v)) return 'Ongeldig emailadres';
                   return null;
                 },
               ),

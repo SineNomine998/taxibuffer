@@ -4,7 +4,7 @@ import 'package:mobile_app/core/dialogs.dart';
 import 'package:mobile_app/core/theme.dart';
 import 'package:mobile_app/widgets/app_logo_row.dart';
 import 'package:mobile_app/widgets/footer_note.dart';
-import '../services/auth_service.dart';
+import '../../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

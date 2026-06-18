@@ -7,13 +7,17 @@ class AppShellScaffold extends StatelessWidget {
   final Widget child;
   final bool showHelp;
   final VoidCallback? onHelpTap;
-  final NavTab? activeTab; // null = no bottom nav (signup flow)
+  final bool showBack;
+  final VoidCallback? onBackTap;
+  final NavTab? activeTab;
 
   const AppShellScaffold({
     super.key,
     required this.child,
     this.showHelp = false,
     this.onHelpTap,
+    this.showBack = false,
+    this.onBackTap,
     this.activeTab,
   });
 
@@ -28,7 +32,12 @@ class AppShellScaffold extends StatelessWidget {
             color: AppColors.cardBg,
             child: Column(
               children: [
-                AppHeader(showHelp: showHelp, onHelpTap: onHelpTap),
+                AppHeader(
+                  showHelp: showHelp,
+                  onHelpTap: onHelpTap,
+                  showBack: showBack,
+                  onBackTap: onBackTap,
+                ),
                 Expanded(child: child),
               ],
             ),

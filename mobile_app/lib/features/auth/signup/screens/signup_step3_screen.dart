@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mobile_app/features/signup/signup_form_state.dart';
+import 'package:mobile_app/core/dialogs.dart';
+import 'package:mobile_app/features/auth/services/auth_service.dart';
+import 'package:mobile_app/features/auth/signup/signup_form_state.dart';
 import 'package:provider/provider.dart';
-import '../../../widgets/app_shell_scaffold.dart';
-import '../../../widgets/primary_pill_button.dart';
-import '../../../widgets/secondary_pill_button.dart';
-import '../../../widgets/footer_note.dart';
+import '../../../../widgets/app_shell_scaffold.dart';
+import '../../../../widgets/primary_pill_button.dart';
+import '../../../../widgets/secondary_pill_button.dart';
+import '../../../../widgets/footer_note.dart';
 import 'vehicle_model.dart';
 
 class SignupStep3Screen extends StatefulWidget {
@@ -16,9 +18,78 @@ class SignupStep3Screen extends StatefulWidget {
 }
 
 class _SignupStep3ScreenState extends State<SignupStep3Screen> {
-  void _finish() {
-    // TODO: finalize signup via mobile_api, then navigate into authenticated shell
-    context.go('/queue');
+  final _authService = AuthService();
+  bool _isLoading = false;
+
+  void _finish() async {
+    final SignupFormState signupFormState = context.read<SignupFormState>();
+    final firstName = signupFormState.firstName;
+    final lastName = signupFormState.lastName;
+    final email = signupFormState.email;
+    final taxiLicenseNumber = signupFormState.taxiLicenseNumber;
+    final password = signupFormState.password;
+    final passwordConfirm = signupFormState.passwordConfirm;
+    final vehicles = signupFormState.vehicles.map((v) => v.toJson()).toList();
+
+    if (signupFormState.firstName.isEmpty ||
+        signupFormState.lastName.isEmpty ||
+        signupFormState.email.isEmpty ||
+        signupFormState.taxiLicenseNumber.isEmpty ||
+        signupFormState.password.isEmpty) {
+      showAppAlert(
+        context: context,
+        title: "Onvolledige gegevens",
+        message: "Er ontbreken gegevens uit een eerdere stap. Begin opnieuw.",
+      );
+      return;
+    }
+
+    if (signupFormState.vehicles.isEmpty) {
+      showAppAlert(
+        context: context,
+        title: "Voertuig vereist",
+        message: "Voeg minstens één voertuig toe om door te gaan.",
+        svgAsset: 'assets/warning-badge.svg',
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _authService.signup(
+        firstName: firstName,
+        lastName: lastName,
+        email: email,
+        taxiLicenseNumber: taxiLicenseNumber,
+        password: password,
+        passwordConfirm: passwordConfirm,
+        vehicles: vehicles,
+      );
+
+      if (!mounted) return;
+
+      // On success:
+      signupFormState.reset();
+      context.go('/queue');
+    } catch (e) {
+      if (!mounted) return;
+
+      await showAppAlert(
+        context: context,
+        title: "Account kon niet worden aangemaakt. Probeer opnieuw.",
+        message: "Er is iets misgegaan.",
+        svgAsset: 'assets/pop-up-denied.svg',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -27,6 +98,7 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
     final current = formState.currentVehicle;
     final others = formState.otherVehicles;
     return AppShellScaffold(
+      showBack: true,
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 30, 20, 32),
         child: Column(

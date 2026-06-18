@@ -14,7 +14,7 @@ Future<void> showAppAlert({
   return showDialog(
     context: context,
     barrierColor: Colors.black54,
-    builder: (_) => Dialog(
+    builder: (dialogContext) => Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       backgroundColor: AppColors.white,
       child: Padding(
@@ -61,7 +61,7 @@ Future<void> showAppAlert({
                 ],
               ),
               child: TextButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => Navigator.of(dialogContext).pop(),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 28,

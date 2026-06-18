@@ -10,4 +10,11 @@ class Vehicle {
     required this.vehicleType,
     this.isCurrent = false,
   });
+
+  Map<String, dynamic> toJson() => {
+    'nickname': nickname,
+    'license_plate': licensePlate,
+    'vehicle_type': vehicleType,
+    'is_current': isCurrent,
+  };
 }
