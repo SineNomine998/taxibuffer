@@ -142,4 +142,20 @@ class AuthService {
     final data = jsonDecode(response.body);
     return data['available'] as bool;
   }
+
+  Future<void> requestPasswordReset(String email) async {
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}/api/mobile/auth/password-reset/',
+    );
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email.trim().toLowerCase()}),
+    );
+
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body);
+      throw Exception(data['detail'] ?? 'Verzoek mislukt');
+    }
+  }
 }

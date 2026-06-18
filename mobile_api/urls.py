@@ -15,4 +15,7 @@ urlpatterns = [
     # Sign-up endpoints
     path("auth/signup/", views.MobileSignUpView.as_view(), name="mobile_signup"),
     path("auth/check-email/", views.MobileCheckEmailView.as_view(), name="mobile_email_check"),
+
+    # Password reset endpoints
+    path("auth/password-reset/", views.MobilePasswordResetView.as_view(), name="mobile_password_reset"),
 ]

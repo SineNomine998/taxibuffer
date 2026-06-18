@@ -1,7 +1,7 @@
 import logging
 from django.db import transaction
-from django.contrib.auth import get_user_model
-from django.contrib.auth import authenticate
+from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth.forms import PasswordResetForm
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -198,4 +198,29 @@ class MobileSignUpView(APIView):
                 },
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class MobilePasswordResetView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email", "").strip().lower()
+        if not email:
+            return Response(
+                {"detail": "Vul een e-mailadres in."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        form = PasswordResetForm(data={"email": email})
+        if form.is_valid():
+            form.save(
+                request=request,
+                use_https=request.is_secure(),
+                email_template_name="queueing/password_reset_email.html",
+                subject_template_name="queueing/password_reset_subject.txt",
+                extra_email_context=None,
+            )
+        return Response(
+            {"detail": "Als dit e-mailadres bekend is, ontvangt u een e-mail."}
         )
