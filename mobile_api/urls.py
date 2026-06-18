@@ -13,5 +13,5 @@ urlpatterns = [
     path("me/", views.MobileMeView.as_view(), name="mobile_me"),
 
     # Sign-up endpoints
-    path("auth/signup/", views.MobileSignUpView, name="mobile_signup"),
+    path("auth/signup/", views.MobileSignUpView.as_view(), name="mobile_signup"),
 ]

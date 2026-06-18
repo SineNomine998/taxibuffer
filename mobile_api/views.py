@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from serializers import MobileLoginSerializer, MobileSignUpSerializer, normalize_license_plate
+from mobile_api.serializers import MobileLoginSerializer, MobileSignUpSerializer, normalize_license_plate
 from accounts.models import Chauffeur, ChauffeurVehicle, VehicleType
 from queueing.views import _build_unique_username
 
