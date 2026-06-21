@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       // Navigate after successful login
-      context.go('/home');
+      context.go('/locations');
     } catch (e) {
       if (!mounted) return;
 

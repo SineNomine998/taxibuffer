@@ -128,3 +128,100 @@ Future<T?> showAppBottomSheet<T>({
     ),
   );
 }
+
+Future<bool?> showAppConfirm({
+  required BuildContext context,
+  required String title,
+  required String message,
+  String confirmLabel = 'Bevestigen',
+  String cancelLabel = 'Annuleren',
+}) {
+  return showDialog<bool>(
+    context: context,
+    barrierColor: Colors.black54,
+    builder: (dialogContext) => Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: AppColors.white,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontFamily: 'DM Sans',
+                fontWeight: FontWeight.w800,
+                fontSize: 22,
+                color: AppColors.textDark,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: const TextStyle(
+                fontFamily: 'DM Sans',
+                fontSize: 15,
+                height: 1.4,
+                color: Color(0xFF4B4B4B),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: BorderSide(
+                        color: Colors.black.withOpacity(0.08),
+                        width: 3,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                    ),
+                    child: Text(
+                      cancelLabel,
+                      style: const TextStyle(
+                        fontFamily: 'DM Sans',
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF5B5B5B),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: kGradient,
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    child: TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(true),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: Text(
+                        confirmLabel,
+                        style: const TextStyle(
+                          fontFamily: 'DM Sans',
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF222222),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}

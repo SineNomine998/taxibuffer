@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'screens/vehicle_model.dart';
+import '../../../core/models/vehicle.dart';
 import 'package:collection/collection.dart';
 
 /// Accumulates data across all signup steps. Created once above the

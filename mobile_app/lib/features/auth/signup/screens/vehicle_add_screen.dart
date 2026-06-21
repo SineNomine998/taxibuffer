@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mobile_app/features/auth/signup/screens/vehicle_model.dart';
+import 'package:mobile_app/core/models/vehicle.dart';
 import 'package:mobile_app/features/auth/signup/signup_form_state.dart';
 import 'package:provider/provider.dart';
 import '../../../../widgets/app_shell_scaffold.dart';

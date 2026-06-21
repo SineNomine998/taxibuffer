@@ -1,5 +1,9 @@
+import 'package:mobile_app/features/account/account_state.dart';
+import 'package:mobile_app/features/account/screens/account_screen.dart';
 import 'package:mobile_app/features/auth/password_reset/screens/password_reset_screen.dart';
 import 'package:mobile_app/features/auth/password_reset/screens/password_reset_sent_screen.dart';
+import 'package:mobile_app/features/location/screens/location_selection_info_screen.dart';
+import 'package:mobile_app/features/location/screens/location_selection_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/features/auth/login/screens/login_screen.dart';
@@ -15,11 +19,18 @@ final GoRouter router = GoRouter(
   routes: [
     GoRoute(path: '/', builder: (context, state) => const InfoScreen()),
     GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-    GoRoute(path: '/password-reset', builder: (_, _) => const PasswordResetScreen()),
-    GoRoute(path: '/password-reset/sent', builder: (_, _) => const PasswordResetSentScreen()),
+    GoRoute(
+      path: '/password-reset',
+      builder: (_, _) => const PasswordResetScreen(),
+    ),
+    GoRoute(
+      path: '/password-reset/sent',
+      builder: (_, _) => const PasswordResetSentScreen(),
+    ),
 
+    // Sign-up routing
     ShellRoute(
-      builder:(context, state, child) {
+      builder: (context, state, child) {
         return ChangeNotifierProvider(
           create: (context) => SignupFormState(),
           child: child,
@@ -27,9 +38,40 @@ final GoRouter router = GoRouter(
       },
       routes: [
         GoRoute(path: '/signup', builder: (_, _) => const SignupStep1Screen()),
-        GoRoute(path: '/signup/password', builder: (_, _) => const SignupStep2Screen()),
-        GoRoute(path: '/signup/vehicle', builder: (_, _) => const SignupStep3Screen()),
-        GoRoute(path: '/signup/vehicle/add', builder: (_, _) => const VehicleAddScreen()),
+        GoRoute(
+          path: '/signup/password',
+          builder: (_, _) => const SignupStep2Screen(),
+        ),
+        GoRoute(
+          path: '/signup/vehicle',
+          builder: (_, _) => const SignupStep3Screen(),
+        ),
+        GoRoute(
+          path: '/signup/vehicle/add',
+          builder: (_, _) => const VehicleAddScreen(),
+        ),
+      ],
+    ),
+
+    // Authenticated routing inside app:
+    ShellRoute(
+      builder: (context, state, child) {
+        return ChangeNotifierProvider(
+          create: (_) => AccountState(),
+          child: child,
+        );
+      },
+      routes: [
+        GoRoute(
+          path: '/locations',
+          builder: (_, _) => const LocationSelectionScreen(),
+        ),
+        GoRoute(
+          path: '/locations/info',
+          builder: (_, _) => const LocationSelectionInfoScreen(),
+        ),
+        GoRoute(path: '/account', builder: (_, __) => const AccountScreen()),
+        // /queue and /numbers join this shell once built
       ],
     ),
   ],

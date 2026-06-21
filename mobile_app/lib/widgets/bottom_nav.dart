@@ -11,14 +11,7 @@ class BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 68,
-      padding: EdgeInsets.fromLTRB(
-        8,
-        8,
-        8,
-        8 + MediaQuery.of(context).padding.bottom,
-      ),
+    return DecoratedBox(
       decoration: BoxDecoration(
         gradient: kGradient,
         boxShadow: [
@@ -29,37 +22,46 @@ class BottomNav extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          _NavItem(
-            tab: NavTab.locations,
-            active: activeTab == NavTab.locations,
-            label: 'Locaties',
-            icon: Icons.location_on_outlined,
-            onTap: () => context.go('/locations'),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Row(
+              children: [
+                _NavItem(
+                  tab: NavTab.locations,
+                  active: activeTab == NavTab.locations,
+                  label: 'Locaties',
+                  icon: Icons.location_on_outlined,
+                  onTap: () => context.go('/locations'),
+                ),
+                _NavItem(
+                  tab: NavTab.queue,
+                  active: activeTab == NavTab.queue,
+                  label: 'Wachtrij',
+                  icon: Icons.format_list_bulleted,
+                  onTap: () => context.go('/queue'),
+                ),
+                _NavItem(
+                  tab: NavTab.numbers,
+                  active: activeTab == NavTab.numbers,
+                  label: 'Nummers',
+                  icon: Icons.tag,
+                  onTap: () => context.go('/numbers'),
+                ),
+                _NavItem(
+                  tab: NavTab.account,
+                  active: activeTab == NavTab.account,
+                  label: 'Account',
+                  icon: Icons.person_outline,
+                  onTap: () => context.go('/account'),
+                ),
+              ],
+            ),
           ),
-          _NavItem(
-            tab: NavTab.queue,
-            active: activeTab == NavTab.queue,
-            label: 'Wachtrij',
-            icon: Icons.format_list_bulleted,
-            onTap: () => context.go('/queue'),
-          ),
-          _NavItem(
-            tab: NavTab.numbers,
-            active: activeTab == NavTab.numbers,
-            label: 'Nummers',
-            icon: Icons.tag,
-            onTap: () => context.go('/numbers'),
-          ),
-          _NavItem(
-            tab: NavTab.account,
-            active: activeTab == NavTab.account,
-            label: 'Account',
-            icon: Icons.person_outline,
-            onTap: () => context.go('/account'),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -83,39 +85,47 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          decoration: BoxDecoration(
-            color: active
-                ? Colors.white.withValues(alpha: 0.65)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+            decoration: BoxDecoration(
               color: active
-                  ? Colors.black.withValues(alpha: 0.12)
+                  ? Colors.white.withValues(alpha: 0.65)
                   : Colors.transparent,
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: AppColors.navInactive),
-              const SizedBox(height: 3),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontFamily: 'DM Sans',
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.navInactive,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: active
+                    ? Colors.black.withValues(alpha: 0.12)
+                    : Colors.transparent,
               ),
-            ],
+            ),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 18, color: AppColors.navInactive),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.navInactive,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
