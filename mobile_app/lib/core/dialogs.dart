@@ -177,7 +177,7 @@ Future<bool?> showAppConfirm({
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       side: BorderSide(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withValues(alpha: 0.08),
                         width: 3,
                       ),
                       shape: RoundedRectangleBorder(

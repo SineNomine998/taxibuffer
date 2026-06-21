@@ -70,7 +70,7 @@ final GoRouter router = GoRouter(
           path: '/locations/info',
           builder: (_, _) => const LocationSelectionInfoScreen(),
         ),
-        GoRoute(path: '/account', builder: (_, __) => const AccountScreen()),
+        GoRoute(path: '/account', builder: (_, _) => const AccountScreen()),
         // /queue and /numbers join this shell once built
       ],
     ),
