@@ -2,31 +2,9 @@ import re
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
-from accounts.models import VehicleType
+from .vehicle import MobileVehicleSerializer
 
 User = get_user_model()
-
-
-def normalize_license_plate(value: str) -> str:
-    return re.sub(r"[^A-Z0-9]", "", value.upper().strip())
-
-
-class MobileVehicleSignUpSerializer(serializers.Serializer):
-    license_plate = serializers.CharField(max_length=20)
-    nickname = serializers.CharField(max_length=60)
-    vehicle_type = serializers.ChoiceField(
-        choices=[VehicleType.AUTO, VehicleType.BUSJE],
-        default=VehicleType.AUTO,
-    )
-    is_current = serializers.BooleanField(default=False)
-
-    def validate_license_plate(self, value):
-        normalized = normalize_license_plate(value)
-
-        if len(normalized) < 5 or len(normalized) > 8:
-            raise serializers.ValidationError("Vul een geldig kenteken in.")
-
-        return normalized
 
 
 class MobileSignUpSerializer(serializers.Serializer):
@@ -36,7 +14,7 @@ class MobileSignUpSerializer(serializers.Serializer):
     taxi_license_number = serializers.CharField(max_length=100)
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True)
-    vehicles = MobileVehicleSignUpSerializer(many=True)
+    vehicles = MobileVehicleSerializer(many=True)
 
     def validate_email(self, value):
         value = value.lower().strip()

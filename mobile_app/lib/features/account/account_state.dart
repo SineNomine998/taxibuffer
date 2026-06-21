@@ -81,6 +81,7 @@ class AccountState extends ChangeNotifier {
 
   Future<void> removeVehicle(Vehicle target) async {
     await _accountService.removeVehicle(target.id!);
+    await load();
     vehicles.removeWhere((v) => v.id == target.id);
     notifyListeners();
   }

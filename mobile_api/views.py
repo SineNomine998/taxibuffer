@@ -3,6 +3,7 @@ from django.db import transaction
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.forms import PasswordResetForm
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,6 +14,9 @@ from mobile_api.serializers import (
     MobileLoginSerializer,
     MobileSignUpSerializer,
     normalize_license_plate,
+    MobileAccountProfileSerializer,
+    MobileAccountSerializer,
+    MobileVehicleSerializer,
 )
 from accounts.models import Chauffeur, ChauffeurVehicle, VehicleType
 from queueing.views import _build_unique_username
@@ -20,6 +24,13 @@ from queueing.views import _build_unique_username
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
+
+
+def get_current_chauffeur(user):
+    chauffeur = getattr(user, "chauffeur", None)
+    if chauffeur is None:
+        raise PermissionDenied("Geen chauffeurprofiel gevonden.")
+    return chauffeur
 
 
 class MobileLoginView(APIView):
@@ -88,28 +99,6 @@ class MobileLogoutView(APIView):
             )
 
         return Response({"detail": "Logged out successfully."})
-
-
-class MobileMeView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        user = request.user
-
-        return Response(
-            {
-                "id": user.id,
-                "username": user.get_username(),
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "email": user.email,
-                "is_active": user.is_active,
-                "taxi_license_number": user.chauffeur.taxi_license_number,
-                "current_vehicle": normalize_license_plate(
-                    user.chauffeur.current_license_plate
-                ),
-            }
-        )
 
 
 class MobileCheckEmailView(APIView):
@@ -224,3 +213,184 @@ class MobilePasswordResetView(APIView):
         return Response(
             {"detail": "Als dit e-mailadres bekend is, ontvangt u een e-mail."}
         )
+
+
+class MobileAccountView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        chauffeur = get_current_chauffeur(user)
+
+        vehicles = ChauffeurVehicle.objects.filter(
+            chauffeur=chauffeur,
+            is_active=True,
+        ).order_by("-is_current", "id")
+
+        current_vehicle = vehicles.filter(is_current=True).first()
+
+        profile_data = {
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "taxi_license_number": chauffeur.taxi_license_number,
+        }
+
+        return Response(
+            {
+                "profile": MobileAccountProfileSerializer(profile_data).data,
+                "vehicles": MobileVehicleSerializer(vehicles, many=True).data,
+                "current_vehicle": (
+                    MobileVehicleSerializer(current_vehicle).data
+                    if current_vehicle
+                    else None
+                ),
+            }
+        )
+
+
+class MobileAccountProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        user = request.user
+        chauffeur = get_current_chauffeur(user)
+
+        serializer = MobileAccountProfileSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        user.first_name = data["first_name"]
+        user.last_name = data["last_name"]
+        user.email = data["email"]
+        user.save(update_fields=["first_name", "last_name", "email"])
+
+        chauffeur.taxi_license_number = data["taxi_license_number"]
+        chauffeur.save(update_fields=["taxi_license_number"])
+
+        return Response(serializer.data)
+
+
+class MobileVehicleCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        chauffeur = get_current_chauffeur(request.user)
+
+        serializer = MobileVehicleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        # if not serializer.is_valid():
+        #     logger.warning("Vehicle creation validation failed: %s", serializer.errors)
+        #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        data = serializer.validated_data
+
+        license_plate = data["license_plate"]
+
+        if ChauffeurVehicle.objects.filter(
+            chauffeur=chauffeur,
+            license_plate__iexact=license_plate,
+            is_active=True,
+        ).exists():
+            raise ValidationError({"detail": "Dit kenteken is al toegevoegd."})
+
+        with transaction.atomic():
+            has_vehicle = ChauffeurVehicle.objects.filter(
+                chauffeur=chauffeur,
+                is_active=True,
+            ).exists()
+
+            make_current = data.get("is_current", False) or not has_vehicle
+
+            if make_current:
+                ChauffeurVehicle.objects.filter(
+                    chauffeur=chauffeur,
+                    is_active=True,
+                ).update(is_current=False)
+
+            vehicle = ChauffeurVehicle.objects.create(
+                chauffeur=chauffeur,
+                license_plate=license_plate,
+                nickname=data.get("nickname", ""),
+                vehicle_type=data.get("vehicle_type", VehicleType.AUTO),
+                is_current=make_current,
+                is_active=True,
+            )
+
+        return Response(
+            MobileVehicleSerializer(vehicle).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class MobileVehicleSetCurrentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, vehicle_id):
+        chauffeur = get_current_chauffeur(request.user)
+
+        try:
+            vehicle = ChauffeurVehicle.objects.get(
+                id=vehicle_id,
+                chauffeur=chauffeur,
+                is_active=True,
+            )
+        except ChauffeurVehicle.DoesNotExist:
+            raise ValidationError({"detail": "Voertuig niet gevonden."})
+
+        with transaction.atomic():
+            ChauffeurVehicle.objects.filter(
+                chauffeur=chauffeur,
+                is_active=True,
+            ).update(is_current=False)
+
+            vehicle.is_current = True
+            vehicle.save(update_fields=["is_current"])
+
+        return Response(MobileVehicleSerializer(vehicle).data)
+
+
+class MobileVehicleDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, vehicle_id):
+        chauffeur = get_current_chauffeur(request.user)
+
+        vehicles = ChauffeurVehicle.objects.filter(
+            chauffeur=chauffeur,
+            is_active=True,
+        )
+
+        try:
+            vehicle = vehicles.get(id=vehicle_id)
+        except ChauffeurVehicle.DoesNotExist:
+            raise ValidationError({"detail": "Voertuig niet gevonden."})
+
+        if vehicles.count() <= 1:
+            raise ValidationError({"detail": "U moet minimaal één voertuig behouden."})
+
+        was_current = vehicle.is_current
+
+        with transaction.atomic():
+            vehicle.is_active = False
+            vehicle.is_current = False
+            vehicle.save(update_fields=["is_active", "is_current"])
+
+            if was_current:
+                replacement = (
+                    ChauffeurVehicle.objects.filter(
+                        chauffeur=chauffeur,
+                        is_active=True,
+                    )
+                    .exclude(id=vehicle_id)
+                    .order_by("id")
+                    .first()
+                )
+
+                if replacement:
+                    replacement.is_current = True
+                    replacement.save(update_fields=["is_current"])
+
+        return Response(status=204)
