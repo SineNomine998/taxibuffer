@@ -30,7 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit() async {
     final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
+    final password = _passwordController.text;
 
     if (email.isEmpty) {
       await showAppAlert(
@@ -84,81 +84,122 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: Container(
         decoration: kGradientBg,
         child: SafeArea(
-          child: Form(
-            key: _formKey,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 36),
-              child: Column(
-                children: [
-                  const Spacer(),
-                  const AppLogoRow(),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Meld je hieronder aan met je account en wachtwoord',
-                    style: AppTextStyles.lead.copyWith(fontSize: 14),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                  _LabeledInput(
-                    label: 'Emailadres',
-                    hint: 'naam@email.nl',
-                    obscure: false,
-                    controller: _emailController,
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Vul uw emailadres in.'
-                        : null,
-                  ),
-                  _LabeledInput(
-                    label: 'Wachtwoord',
-                    hint: '••••••••',
-                    obscure: true,
-                    controller: _passwordController,
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Vul uw wachtwoord in.'
-                        : null,
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _submit,
-                    child: _isLoading
-                        ? CircularProgressIndicator()
-                        : Text('Inloggen'),
-                  ),
-                  const SizedBox(height: 25),
-                  GestureDetector(
-                    onTap: () => context.go('/signup'),
-                    child: RichText(
-                      text: TextSpan(
-                        style: AppTextStyles.lead.copyWith(
-                          fontSize: 14,
-                          color: AppColors.textSubtle,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: IntrinsicHeight(
+                    child: Form(
+                      key: _formKey,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: constraints.maxWidth * 0.06,
+                          vertical: constraints.maxHeight * 0.045,
                         ),
-                        children: [
-                          const TextSpan(text: 'Geen account? '),
-                          TextSpan(
-                            text: 'Maak er een aan',
-                            style: AppTextStyles.registerLink,
-                          ),
-                        ],
+                        child: Column(
+                          children: [
+                            const Spacer(),
+
+                            const AppLogoRow(),
+                            SizedBox(height: constraints.maxHeight * 0.012),
+
+                            Text(
+                              'Meld je hieronder aan met je account en wachtwoord',
+                              style: AppTextStyles.lead.copyWith(fontSize: 14),
+                              textAlign: TextAlign.center,
+                            ),
+
+                            SizedBox(height: constraints.maxHeight * 0.04),
+
+                            _LabeledInput(
+                              label: 'Emailadres',
+                              hint: 'naam@email.nl',
+                              obscure: false,
+                              controller: _emailController,
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'Vul uw emailadres in.'
+                                  : null,
+                            ),
+
+                            SizedBox(height: constraints.maxHeight * 0.018),
+
+                            _LabeledInput(
+                              label: 'Wachtwoord',
+                              hint: '••••••••',
+                              obscure: true,
+                              controller: _passwordController,
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'Vul uw wachtwoord in.'
+                                  : null,
+                            ),
+
+                            SizedBox(height: constraints.maxHeight * 0.03),
+
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _submit,
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Inloggen'),
+                              ),
+                            ),
+
+                            SizedBox(height: constraints.maxHeight * 0.03),
+
+                            GestureDetector(
+                              onTap: () => context.go('/signup'),
+                              child: RichText(
+                                text: TextSpan(
+                                  style: AppTextStyles.lead.copyWith(
+                                    fontSize: 14,
+                                    color: AppColors.textSubtle,
+                                  ),
+                                  children: [
+                                    const TextSpan(text: 'Geen account? '),
+                                    TextSpan(
+                                      text: 'Maak er een aan',
+                                      style: AppTextStyles.registerLink,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            SizedBox(height: constraints.maxHeight * 0.01),
+
+                            GestureDetector(
+                              onTap: () => context.go('/password-reset'),
+                              child: Text(
+                                'Wachtwoord vergeten?',
+                                style: AppTextStyles.registerLink,
+                              ),
+                            ),
+
+                            const Spacer(),
+
+                            const FooterNote(),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () => context.go('/password-reset'),
-                    child: Text(
-                      'Wachtwoord vergeten?',
-                      style: AppTextStyles.registerLink,
-                    ),
-                  ),
-                  const Spacer(),
-                  const FooterNote(),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ),
       ),
