@@ -12,7 +12,8 @@ class AddVehicleCard extends StatefulWidget {
 }
 
 class _AddVehicleCardState extends State<AddVehicleCard> {
-  final _formKey = GlobalKey<FormState>();
+  GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
   final _nicknameController = TextEditingController();
   final _plateController = TextEditingController();
   String _vehicleType = 'auto';
@@ -27,24 +28,42 @@ class _AddVehicleCardState extends State<AddVehicleCard> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isSaving) return;
+
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) return;
+
     setState(() => _isSaving = true);
-    await widget.onAdd(
-      Vehicle(
-        nickname: _nicknameController.text.trim(),
-        licensePlate: _plateController.text.trim(),
-        vehicleType: _vehicleType,
-        isCurrent: _setAsCurrent,
-      ),
-    );
-    if (!mounted) return;
-    _nicknameController.clear();
-    _plateController.clear();
-    setState(() {
-      _vehicleType = 'auto';
-      _setAsCurrent = false;
-      _isSaving = false;
-    });
+    
+    try {
+      await widget.onAdd(
+        Vehicle(
+          nickname: _nicknameController.text.trim(),
+          licensePlate: _plateController.text.trim(),
+          vehicleType: _vehicleType,
+          isCurrent: _setAsCurrent,
+        ),
+      );
+
+      if (!mounted) return;
+
+      FocusScope.of(context).unfocus();
+
+      _nicknameController.clear();
+      _plateController.clear();
+
+      setState(() {
+        _vehicleType = 'auto';
+        _setAsCurrent = false;
+        _formKey = GlobalKey<FormState>();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
   }
 
   @override
