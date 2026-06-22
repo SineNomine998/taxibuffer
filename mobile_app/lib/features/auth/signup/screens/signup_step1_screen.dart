@@ -74,6 +74,7 @@ class _SignupStep1ScreenState extends State<SignupStep1Screen> {
         context: context,
         title: 'Oeps, foutje opgetreden',
         message: e.toString(),
+        svgAsset: "assets/pop-up-denied.svg",
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);

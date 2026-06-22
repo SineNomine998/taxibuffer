@@ -79,6 +79,7 @@ class _AccountScreenState extends State<AccountScreen> {
         context: context,
         title: 'Fout',
         message: e.toString(),
+        svgAsset: "assets/pop-up-denied.svg",
       );
     } finally {
       if (mounted) setState(() => _isSavingProfile = false);
@@ -181,6 +182,7 @@ class _AccountScreenState extends State<AccountScreen> {
                           context: context,
                           title: 'Fout',
                           message: e.toString(),
+                          svgAsset: "assets/pop-up-denied.svg",
                         );
                       }
                     },

@@ -40,6 +40,7 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
         context: context,
         title: "Onvolledige gegevens",
         message: "Er ontbreken gegevens uit een eerdere stap. Begin opnieuw.",
+        svgAsset: "assets/warning-badge.svg",
       );
       return;
     }
