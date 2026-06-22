@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/dialogs.dart';
 import 'package:mobile_app/core/theme.dart';
 import 'package:mobile_app/widgets/app_logo_row.dart';
 import 'package:mobile_app/widgets/footer_note.dart';
 import '../../services/auth_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,14 +20,38 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authService = AuthService();
+  final _secureStorage = const FlutterSecureStorage();
 
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _rememberEmail = true;
+
+  static const _rememberedEmailKey = 'remembered_login_email';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRememberedEmail();
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadRememberedEmail() async {
+    final rememberedEmail = await _secureStorage.read(key: _rememberedEmailKey);
+
+    if (!mounted) return;
+
+    if (rememberedEmail != null && rememberedEmail.isNotEmpty) {
+      _emailController.text = rememberedEmail;
+      setState(() {
+        _rememberEmail = true;
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -57,6 +83,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await _authService.login(email: email, password: password);
+
+      if (_rememberEmail) {
+        await _secureStorage.write(key: _rememberedEmailKey, value: email);
+      } else {
+        await _secureStorage.delete(key: _rememberedEmailKey);
+      }
+
+      TextInput.finishAutofillContext();
 
       if (!mounted) return;
 
@@ -96,103 +130,165 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
                   child: IntrinsicHeight(
-                    child: Form(
-                      key: _formKey,
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: constraints.maxWidth * 0.06,
-                          vertical: constraints.maxHeight * 0.045,
-                        ),
-                        child: Column(
-                          children: [
-                            const Spacer(),
+                    child: AutofillGroup(
+                      child: Form(
+                        key: _formKey,
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: constraints.maxWidth * 0.06,
+                            vertical: constraints.maxHeight * 0.045,
+                          ),
+                          child: Column(
+                            children: [
+                              const Spacer(),
 
-                            const AppLogoRow(),
-                            SizedBox(height: constraints.maxHeight * 0.012),
+                              const AppLogoRow(),
+                              SizedBox(height: constraints.maxHeight * 0.012),
 
-                            Text(
-                              'Meld je hieronder aan met je account en wachtwoord',
-                              style: AppTextStyles.lead.copyWith(fontSize: 14),
-                              textAlign: TextAlign.center,
-                            ),
-
-                            SizedBox(height: constraints.maxHeight * 0.04),
-
-                            _LabeledInput(
-                              label: 'Emailadres',
-                              hint: 'naam@email.nl',
-                              obscure: false,
-                              controller: _emailController,
-                              validator: (v) => (v == null || v.trim().isEmpty)
-                                  ? 'Vul uw emailadres in.'
-                                  : null,
-                            ),
-
-                            SizedBox(height: constraints.maxHeight * 0.018),
-
-                            _LabeledInput(
-                              label: 'Wachtwoord',
-                              hint: '••••••••',
-                              obscure: true,
-                              controller: _passwordController,
-                              validator: (v) => (v == null || v.trim().isEmpty)
-                                  ? 'Vul uw wachtwoord in.'
-                                  : null,
-                            ),
-
-                            SizedBox(height: constraints.maxHeight * 0.03),
-
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _submit,
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Text('Inloggen'),
+                              Text(
+                                'Meld je hieronder aan met je account en wachtwoord',
+                                style: AppTextStyles.lead.copyWith(
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                            ),
 
-                            SizedBox(height: constraints.maxHeight * 0.03),
+                              SizedBox(height: constraints.maxHeight * 0.04),
 
-                            GestureDetector(
-                              onTap: () => context.go('/signup'),
-                              child: RichText(
-                                text: TextSpan(
-                                  style: AppTextStyles.lead.copyWith(
-                                    fontSize: 14,
+                              _LabeledInput(
+                                label: 'Emailadres',
+                                hint: 'naam@email.nl',
+                                obscure: false,
+                                controller: _emailController,
+                                keyboardType: TextInputType.emailAddress,
+                                autofillHints: const [
+                                  AutofillHints.username,
+                                  AutofillHints.email,
+                                ],
+                                textInputAction: TextInputAction.next,
+                                validator: (v) =>
+                                    (v == null || v.trim().isEmpty)
+                                    ? 'Vul uw emailadres in.'
+                                    : null,
+                              ),
+
+                              SizedBox(height: constraints.maxHeight * 0.018),
+
+                              _LabeledInput(
+                                label: 'Wachtwoord',
+                                hint: '••••••••',
+                                obscure: _obscurePassword,
+                                controller: _passwordController,
+                                keyboardType: TextInputType.visiblePassword,
+                                autofillHints: const [AutofillHints.password],
+                                textInputAction: TextInputAction.done,
+                                onFieldSubmitted: (_) {
+                                  if (!_isLoading) _submit();
+                                },
+                                suffixIcon: IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
                                     color: AppColors.textSubtle,
                                   ),
-                                  children: [
-                                    const TextSpan(text: 'Geen account? '),
-                                    TextSpan(
-                                      text: 'Maak er een aan',
-                                      style: AppTextStyles.registerLink,
+                                ),
+                                validator: (v) =>
+                                    (v == null || v.trim().isEmpty)
+                                    ? 'Vul uw wachtwoord in.'
+                                    : null,
+                              ),
+
+                              Row(
+                                children: [
+                                  Checkbox(
+                                    value: _rememberEmail,
+                                    onChanged: (value) {
+                                      setState(
+                                        () => _rememberEmail = value ?? true,
+                                      );
+                                    },
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setState(
+                                          () =>
+                                              _rememberEmail = !_rememberEmail,
+                                        );
+                                      },
+                                      child: Text(
+                                        'E-mailadres onthouden',
+                                        style: AppTextStyles.lead.copyWith(
+                                          fontSize: 13,
+                                          color: AppColors.textSubtle,
+                                        ),
+                                      ),
                                     ),
-                                  ],
+                                  ),
+                                ],
+                              ),
+
+                              SizedBox(height: constraints.maxHeight * 0.03),
+
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _isLoading ? null : _submit,
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Text('Inloggen'),
                                 ),
                               ),
-                            ),
 
-                            SizedBox(height: constraints.maxHeight * 0.01),
+                              SizedBox(height: constraints.maxHeight * 0.03),
 
-                            GestureDetector(
-                              onTap: () => context.go('/password-reset'),
-                              child: Text(
-                                'Wachtwoord vergeten?',
-                                style: AppTextStyles.registerLink,
+                              GestureDetector(
+                                onTap: () => context.go('/signup'),
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: AppTextStyles.lead.copyWith(
+                                      fontSize: 14,
+                                      color: AppColors.textSubtle,
+                                    ),
+                                    children: [
+                                      const TextSpan(text: 'Geen account? '),
+                                      TextSpan(
+                                        text: 'Maak er een aan',
+                                        style: AppTextStyles.registerLink,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                            ),
 
-                            const Spacer(),
+                              SizedBox(height: constraints.maxHeight * 0.01),
 
-                            const FooterNote(),
-                          ],
+                              GestureDetector(
+                                onTap: () => context.go('/password-reset'),
+                                child: Text(
+                                  'Wachtwoord vergeten?',
+                                  style: AppTextStyles.registerLink,
+                                ),
+                              ),
+
+                              const Spacer(),
+
+                              const FooterNote(),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -213,6 +309,11 @@ class _LabeledInput extends StatelessWidget {
   final bool obscure;
   final TextEditingController? controller;
   final String? Function(String?)? validator;
+  final Widget? suffixIcon;
+  final TextInputType? keyboardType;
+  final Iterable<String>? autofillHints;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onFieldSubmitted;
 
   const _LabeledInput({
     required this.label,
@@ -220,6 +321,11 @@ class _LabeledInput extends StatelessWidget {
     required this.obscure,
     this.controller,
     this.validator,
+    this.suffixIcon,
+    this.keyboardType,
+    this.autofillHints,
+    this.textInputAction,
+    this.onFieldSubmitted,
   });
 
   @override
@@ -246,6 +352,12 @@ class _LabeledInput extends StatelessWidget {
             controller: controller,
             obscureText: obscure,
             validator: validator,
+            keyboardType: keyboardType,
+            autofillHints: autofillHints,
+            textInputAction: textInputAction,
+            onFieldSubmitted: onFieldSubmitted,
+            autocorrect: false,
+            enableSuggestions: !obscure,
             style: const TextStyle(
               fontFamily: 'DM Sans',
               fontSize: 15,
@@ -258,6 +370,7 @@ class _LabeledInput extends StatelessWidget {
                 fontSize: 15,
                 color: AppColors.textDark.withValues(alpha: 0.45),
               ),
+              suffixIcon: suffixIcon,
               contentPadding: const EdgeInsets.all(14),
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
