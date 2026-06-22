@@ -1,9 +1,12 @@
 import logging
+import pytz
+
 from django.db import transaction
+from django.utils import timezone
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.forms import PasswordResetForm
 from rest_framework import status
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -17,8 +20,15 @@ from mobile_api.serializers import (
     MobileAccountProfileSerializer,
     MobileAccountSerializer,
     MobileVehicleSerializer,
+    serialize_queue,
+    serialize_notification,
+    serialize_waiting_entry,
 )
 from accounts.models import Chauffeur, ChauffeurVehicle, VehicleType
+from queueing.models import TaxiQueue, QueueEntry, QueueNotification
+from queueing.services import QueueService
+from queueing.constants import ACTIVE_QUEUE_STATUSES
+from geofence.services import point_in_buffer, make_point_from_lat_lng
 from queueing.views import _build_unique_username
 
 logger = logging.getLogger(__name__)
@@ -31,6 +41,19 @@ def get_current_chauffeur(user):
     if chauffeur is None:
         raise PermissionDenied("Geen chauffeurprofiel gevonden.")
     return chauffeur
+
+
+def parse_lat_lng(data):
+    lat = data.get("lat")
+    lng = data.get("lng")
+
+    if lat is None or lng is None:
+        raise ValidationError({"detail": "Locatiegegevens ontbreken."})
+
+    try:
+        return float(lat), float(lng)
+    except (TypeError, ValueError):
+        raise ValidationError({"detail": "Ongeldige locatiegegevens."})
 
 
 class MobileLoginView(APIView):
@@ -394,3 +417,429 @@ class MobileVehicleDeleteView(APIView):
                     replacement.save(update_fields=["is_current"])
 
         return Response(status=204)
+
+
+class MobileQueueListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        chauffeur = get_current_chauffeur(request.user)
+
+        current_vehicle = chauffeur.get_current_vehicle()
+        if not current_vehicle:
+            return Response(
+                {
+                    "detail": "U heeft nog geen huidig voertuig. Voeg eerst een voertuig toe."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        active_entry = (
+            QueueEntry.objects.filter(
+                chauffeur=chauffeur,
+                status__in=ACTIVE_QUEUE_STATUSES,
+            )
+            .select_related("queue")
+            .order_by("-created_at")
+            .first()
+        )
+
+        queues = (
+            TaxiQueue.objects.filter(active=True)
+            .select_related("buffer_zone", "pickup_zone")
+            .order_by("pickup_zone__created_at")
+        )
+
+        return Response(
+            {
+                "active_entry_uuid": str(active_entry.uuid) if active_entry else None,
+                "already_in_queue": active_entry is not None,
+                "queues": [serialize_queue(queue) for queue in queues],
+            }
+        )
+
+
+class MobileValidateLocationView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, queue_id):
+        queue = (
+            TaxiQueue.objects.select_related("buffer_zone")
+            .filter(id=queue_id, active=True)
+            .first()
+        )
+
+        if queue is None:
+            raise NotFound("Deze wachtrij is momenteel gesloten.")
+
+        lat, lng = parse_lat_lng(request.data)
+
+        buffer_zone = getattr(queue, "buffer_zone", None)
+        if not buffer_zone:
+            return Response(
+                {
+                    "is_valid": True,
+                    "inside_buffer": True,
+                    "message": "Geen bufferzone ingesteld.",
+                }
+            )
+
+        inside = point_in_buffer(buffer_zone, lat, lng, inclusive=True)
+
+        if not inside:
+            return Response(
+                {
+                    "is_valid": False,
+                    "inside_buffer": False,
+                    "error_message": (
+                        f"U bevindt zich nog niet in de buurt van bufferzone "
+                        f"{buffer_zone.name}."
+                    ),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            {
+                "is_valid": True,
+                "inside_buffer": True,
+                "message": "Locatie goedgekeurd.",
+            }
+        )
+
+
+class MobileJoinQueueView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, queue_id):
+        chauffeur = get_current_chauffeur(request.user)
+
+        queue = (
+            TaxiQueue.objects.select_related("buffer_zone")
+            .filter(id=queue_id, active=True)
+            .first()
+        )
+
+        if queue is None:
+            raise NotFound("Deze wachtrij is momenteel gesloten.")
+
+        current_vehicle = chauffeur.get_current_vehicle()
+        if not current_vehicle:
+            return Response(
+                {"detail": "U kunt alleen aanmelden met een huidig voertuig."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        existing_entry = (
+            QueueEntry.objects.filter(
+                chauffeur=chauffeur,
+                status__in=ACTIVE_QUEUE_STATUSES,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+        if existing_entry:
+            return Response(
+                {
+                    "detail": "U staat al in een wachtrij.",
+                    "entry_uuid": str(existing_entry.uuid),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        lat, lng = parse_lat_lng(request.data)
+        signup_point = make_point_from_lat_lng(lat, lng, srid=4326)
+
+        buffer_zone = getattr(queue, "buffer_zone", None)
+        if buffer_zone:
+            inside = point_in_buffer(buffer_zone, lat, lng, inclusive=True)
+            if not inside:
+                return Response(
+                    {
+                        "detail": (
+                            f"U bevindt zich nog niet in de buurt van bufferzone "
+                            f"{buffer_zone.name}."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        queue_service = QueueService()
+        success, message, entry_uuid = queue_service.add_chauffeur_to_queue(
+            chauffeur=chauffeur,
+            queue=queue,
+            signup_location=signup_point,
+        )
+
+        if not success:
+            return Response(
+                {
+                    "detail": message or "Kon niet aanmelden.",
+                    "entry_uuid": str(entry_uuid) if entry_uuid else None,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        entry = (
+            QueueEntry.objects.filter(
+                queue=queue,
+                chauffeur=chauffeur,
+                status__in=ACTIVE_QUEUE_STATUSES,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+        if entry is None:
+            return Response(
+                {"detail": "Aanmelding gelukt, maar wachtrij-item niet gevonden."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response(
+            {
+                "success": True,
+                "entry_uuid": str(entry.uuid),
+                "queue_id": queue.id,
+                "status": entry.status,
+                "position": entry.get_queue_position(),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class MobileQueueStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        chauffeur = get_current_chauffeur(request.user)
+
+        entry = (
+            QueueEntry.objects.filter(
+                chauffeur=chauffeur,
+                status__in=ACTIVE_QUEUE_STATUSES,
+            )
+            .select_related("queue", "chauffeur__user")
+            .order_by("-created_at")
+            .first()
+        )
+
+        if entry is None:
+            return Response(
+                {
+                    "in_queue": False,
+                    "entry": None,
+                    "waiting_people": [],
+                }
+            )
+
+        queue = entry.queue
+
+        lat = request.query_params.get("lat")
+        lng = request.query_params.get("lng")
+
+        if lat and lng:
+            try:
+                lat = float(lat)
+                lng = float(lng)
+                buffer_zone = getattr(queue, "buffer_zone", None)
+
+                if buffer_zone and not point_in_buffer(buffer_zone, lat, lng):
+                    entry.status = QueueEntry.Status.LEFT_ZONE
+                    entry.dequeued_at = timezone.now()
+                    entry.save(update_fields=["status", "dequeued_at"])
+
+                    return Response(
+                        {
+                            "in_queue": False,
+                            "dequeued": True,
+                            "dequeue_reason": "left_zone",
+                            "detail": "U bent uit de bufferzone gegaan.",
+                        }
+                    )
+            except (TypeError, ValueError):
+                pass
+
+        waiting_entries = (
+            queue.get_waiting_entries()
+            .select_related("chauffeur__user")
+            .order_by("created_at")
+        )
+
+        pending_notification = (
+            QueueNotification.objects.filter(
+                queue_entry=entry,
+                response=QueueNotification.ResponseType.PENDING,
+            )
+            .order_by("-notification_time")
+            .first()
+        )
+
+        notification_data = serialize_notification(pending_notification)
+
+        return Response(
+            {
+                "in_queue": True,
+                "entry": {
+                    "uuid": str(entry.uuid),
+                    "queue_id": queue.id,
+                    "queue_name": str(queue),
+                    "status": entry.status,
+                    "status_display": entry.get_status_display(),
+                    "position": entry.get_queue_position(),
+                    "total_waiting": waiting_entries.count(),
+                    "license_plate": entry.display_license_plate,
+                    "created_at": (
+                        entry.created_at.isoformat() if entry.created_at else None
+                    ),
+                },
+                "has_notification": pending_notification is not None,
+                "notification": notification_data,
+                "sequence_number": (
+                    notification_data["sequence_number"] if notification_data else None
+                ),
+                "last_updated": timezone.now().isoformat(),
+                "waiting_people": [
+                    serialize_waiting_entry(waiting_entry, chauffeur.id)
+                    for waiting_entry in waiting_entries
+                ],
+            }
+        )
+
+
+class MobileLeaveQueueView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        chauffeur = get_current_chauffeur(request.user)
+
+        entry = (
+            QueueEntry.objects.filter(
+                chauffeur=chauffeur,
+                status__in=ACTIVE_QUEUE_STATUSES,
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+        if entry is None:
+            return Response(
+                {"detail": "U staat momenteel niet in een actieve wachtrij."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        entry.status = QueueEntry.Status.LEFT_ZONE
+        entry.dequeued_at = timezone.now()
+        entry.save(update_fields=["status", "dequeued_at"])
+
+        return Response(
+            {
+                "success": True,
+                "message": "U heeft de wachtrij verlaten.",
+            }
+        )
+
+
+class MobileNotificationResponseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        chauffeur = get_current_chauffeur(request.user)
+
+        notification_id = request.data.get("notification_id")
+        response_type = request.data.get("response")
+
+        if not notification_id or not response_type:
+            raise ValidationError({"detail": "Ontbrekende gegevens."})
+
+        if response_type not in ["accepted", "declined"]:
+            raise ValidationError({"detail": "Ongeldig antwoord."})
+
+        notification = (
+            QueueNotification.objects.select_related("queue_entry")
+            .filter(
+                id=notification_id,
+                queue_entry__chauffeur=chauffeur,
+            )
+            .first()
+        )
+
+        if notification is None:
+            raise NotFound("Oproep niet gevonden.")
+
+        if notification.response != QueueNotification.ResponseType.PENDING:
+            raise ValidationError({"detail": "Deze oproep is al beantwoord."})
+
+        if response_type == "accepted":
+            notification.respond(QueueNotification.ResponseType.ACCEPTED)
+            message = "Oproep geaccepteerd."
+        # else:
+        #     notification.respond(QueueNotification.ResponseType.DECLINED)
+        #     message = "Oproep geweigerd."
+
+        return Response(
+            {
+                "success": True,
+                "message": message,
+            }
+        )
+
+
+class MobileSequenceHistoryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        chauffeur = get_current_chauffeur(request.user)
+
+        europe = pytz.timezone("Europe/Amsterdam")
+        now_local = timezone.now().astimezone(europe)
+        today_start_local = now_local.replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        today_start_utc = today_start_local.astimezone(pytz.UTC)
+
+        notifications = (
+            QueueNotification.objects.filter(
+                queue_entry__chauffeur=chauffeur,
+                notification_time__gte=today_start_utc,
+            )
+            .select_related("queue_entry", "queue_entry__queue")
+            .order_by("-notification_time")
+        )
+
+        items = []
+
+        for notification in notifications:
+            local_time = (
+                notification.notification_time.astimezone(europe)
+                if notification.notification_time
+                else None
+            )
+
+            items.append(
+                {
+                    "id": notification.id,
+                    "sequence_number": notification.sequence_number,
+                    "response": notification.response,
+                    "notification_time": (
+                        notification.notification_time.isoformat()
+                        if notification.notification_time
+                        else None
+                    ),
+                    "local_time": local_time.strftime("%H:%M") if local_time else None,
+                    "queue_id": notification.queue_entry.queue_id,
+                    "queue_name": str(notification.queue_entry.queue),
+                    "entry_uuid": str(notification.queue_entry.uuid),
+                }
+            )
+
+        return Response(
+            {
+                "date": now_local.strftime("%d-%m-%Y"),
+                "items": items,
+            }
+        )

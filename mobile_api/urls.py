@@ -47,4 +47,38 @@ urlpatterns = [
         views.MobileVehicleDeleteView.as_view(),
         name="mobile_vehicle_delete",
     ),
+    # Queue endpoints
+    path("queues/", views.MobileQueueListView.as_view(), name="mobile_queue_list"),
+    path(
+        "queues/<int:queue_id>/validate-location/",
+        views.MobileValidateLocationView.as_view(),
+        name="mobile_validate_location",
+    ),
+    path(
+        "queues/<int:queue_id>/join/",
+        views.MobileJoinQueueView.as_view(),
+        name="mobile_join_queue",
+    ),
+    path(
+        "queue/status/",
+        views.MobileQueueStatusView.as_view(),
+        name="mobile_queue_status",
+    ),
+    path(
+        "queue/leave/",
+        views.MobileLeaveQueueView.as_view(),
+        name="mobile_leave_queue",
+    ),
+    # Notification endpoints
+    path(
+        "notifications/respond/",
+        views.MobileNotificationResponseView.as_view(),
+        name="mobile_notification_response",
+    ),
+    # Sequence history endpoints
+    path(
+        "sequence-history/",
+        views.MobileSequenceHistoryView.as_view(),
+        name="mobile_sequence_history",
+    ),
 ]
