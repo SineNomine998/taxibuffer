@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -14,6 +15,8 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    await _syncPendingLogoutWithBackend();
+
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/mobile/auth/login/');
 
     final response = await http.post(
@@ -32,11 +35,17 @@ class AuthService {
       access: data['access'],
       refresh: data['refresh'],
     );
+    await _tokenStorage.clearLogoutPending();
 
     return data['user'];
   }
 
+  // TODO! Delete
   Future<Map<String, dynamic>> getMe() async {
+    if (await _tokenStorage.isLogoutPending()) {
+      throw Exception('Logout is pending');
+    }
+
     final accessToken = await _tokenStorage.getAccessToken();
 
     if (accessToken == null) {
@@ -60,23 +69,45 @@ class AuthService {
   }
 
   Future<void> logout() async {
-    final accessToken = await _tokenStorage.getAccessToken();
     final refreshToken = await _tokenStorage.getRefreshToken();
 
-    if (accessToken != null && refreshToken != null) {
-      final uri = Uri.parse('${ApiConfig.baseUrl}/api/mobile/auth/logout/');
-
-      await http.post(
-        uri,
-        headers: {
-          'Content-type': 'application/json',
-          'Authorization': 'Bearer $accessToken',
-        },
-        body: jsonEncode({'refresh': refreshToken}),
-      );
+    if (refreshToken != null) {
+      await _tokenStorage.savePendingLogoutRefreshToken(refreshToken);
     }
 
     await _tokenStorage.clearTokens();
+    await _tokenStorage.setLogoutPending(true);
+
+    if (refreshToken != null) {
+      unawaited(_syncPendingLogoutWithBackend());
+    }
+  }
+
+  Future<void> _syncPendingLogoutWithBackend() async {
+    final pendingRefreshToken = await _tokenStorage
+        .getPendingLogoutRefreshToken();
+
+    if (pendingRefreshToken == null) {
+      await _tokenStorage.clearLogoutPending();
+      return;
+    }
+
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}/api/mobile/auth/logout/');
+
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh': pendingRefreshToken}),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        await _tokenStorage.clearPendingLogoutRefreshToken();
+        await _tokenStorage.clearLogoutPending();
+      }
+    } catch (_) {
+      // Keep pending token so we can retry later.
+    }
   }
 
   Future<Map<String, dynamic>> signup({
@@ -123,6 +154,7 @@ class AuthService {
       access: data['access'],
       refresh: data['refresh'],
     );
+    await _tokenStorage.clearLogoutPending();
 
     return data['user'];
   }

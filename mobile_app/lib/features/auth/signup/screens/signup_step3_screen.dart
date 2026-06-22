@@ -74,7 +74,7 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
 
       // On success:
       signupFormState.reset();
-      context.go('/queue');
+      context.go('/locations');
     } catch (e) {
       if (!mounted) return;
 

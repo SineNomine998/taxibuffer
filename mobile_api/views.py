@@ -78,7 +78,7 @@ class MobileTokenRefreshView(TokenRefreshView):
 
 
 class MobileLogoutView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         refresh_token = request.data.get("refresh")
