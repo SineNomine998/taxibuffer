@@ -96,7 +96,7 @@ class _AccountScreenState extends State<AccountScreen> {
     if (confirmed != true || !context.mounted) return;
     await AuthService().logout();
     if (!context.mounted) return;
-    if(!mounted) return;
+    if (!mounted) return;
     context.go('/login');
   }
 

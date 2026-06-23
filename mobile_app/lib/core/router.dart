@@ -2,6 +2,7 @@ import 'package:mobile_app/features/account/account_state.dart';
 import 'package:mobile_app/features/account/screens/account_screen.dart';
 import 'package:mobile_app/features/auth/password_reset/screens/password_reset_screen.dart';
 import 'package:mobile_app/features/auth/password_reset/screens/password_reset_sent_screen.dart';
+import 'package:mobile_app/features/info/screens/startup_screen.dart';
 import 'package:mobile_app/features/location/screens/location_selection_info_screen.dart';
 import 'package:mobile_app/features/location/screens/location_selection_screen.dart';
 import 'package:mobile_app/features/queue/queue_state.dart';
@@ -20,8 +21,11 @@ import 'package:mobile_app/features/auth/signup/screens/vehicle_add_screen.dart'
 final GoRouter router = GoRouter(
   initialLocation: '/',
   routes: [
+    // Making sure info pages don't show up on every launch.
+    GoRoute(path: '/', builder: (_, _) => const StartupScreen()),
+    
     // Info pages routing
-    GoRoute(path: '/', builder: (context, state) => const InfoScreen()),
+    GoRoute(path: '/info', builder: (context, state) => const InfoScreen()),
 
     // Login routing
     GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),

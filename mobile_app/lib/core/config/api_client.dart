@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:mobile_app/core/config/api_config.dart';
+import 'package:mobile_app/core/config/session_manager.dart';
 import '../storage/token_storage.dart';
 
 /// Thin HTTP client that:
@@ -37,11 +38,23 @@ class ApiClient {
 
     // Access token expired -> try a silent refresh.
     final refreshed = await _refreshAccessToken();
-    if (!refreshed) throw ApiAuthException();
+    if (!refreshed) {
+      await _tokenStorage.clearTokens();
+
+      SessionManager.handleAuthExpired();
+
+      throw ApiAuthException();
+    }
 
     // Retry once with the new token.
     final retried = await call(await _authHeaders());
-    if (retried.statusCode == 401) throw ApiAuthException();
+    if (retried.statusCode == 401) {
+      await _tokenStorage.clearTokens();
+
+      SessionManager.handleAuthExpired();
+
+      throw ApiAuthException();
+    }
 
     return retried;
   }
@@ -99,7 +112,8 @@ class ApiClient {
 }
 
 /// Thrown when a request fails with 401 after a token refresh attempt.
-/// Callers should catch this and redirect to the login screen.
+/// ApiClient already clears tokens and triggers the global
+/// auth-expired flow via SessionManager
 class ApiAuthException implements Exception {
   @override
   String toString() =>

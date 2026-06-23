@@ -53,11 +53,6 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
     try {
       final position = await _locationService.getCurrentPosition();
 
-      debugPrint('GPS LAT: ${position.latitude}');
-      debugPrint('GPS LNG: ${position.longitude}');
-      debugPrint('GPS ACCURACY: ${position.accuracy}');
-      debugPrint('GPS MOCKED: ${position.isMocked}');
-
       final result = await _locationService.validateLocation(
         lat: position.latitude,
         lng: position.longitude,
@@ -86,7 +81,9 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
 
       context.read<QueueState>().setActiveEntry(entryUuid);
       context.go('/queue/$entryUuid');
-    } on LocationPermissionDeniedException catch (e) {
+    }
+    // TODO: Display permission pop-up again if the user tries to sign up for a queue after declining the permission.
+    on LocationPermissionDeniedException catch (e) {
       if (!mounted) return;
       await showAppAlert(
         context: context,

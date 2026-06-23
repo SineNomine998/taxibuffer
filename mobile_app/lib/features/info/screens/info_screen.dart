@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/theme.dart';
 import 'package:mobile_app/widgets/app_logo_row.dart';
@@ -38,10 +39,26 @@ class _InfoScreenState extends State<InfoScreen> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
-    } else {
-      context.go('/login'); // GoRouter
     }
   }
+
+  Future<void> _finishOnboarding() async {
+    await markInfoSeen();
+
+    if(!mounted) return;
+
+    context.go('/login');
+  }
+
+  Future<void> markInfoSeen() async {
+  const storage = FlutterSecureStorage();
+  const key = 'info_seen_count';
+
+  final rawCount = await storage.read(key: key);
+  final count = int.tryParse(rawCount ?? '0') ?? 0;
+
+  await storage.write(key: key, value: '${count + 1}');
+}
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +89,7 @@ class _InfoScreenState extends State<InfoScreen> {
 
                 PillButton(
                   label: _page == _pages.length - 1 ? 'Aan de slag' : 'Verder',
-                  onPressed: _next,
+                  onPressed: _page == _pages.length - 1 ? _finishOnboarding : _next,
                 ),
                 const SizedBox(height: 20),
                 const FooterNote(),
