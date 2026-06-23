@@ -4,6 +4,7 @@ import 'package:mobile_app/features/auth/password_reset/screens/password_reset_s
 import 'package:mobile_app/features/auth/password_reset/screens/password_reset_sent_screen.dart';
 import 'package:mobile_app/features/location/screens/location_selection_info_screen.dart';
 import 'package:mobile_app/features/location/screens/location_selection_screen.dart';
+import 'package:mobile_app/features/sequence/screens/sequence_history_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/features/auth/login/screens/login_screen.dart';
@@ -17,8 +18,13 @@ import 'package:mobile_app/features/auth/signup/screens/vehicle_add_screen.dart'
 final GoRouter router = GoRouter(
   initialLocation: '/',
   routes: [
+    // Info pages routing
     GoRoute(path: '/', builder: (context, state) => const InfoScreen()),
+
+    // Login routing
     GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+
+    // Password reset routing
     GoRoute(
       path: '/password-reset',
       builder: (_, _) => const PasswordResetScreen(),
@@ -62,6 +68,7 @@ final GoRouter router = GoRouter(
         );
       },
       routes: [
+        // Locations routing
         GoRoute(
           path: '/locations',
           builder: (_, _) => const LocationSelectionScreen(),
@@ -70,8 +77,15 @@ final GoRouter router = GoRouter(
           path: '/locations/info',
           builder: (_, _) => const LocationSelectionInfoScreen(),
         ),
+
+        // Account routing
         GoRoute(path: '/account', builder: (_, _) => const AccountScreen()),
-        // /queue and /numbers join this shell once built
+
+        // Sequence history routing
+        GoRoute(
+          path: '/numbers',
+          builder: (_, _) => const SequenceHistoryScreen(),
+        ),
       ],
     ),
   ],

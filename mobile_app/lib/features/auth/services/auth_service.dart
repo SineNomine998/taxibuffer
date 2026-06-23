@@ -40,34 +40,6 @@ class AuthService {
     return data['user'];
   }
 
-  // TODO! Delete
-  Future<Map<String, dynamic>> getMe() async {
-    if (await _tokenStorage.isLogoutPending()) {
-      throw Exception('Logout is pending');
-    }
-
-    final accessToken = await _tokenStorage.getAccessToken();
-
-    if (accessToken == null) {
-      throw Exception('No access token found');
-    }
-
-    final uri = Uri.parse('${ApiConfig.baseUrl}/api/mobile/me/');
-
-    final response = await http.get(
-      uri,
-      headers: {'Authorization': 'Bearer $accessToken'},
-    );
-
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode != 200) {
-      throw Exception(data['detail'] ?? 'Could not fetch user');
-    }
-
-    return data;
-  }
-
   Future<void> logout() async {
     final refreshToken = await _tokenStorage.getRefreshToken();
 

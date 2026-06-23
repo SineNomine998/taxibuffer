@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_app/features/info/screens/info_screen.dart';
 import 'app.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
-
-void main() => runApp(const App());
-
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('nl');
+  runApp(const App());
+}
 
 // Below is not used, rest assured!
 
@@ -39,7 +42,7 @@ class MyApp extends StatelessWidget {
         colorScheme: .fromSeed(seedColor: Colors.deepPurple),
       ),
       home: InfoScreen(),
-    //   home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      //   home: const MyHomePage(title: 'Flutter Demo Home Page'),
     );
   }
 }
