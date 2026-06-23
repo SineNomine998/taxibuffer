@@ -454,7 +454,7 @@ class MobileQueueListView(APIView):
             {
                 "active_entry_uuid": str(active_entry.uuid) if active_entry else None,
                 "already_in_queue": active_entry is not None,
-                "queues": [serialize_queue(queue) for queue in queues],
+                "queues": [serialize_queue(queue, request) for queue in queues],
             }
         )
 

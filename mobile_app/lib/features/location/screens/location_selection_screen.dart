@@ -216,7 +216,7 @@ class _LocationCard extends StatelessWidget {
                 child: zone.imageUrl != null
                     ? Image.network(zone.imageUrl!, fit: BoxFit.cover)
                     : Image.asset(
-                        'assets/cruise_terminal.png',
+                        'assets/cruise-terminal.png',
                         fit: BoxFit.cover,
                       ),
               ),

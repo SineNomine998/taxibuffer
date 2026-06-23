@@ -1,8 +1,20 @@
-def serialize_queue(queue):
+def absolute_url(request, path):
+    if not path:
+        return None
+    
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    
+    return request.build_absolute_uri(path)
+
+
+def serialize_queue(queue, request):
     waiting_count = queue.get_waiting_entries().count()
 
     pickup_zone = getattr(queue, "pickup_zone", None)
     buffer_zone = getattr(queue, "buffer_zone", None)
+
+    image_url = getattr(pickup_zone, "image_url", None)
 
     return {
         "queue_id": queue.id,
@@ -11,7 +23,7 @@ def serialize_queue(queue):
         "is_active": queue.active,
         "waiting_count": waiting_count,
         "buffer_zone_name": getattr(buffer_zone, "name", None),
-        "image_url": None,
+        "image_url": absolute_url(request, image_url),
     }
 
 
