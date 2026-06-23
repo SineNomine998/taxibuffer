@@ -1,25 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../../../core/config/api_config.dart';
-import '../../../core/storage/token_storage.dart';
+import 'package:mobile_app/core/config/api_client.dart';
 import '../models/sequence_notification.dart';
 
 class SequenceService {
-  final TokenStorage _tokenStorage;
+  final ApiClient _api;
 
-  SequenceService({TokenStorage? tokenStorage})
-    : _tokenStorage = tokenStorage ?? TokenStorage();
-
-  Future<Map<String, String>> _authHeaders() async {
-    final token = await _tokenStorage.getAccessToken();
-
-    if (token == null) throw Exception('Niet ingelogd.');
-
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
-  }
+  SequenceService({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
 
   String _errorMessage(http.Response response, String fallback) {
     try {
@@ -38,9 +25,7 @@ class SequenceService {
   }
 
   Future<List<SequenceNotification>> fetchTodaysNotifications() async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}/api/mobile/sequence-history/');
-
-    final response = await http.get(uri, headers: await _authHeaders());
+    final response = await _api.get('/api/mobile/sequence-history/');
 
     if (response.statusCode != 200) {
       throw Exception(_errorMessage(response, 'Kon nummers niet laden.'));

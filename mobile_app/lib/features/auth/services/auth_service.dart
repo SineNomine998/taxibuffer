@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:mobile_app/core/config/api_client.dart';
 import 'package:mobile_app/features/account/services/account_service.dart';
 
 import '../../../core/config/api_config.dart';
@@ -176,40 +177,9 @@ class AuthService {
     try {
       await accountService.fetchAccount();
       return true;
-    } catch (_) {
-      return await _refreshAccessToken();
-    }
-  }
-
-  Future<bool> _refreshAccessToken() async {
-    final refreshToken = await _tokenStorage.getRefreshToken();
-
-    if (refreshToken == null) {
+    } on ApiAuthException {
+      await _tokenStorage.clearTokens();
       return false;
-    }
-
-    try {
-      final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/api/mobile/auth/refresh/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'refresh': refreshToken}),
-      );
-
-      if (response.statusCode != 200) {
-        await _tokenStorage.clearTokens();
-        return false;
-      }
-
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final access = data['access'] as String?;
-
-      if (access == null || access.isEmpty) {
-        await _tokenStorage.clearTokens();
-        return false;
-      }
-
-      await _tokenStorage.saveAccessToken(access);
-      return true;
     } catch (_) {
       return false;
     }
