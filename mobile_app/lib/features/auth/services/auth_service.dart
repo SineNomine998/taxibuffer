@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:mobile_app/features/account/services/account_service.dart';
 
 import '../../../core/config/api_config.dart';
 import '../../../core/storage/token_storage.dart';
 
 class AuthService {
   final TokenStorage _tokenStorage;
+  final AccountService accountService = AccountService();
 
   AuthService({TokenStorage? tokenStorage})
     : _tokenStorage = tokenStorage ?? TokenStorage();
@@ -160,6 +162,56 @@ class AuthService {
     if (response.statusCode != 200) {
       final data = jsonDecode(response.body);
       throw Exception(data['detail'] ?? 'Verzoek mislukt');
+    }
+  }
+
+  Future<bool> tryRestoreSession() async {
+    final accessToken = await _tokenStorage.getAccessToken();
+    final refreshToken = await _tokenStorage.getRefreshToken();
+
+    if (accessToken == null || refreshToken == null) {
+      return false;
+    }
+
+    try {
+      await accountService.fetchAccount();
+      return true;
+    } catch (_) {
+      return await _refreshAccessToken();
+    }
+  }
+
+  Future<bool> _refreshAccessToken() async {
+    final refreshToken = await _tokenStorage.getRefreshToken();
+
+    if (refreshToken == null) {
+      return false;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/api/mobile/auth/refresh/'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh': refreshToken}),
+      );
+
+      if (response.statusCode != 200) {
+        await _tokenStorage.clearTokens();
+        return false;
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final access = data['access'] as String?;
+
+      if (access == null || access.isEmpty) {
+        await _tokenStorage.clearTokens();
+        return false;
+      }
+
+      await _tokenStorage.saveAccessToken(access);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 }

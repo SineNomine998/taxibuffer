@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/rendering.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:mobile_app/core/config/api_client.dart';
 import 'package:http/http.dart' as http;
-import '../../../core/config/api_config.dart';
-import '../../../core/storage/token_storage.dart';
 import '../models/pickup_zone.dart';
 
 class GeofenceResult {
@@ -20,23 +19,9 @@ class LocationPermissionDeniedException implements Exception {
 }
 
 class LocationService {
-  final TokenStorage _tokenStorage;
+  final ApiClient _api;
 
-  LocationService({TokenStorage? tokenStorage})
-    : _tokenStorage = tokenStorage ?? TokenStorage();
-
-  Future<Map<String, String>> _authHeaders() async {
-    final token = await _tokenStorage.getAccessToken();
-
-    if (token == null) {
-      throw Exception('Niet ingelogd.');
-    }
-
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
-  }
+  LocationService({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
 
   String _errorMessage(http.Response response, String fallback) {
     try {
@@ -88,9 +73,7 @@ class LocationService {
   }
 
   Future<List<PickupZone>> fetchQueues() async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}/api/mobile/queues/');
-
-    final response = await http.get(uri, headers: await _authHeaders());
+    final response = await _api.get('/api/mobile/queues/');
 
     if (response.statusCode != 200) {
       throw Exception(_errorMessage(response, 'Kon locaties niet laden.'));
@@ -131,14 +114,9 @@ class LocationService {
     required double lng,
     required int queueId,
   }) async {
-    final uri = Uri.parse(
-      '${ApiConfig.baseUrl}/api/mobile/queues/$queueId/validate-location/',
-    );
-
-    final response = await http.post(
-      uri,
-      headers: await _authHeaders(),
-      body: jsonEncode({'lat': lat, 'lng': lng}),
+    final response = await _api.post(
+      '/api/mobile/queues/$queueId/validate-location/',
+      body: {'lat': lat, 'lng': lng},
     );
 
     if (response.statusCode != 200) {
@@ -161,14 +139,9 @@ class LocationService {
     required double lat,
     required double lng,
   }) async {
-    final uri = Uri.parse(
-      '${ApiConfig.baseUrl}/api/mobile/queues/$queueId/join/',
-    );
-
-    final response = await http.post(
-      uri,
-      headers: await _authHeaders(),
-      body: jsonEncode({'lat': lat, 'lng': lng}),
+    final response = await _api.post(
+      '/api/mobile/queues/$queueId/join/',
+      body: {'lat': lat, 'lng': lng},
     );
 
     debugPrint('JOIN STATUS: ${response.statusCode}');
