@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_app/features/queue/queue_state.dart';
+import 'package:provider/provider.dart';
 import '../../../core/dialogs.dart';
 import '../../../core/theme.dart';
 import '../../../widgets/app_shell_scaffold.dart';
@@ -51,6 +53,11 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
     try {
       final position = await _locationService.getCurrentPosition();
 
+      debugPrint('GPS LAT: ${position.latitude}');
+      debugPrint('GPS LNG: ${position.longitude}');
+      debugPrint('GPS ACCURACY: ${position.accuracy}');
+      debugPrint('GPS MOCKED: ${position.isMocked}');
+
       final result = await _locationService.validateLocation(
         lat: position.latitude,
         lng: position.longitude,
@@ -69,14 +76,16 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
         return;
       }
 
-      await _locationService.joinQueue(
+      final entryUuid = await _locationService.joinQueue(
         queueId: zone.queueId,
         lat: position.latitude,
         lng: position.longitude,
       );
 
       if (!mounted) return;
-      context.go('/queue');
+
+      context.read<QueueState>().setActiveEntry(entryUuid);
+      context.go('/queue/$entryUuid');
     } on LocationPermissionDeniedException catch (e) {
       if (!mounted) return;
       await showAppAlert(
@@ -115,6 +124,8 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool alreadyInQueue = context.watch<QueueState>().isInQueue;
+
     return AppShellScaffold(
       showHelp: true,
       onHelpTap: () => context.push('/locations/info'),
@@ -145,7 +156,40 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                   color: Color(0xFF6B7280),
                 ),
               ),
+
               const SizedBox(height: 14),
+
+              if (alreadyInQueue)
+                GestureDetector(
+                  onTap: () => context.go('/queue'),
+                  child: Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0x38E0BD22),
+                      border: Border.all(color: const Color(0x99E0BD22)),
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'U staat al in een wachtrij  →',
+                          style: TextStyle(
+                            fontFamily: 'DM Sans',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF2F2F2F),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
 
               if (_isLoading)
                 const Padding(
@@ -167,6 +211,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                     child: _LocationCard(
                       zone: zone,
                       isSubmitting: _submittingQueueId == zone.queueId,
+                      alreadyInQueue: alreadyInQueue,
                       onRegister: () => _onRegister(zone),
                     ),
                   ),
@@ -181,17 +226,19 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
 class _LocationCard extends StatelessWidget {
   final PickupZone zone;
   final bool isSubmitting;
+  final bool alreadyInQueue;
   final VoidCallback onRegister;
 
   const _LocationCard({
     required this.zone,
     required this.isSubmitting,
+    required this.alreadyInQueue,
     required this.onRegister,
   });
 
   @override
   Widget build(BuildContext context) {
-    final disabled = !zone.isActive;
+    final disabled = !zone.isActive || alreadyInQueue;
     return Opacity(
       opacity: disabled ? 0.55 : 1.0,
       child: Container(
@@ -281,7 +328,11 @@ class _LocationCard extends StatelessWidget {
                                     ),
                                   )
                                 : Text(
-                                    disabled ? 'Gesloten' : 'Aanmelden',
+                                    !zone.isActive
+                                        ? 'Gesloten'
+                                        : alreadyInQueue
+                                        ? 'Actieve wachtrij'
+                                        : 'Aanmelden',
                                     style: const TextStyle(
                                       fontFamily: 'DM Sans',
                                       fontSize: 14,

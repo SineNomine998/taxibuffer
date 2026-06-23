@@ -18,8 +18,8 @@ from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -32,7 +32,13 @@ DEBUG = True
 
 UNDER_CONSTRUCTION = False
 
-ALLOWED_HOSTS = ["taxibuffer.nl", "www.taxibuffer.nl", "localhost", "127.0.0.1", "10.0.2.2"]
+ALLOWED_HOSTS = [
+    "taxibuffer.nl",
+    "www.taxibuffer.nl",
+    "localhost",
+    "127.0.0.1",
+    "10.0.2.2",
+]
 
 SITE_ID = 1
 
@@ -43,10 +49,26 @@ MAIN_DOMAIN = "taxibuffer.nl"
 if DEBUG:
     MAIN_DOMAIN = "localhost:8000"
 
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [("127.0.0.1", 6379)],
+            },
+        }
+    }
+
 
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -65,7 +87,17 @@ INSTALLED_APPS = [
     "dashboard",
     "mobile_api",
     "django_q",
+    "channels",
 ]
+
+ASGI_APPLICATION = "taxibuffer.asgi.application"
+
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels_redis.core.RedisChannelLayer",
+#         "CONFIG": {"hosts": [("127.0.0.1", 6379)]},
+#     }
+# }
 
 Q_CLUSTER = {
     "name": "taxibuffer",
@@ -174,9 +206,7 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",  # Fallback
     ],
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticated",
-    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
 }
 
 SIMPLE_JWT = {

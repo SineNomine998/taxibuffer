@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/rendering.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/api_config.dart';
@@ -155,7 +156,7 @@ class LocationService {
     );
   }
 
-  Future<void> joinQueue({
+  Future<String> joinQueue({
     required int queueId,
     required double lat,
     required double lng,
@@ -170,10 +171,16 @@ class LocationService {
       body: jsonEncode({'lat': lat, 'lng': lng}),
     );
 
+    debugPrint('JOIN STATUS: ${response.statusCode}');
+    debugPrint('JOIN BODY: ${response.body}');
+
     if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception(
-        _errorMessage(response, 'Aanmelden bij wachtrij mislukt.'),
-      );
+      final data = jsonDecode(response.body);
+      throw Exception(data['detail'] ?? 'Aanmelden bij wachtrij mislukt.');
     }
+
+    final data = jsonDecode(response.body);
+
+    return data['entry_uuid'] as String;
   }
 }

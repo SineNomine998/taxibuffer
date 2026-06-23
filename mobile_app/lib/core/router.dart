@@ -4,6 +4,8 @@ import 'package:mobile_app/features/auth/password_reset/screens/password_reset_s
 import 'package:mobile_app/features/auth/password_reset/screens/password_reset_sent_screen.dart';
 import 'package:mobile_app/features/location/screens/location_selection_info_screen.dart';
 import 'package:mobile_app/features/location/screens/location_selection_screen.dart';
+import 'package:mobile_app/features/queue/queue_state.dart';
+import 'package:mobile_app/features/queue/screens/queue_status_screen.dart';
 import 'package:mobile_app/features/sequence/screens/sequence_history_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -85,6 +87,26 @@ final GoRouter router = GoRouter(
         GoRoute(
           path: '/numbers',
           builder: (_, _) => const SequenceHistoryScreen(),
+        ),
+
+        // Queue routing
+        // /queue is the tab destination - redirects to active entry if in queue,
+        // otherwise falls back to LocationSelectionScreen (no active queue).
+        GoRoute(
+          path: '/queue',
+          redirect: (context, state) {
+            final queueState = context.read<QueueState>();
+            if (queueState.isInQueue) {
+              return '/queue/${queueState.activeEntryUuid}';
+            }
+            return null; // render fallback builder below
+          },
+          builder: (_, _) => const LocationSelectionScreen(),
+        ),
+        GoRoute(
+          path: '/queue/:entryUuid',
+          builder: (_, state) =>
+              QueueStatusScreen(entryUuid: state.pathParameters['entryUuid']!),
         ),
       ],
     ),

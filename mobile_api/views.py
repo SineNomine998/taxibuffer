@@ -525,6 +525,9 @@ class MobileJoinQueueView(APIView):
 
         current_vehicle = chauffeur.get_current_vehicle()
         if not current_vehicle:
+            logger.warning(
+                "Mobile join failed: no current vehicle user=%s", request.user.email
+            )
             return Response(
                 {"detail": "U kunt alleen aanmelden met een huidig voertuig."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -539,13 +542,25 @@ class MobileJoinQueueView(APIView):
             .first()
         )
 
+        logger.info(
+            "Mobile join attempt user=%s queue_id=%s lat=%s lng=%s",
+            request.user.email,
+            queue_id,
+            request.data.get("lat"),
+            request.data.get("lng"),
+        )
+
         if existing_entry:
             return Response(
                 {
-                    "detail": "U staat al in een wachtrij.",
+                    "success": True,
+                    "already_in_queue": True,
                     "entry_uuid": str(existing_entry.uuid),
+                    "queue_id": existing_entry.queue_id,
+                    "status": existing_entry.status,
+                    "position": existing_entry.get_queue_position(),
                 },
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_200_OK,
             )
 
         lat, lng = parse_lat_lng(request.data)
@@ -573,6 +588,32 @@ class MobileJoinQueueView(APIView):
         )
 
         if not success:
+            logger.warning(
+                "Mobile join failed: QueueService success=False user=%s queue_id=%s message=%s entry_uuid=%s",
+                request.user.email,
+                queue_id,
+                message,
+                entry_uuid,
+            )
+
+            if message == "Notification missed." and entry_uuid:
+                missed_entry = QueueEntry.objects.filter(uuid=entry_uuid).first()
+
+                if missed_entry:
+                    missed_entry.dequeue()
+
+                return Response(
+                    {
+                        "detail": (
+                            "Er is blijkbaar iets misgegaan bij het aanmelden. "
+                            "Probeer het opnieuw."
+                        ),
+                        "retry_allowed": True,
+                        "entry_uuid": str(entry_uuid),
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+
             return Response(
                 {
                     "detail": message or "Kon niet aanmelden.",

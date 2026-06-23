@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:mobile_app/features/info/screens/info_screen.dart';
 import 'app.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:mobile_app/features/queue/queue_state.dart';
+import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('nl');
-  runApp(const App());
+
+  runApp(
+    ChangeNotifierProvider(create: (_) => QueueState(), child: const App()),
+  );
 }
 
 // Below is not used, rest assured!
