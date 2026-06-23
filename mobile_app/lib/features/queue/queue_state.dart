@@ -6,16 +6,16 @@ class QueueState extends ChangeNotifier {
   String? _activeEntryUuid;
 
   String? get activeEntryUuid => _activeEntryUuid;
-  bool get isInQueue => _activeEntryUuid != null;
 
-  void setActiveEntry(String uuid) {
-    if (_activeEntryUuid == uuid) return;
-    _activeEntryUuid = uuid;
+  bool get isInQueue =>
+      _activeEntryUuid != null && _activeEntryUuid!.isNotEmpty;
+
+  void setActiveEntry(String entryUuid) {
+    _activeEntryUuid = entryUuid;
     notifyListeners();
   }
 
-  void clear() {
-    if (_activeEntryUuid == null) return;
+  void clearActiveEntry() {
     _activeEntryUuid = null;
     notifyListeners();
   }

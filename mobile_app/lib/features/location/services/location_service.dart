@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/rendering.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mobile_app/core/config/api_client.dart';
 import 'package:http/http.dart' as http;
@@ -16,6 +15,21 @@ class LocationPermissionDeniedException implements Exception {
   final bool permanently;
 
   LocationPermissionDeniedException({this.permanently = false});
+}
+
+class QueueListState {
+  final String? activeEntryUuid;
+  final bool alreadyInQueue;
+  final List<PickupZone> queues;
+
+  const QueueListState({
+    required this.activeEntryUuid,
+    required this.alreadyInQueue,
+    required this.queues,
+  });
+
+  bool get hasActiveQueue =>
+      activeEntryUuid != null && activeEntryUuid!.isNotEmpty;
 }
 
 class LocationService {
@@ -72,7 +86,7 @@ class LocationService {
     );
   }
 
-  Future<List<PickupZone>> fetchQueues() async {
+  Future<QueueListState> fetchQueuesState() async {
     final response = await _api.get('/api/mobile/queues/');
 
     if (response.statusCode != 200) {
@@ -88,25 +102,42 @@ class LocationService {
     //   "queues": [...]
     // }
     if (data is Map<String, dynamic>) {
-      final queues = data['queues'];
+      final queuesJson = data['queues'];
 
-      if (queues is List) {
-        return queues
-            .map((e) => PickupZone.fromJson(e as Map<String, dynamic>))
-            .toList();
+      if (queuesJson is! List) {
+        throw Exception('Ongeldig locaties-formaat ontvangen.');
       }
 
-      throw Exception('Ongeldig locaties-formaat ontvangen.');
+      final queues = queuesJson
+          .map((e) => PickupZone.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+      return QueueListState(
+        activeEntryUuid: data['active_entry_uuid'] as String?,
+        alreadyInQueue: data['already_in_queue'] as bool? ?? false,
+        queues: queues,
+      );
     }
 
     // Temporary backwards compatibility if backend returns a raw list.
     if (data is List) {
-      return data
+      final queues = data
           .map((e) => PickupZone.fromJson(e as Map<String, dynamic>))
           .toList();
+
+      return QueueListState(
+        activeEntryUuid: null,
+        alreadyInQueue: false,
+        queues: queues,
+      );
     }
 
     throw Exception('Ongeldig locaties-formaat ontvangen.');
+  }
+
+  Future<List<PickupZone>> fetchQueues() async {
+    final state = await fetchQueuesState();
+    return state.queues;
   }
 
   Future<GeofenceResult> validateLocation({
@@ -144,16 +175,18 @@ class LocationService {
       body: {'lat': lat, 'lng': lng},
     );
 
-    debugPrint('JOIN STATUS: ${response.statusCode}');
-    debugPrint('JOIN BODY: ${response.body}');
-
     if (response.statusCode != 200 && response.statusCode != 201) {
       final data = jsonDecode(response.body);
       throw Exception(data['detail'] ?? 'Aanmelden bij wachtrij mislukt.');
     }
 
-    final data = jsonDecode(response.body);
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final entryUuid = data['entry_uuid'];
 
-    return data['entry_uuid'] as String;
+    if (entryUuid == null || entryUuid.toString().isEmpty) {
+      throw Exception('Geen actieve wachtrij gevonden.');
+    }
+
+    return entryUuid.toString();
   }
 }

@@ -35,13 +35,24 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
       _isLoading = true;
       _loadError = null;
     });
+
     try {
-      final queues = await _locationService.fetchQueues();
+      final state = await _locationService.fetchQueuesState();
+
       if (!mounted) return;
-      setState(() => _queues = queues);
+
+      final queueState = context.read<QueueState>();
+
+      if (state.hasActiveQueue) {
+        queueState.setActiveEntry(state.activeEntryUuid!);
+      } else {
+        queueState.clearActiveEntry();
+      }
+
+      setState(() => _queues = state.queues);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _loadError = e.toString());
+      setState(() => _loadError = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -158,7 +169,15 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
 
               if (alreadyInQueue)
                 GestureDetector(
-                  onTap: () => context.go('/queue'),
+                  onTap: () {
+                    final entryUuid = context
+                        .read<QueueState>()
+                        .activeEntryUuid;
+
+                    if (entryUuid == null || entryUuid.isEmpty) return;
+
+                    context.go('/queue/$entryUuid');
+                  },
                   child: Container(
                     width: double.infinity,
                     margin: const EdgeInsets.only(bottom: 14),

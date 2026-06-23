@@ -90,7 +90,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen> {
   /// whether by leaving voluntarily or being dequeued externally.
   void _exitQueue() {
     if (!mounted) return;
-    context.read<QueueState>().clear();
+    context.read<QueueState>().clearActiveEntry();
     context.go('/locations');
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/dialogs.dart';
 import 'package:mobile_app/core/theme.dart';
+import 'package:mobile_app/features/location/services/location_service.dart';
 import 'package:mobile_app/widgets/app_logo_row.dart';
 import 'package:mobile_app/widgets/footer_note.dart';
 import '../../services/auth_service.dart';
@@ -92,10 +93,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
       TextInput.finishAutofillContext();
 
+      final queueState = await LocationService().fetchQueuesState();
+
       if (!mounted) return;
 
       // Navigate after successful login
-      context.go('/locations');
+      if (queueState.hasActiveQueue) {
+        context.go('/queue/${queueState.activeEntryUuid}');
+      } else {
+        context.go('/locations');
+      }
     } catch (e) {
       if (!mounted) return;
 
