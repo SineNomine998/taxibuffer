@@ -16,15 +16,14 @@ from django.core.asgi import get_asgi_application
 django_asgi_app = get_asgi_application()
 
 from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.security.websocket import AllowedHostsOriginValidator
 from mobile_api.middleware import JwtAuthMiddleware
 import mobile_api.routing
 
 application = ProtocolTypeRouter(
     {
         "http": django_asgi_app,
-        "websocket": AllowedHostsOriginValidator(
-            JwtAuthMiddleware(URLRouter(mobile_api.routing.websocket_urlpatterns))
+        "websocket": JwtAuthMiddleware(
+            URLRouter(mobile_api.routing.websocket_urlpatterns)
         ),
     }
 )
