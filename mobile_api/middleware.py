@@ -1,8 +1,12 @@
+import logging
+
 from urllib.parse import parse_qs
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import AccessToken
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -35,8 +39,6 @@ class JwtAuthMiddleware:
 
         scope["user"] = await get_user_from_token(token)
 
-        print("WS query string:", query_string)
-        print("WS token exists:", bool(token))
-        print("WS user:", scope["user"])
+        logger.info("WS auth user=%s authenticated=%s", scope["user"], scope["user"].is_authenticated)
 
         return await self.inner(scope, receive, send)
