@@ -52,4 +52,4 @@ db.sqlite3-journal
 Thumbs.db
 
 # firebase sdk
-taxibuffer-83732-firebase-adminsdk-fbsvc-1f27ea710e.json
+firebase-service-account.json

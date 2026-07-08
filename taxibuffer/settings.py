@@ -92,7 +92,7 @@ INSTALLED_APPS = [
 
 ASGI_APPLICATION = "taxibuffer.asgi.application"
 
-FIREBASE_SERVICE_ACCOUNT_PATH = BASE_DIR / "taxibuffer-83732-firebase-adminsdk-fbsvc-1f27ea710e.json"
+FIREBASE_SERVICE_ACCOUNT_PATH = BASE_DIR / "firebase-service-account.json"
 
 Q_CLUSTER = {
     "name": "taxibuffer",
