@@ -19,8 +19,9 @@ class QueueStatusScreen extends StatefulWidget {
   State<QueueStatusScreen> createState() => _QueueStatusScreenState();
 }
 
-class _QueueStatusScreenState extends State<QueueStatusScreen> {
-  late final QueueService _queueService;
+class _QueueStatusScreenState extends State<QueueStatusScreen>
+    with WidgetsBindingObserver {
+  late QueueService _queueService;
   QueueStatus? _status;
   bool _isConnecting = true;
   bool _isLeaving = false;
@@ -31,6 +32,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _queueService = QueueService();
     // Mark this entry as active globally so BottomNav and other screens know.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -65,9 +67,12 @@ class _QueueStatusScreenState extends State<QueueStatusScreen> {
 
   void _onStatus(QueueStatus status) {
     if (!mounted) return;
-    setState(() => _status = status);
+    setState(() {
+      _status = status;
+      _connectionError = null;
+    });
 
-    // Entry no longer active — dequeued externally.
+    // Entry no longer active - dequeued externally.
     if (!status.active) {
       _exitQueue();
       return;
@@ -156,7 +161,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen> {
                 child: TextButton(
                   onPressed: () {
                     Navigator.of(dialogContext).pop();
-                    // TODO: call respondToNotification(notification.id, 'accepted') via HTTP once endpoint exists
+                    // TODO: call respondToNotification(notification.id, 'accepted') via HTTP or WebSocket? once endpoint exists
                     _exitQueue();
                   },
                   style: TextButton.styleFrom(
@@ -221,9 +226,28 @@ class _QueueStatusScreenState extends State<QueueStatusScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _subscription?.cancel();
     _queueService.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reconnect();
+    }
+  }
+
+  Future<void> _reconnect() async {
+    await _subscription?.cancel();
+    _subscription = null;
+    _queueService.dispose();
+
+    if (!mounted) return;
+
+    _queueService = QueueService();
+    await _connect();
   }
 
   @override
@@ -248,222 +272,230 @@ class _QueueStatusScreenState extends State<QueueStatusScreen> {
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Aangemeld!',
-            style: TextStyle(
-              fontFamily: 'DM Sans',
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF111827),
+    return RefreshIndicator(
+      onRefresh: _reconnect,
+      color: AppColors.gradientStart,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Aangemeld!',
+              style: TextStyle(
+                fontFamily: 'DM Sans',
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF111827),
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          const Text(
-            'U krijgt een seintje als u door mag rijden.',
-            style: TextStyle(
-              fontFamily: 'DM Sans',
-              fontSize: 14,
-              color: Color(0xFF6B7280),
+            const SizedBox(height: 2),
+            const Text(
+              'U krijgt een seintje als u door mag rijden.',
+              style: TextStyle(
+                fontFamily: 'DM Sans',
+                fontSize: 14,
+                color: Color(0xFF6B7280),
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
+            const SizedBox(height: 14),
 
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 30,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 130,
-                  height: 220,
-                  child: _QueueImage(imageUrl: status.imageUrl),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 130,
+                    height: 220,
+                    child: _QueueImage(imageUrl: status.imageUrl),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  status.queueName,
+                                  style: const TextStyle(
+                                    fontFamily: 'DM Sans',
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0B0B0B),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                width: 18,
+                                height: 18,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF16A34A),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.check,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            status.queueAddress ??
+                                'Wilhelminakade 699, 3072 AP, Rotterdam',
+                            style: const TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 13,
+                              color: Color(0xFF9CA3AF),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'U staat momenteel op plek:',
+                            style: TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Center(
+                            child: Text(
+                              status.position != null
+                                  ? '${status.position}'
+                                  : '-',
+                              style: const TextStyle(
+                                fontFamily: 'DM Sans',
+                                fontSize: 44,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF111827),
+                                height: 1,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: _isLeaving ? null : _onLeave,
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 18,
+                                ),
+                                side: BorderSide(
+                                  color: Colors.black.withValues(alpha: 0.12),
+                                  width: 3,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
+                              ),
                               child: Text(
-                                status.queueName,
+                                _isLeaving ? 'Bezig...' : 'Verlaten',
                                 style: const TextStyle(
                                   fontFamily: 'DM Sans',
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF0B0B0B),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF4B4B4B),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Container(
-                              width: 18,
-                              height: 18,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF16A34A),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.check,
-                                size: 12,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          status.queueAddress ??
-                              'Wilhelminakade 699, 3072 AP, Rotterdam',
-                          style: const TextStyle(
-                            fontFamily: 'DM Sans',
-                            fontSize: 13,
-                            color: Color(0xFF9CA3AF),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'U staat momenteel op plek:',
-                          style: TextStyle(
-                            fontFamily: 'DM Sans',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF111827),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Center(
-                          child: Text(
-                            status.position != null
-                                ? '${status.position}'
-                                : '-',
-                            style: const TextStyle(
-                              fontFamily: 'DM Sans',
-                              fontSize: 44,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF111827),
-                              height: 1,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: _isLeaving ? null : _onLeave,
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 12,
-                                horizontal: 18,
-                              ),
-                              side: BorderSide(
-                                color: Colors.black.withValues(alpha: 0.12),
-                                width: 3,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
-                              ),
-                            ),
-                            child: Text(
-                              _isLeaving ? 'Bezig...' : 'Verlaten',
-                              style: const TextStyle(
-                                fontFamily: 'DM Sans',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF4B4B4B),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          GestureDetector(
-            onTap: _showQueueOverview,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-              decoration: BoxDecoration(
-                color: const Color(0x38E0BD22),
-                border: Border.all(color: const Color(0x99E0BD22)),
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: const Center(
-                child: Text(
-                  'Bekijk volledige wachtrij',
-                  style: TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF2F2F2F),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          if (_connectionError != null)
-            Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 8,
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('🔴', style: TextStyle(fontSize: 12)),
-                    SizedBox(width: 6),
-                    Text(
-                      'Verbinding verbroken',
-                      style: TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF8B1C1C),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            GestureDetector(
+              onTap: _showQueueOverview,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0x38E0BD22),
+                  border: Border.all(color: const Color(0x99E0BD22)),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: const Center(
+                  child: Text(
+                    'Bekijk volledige wachtrij',
+                    style: TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF2F2F2F),
+                    ),
+                  ),
                 ),
               ),
             ),
-        ],
+            const SizedBox(height: 14),
+
+            if (_connectionError != null)
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('🔴', style: TextStyle(fontSize: 12)),
+                      SizedBox(width: 6),
+                      Text(
+                        'Verbinding verbroken',
+                        style: TextStyle(
+                          fontFamily: 'DM Sans',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF8B1C1C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

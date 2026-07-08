@@ -75,6 +75,7 @@ urlpatterns = [
         views.MobileNotificationResponseView.as_view(),
         name="mobile_notification_response",
     ),
+    path("push-token/", views.MobilePushTokenView.as_view(), name="mobile_push_token"),
     # Sequence history endpoints
     path(
         "sequence-history/",

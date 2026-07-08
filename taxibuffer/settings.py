@@ -92,12 +92,7 @@ INSTALLED_APPS = [
 
 ASGI_APPLICATION = "taxibuffer.asgi.application"
 
-# CHANNEL_LAYERS = {
-#     "default": {
-#         "BACKEND": "channels_redis.core.RedisChannelLayer",
-#         "CONFIG": {"hosts": [("127.0.0.1", 6379)]},
-#     }
-# }
+FIREBASE_SERVICE_ACCOUNT_PATH = BASE_DIR / "taxibuffer-83732-firebase-adminsdk-fbsvc-1f27ea710e.json"
 
 Q_CLUSTER = {
     "name": "taxibuffer",

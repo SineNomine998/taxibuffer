@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "235682226959",
+    "project_id": "taxibuffer-83732",
+    "storage_bucket": "taxibuffer-83732.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:235682226959:android:f9d352e283240a8a8b947a",
+        "android_client_info": {
+          "package_name": "com.codingthecurbs.taxibuffer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDtopmwPKmKgGDYa5GCVOmof3Fz1YzDbiQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

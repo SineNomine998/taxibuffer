@@ -41,9 +41,11 @@ class TaxiQueue(models.Model):
         was_active = None
 
         if self.pk:
-            was_active = TaxiQueue.objects.filter(pk=self.pk).values_list(
-                "active", flat=True
-            ).first()
+            was_active = (
+                TaxiQueue.objects.filter(pk=self.pk)
+                .values_list("active", flat=True)
+                .first()
+            )
 
         if not self.name:
             self.name = f"{self.buffer_zone.name} --> {self.pickup_zone.name}"
@@ -178,6 +180,14 @@ class QueueEntry(models.Model):
             self.status = QueueEntry.Status.NOTIFIED
             self.notified_at = timezone.now()
             self.save(update_fields=["status", "notified_at"])
+
+            from mobile_api.push import send_queue_called_push
+
+            transaction.on_commit(
+                lambda notification_id=notification.id: send_queue_called_push(
+                    notification_id
+                )
+            )
 
             return notification
 

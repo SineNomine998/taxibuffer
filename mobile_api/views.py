@@ -30,6 +30,7 @@ from queueing.services import QueueService
 from queueing.constants import ACTIVE_QUEUE_STATUSES
 from geofence.services import point_in_buffer, make_point_from_lat_lng
 from queueing.views import _build_unique_username
+from mobile_api.models import MobilePushToken
 
 logger = logging.getLogger(__name__)
 
@@ -563,6 +564,27 @@ class MobileJoinQueueView(APIView):
                 status=status.HTTP_200_OK,
             )
 
+        has_push_token = MobilePushToken.objects.filter(
+            chauffeur=chauffeur,
+            active=True,
+        ).exists()
+
+        if not has_push_token:
+            logger.warning(
+                "Mobile join failed: no active push token user=%s",
+                request.user.email,
+            )
+            return Response(
+                {
+                    "detail": (
+                        "Meldingen zijn verplicht om deel te nemen aan de wachtrij. "
+                        "Schakel meldingen in en probeer opnieuw."
+                    ),
+                    "code": "notifications_required",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         lat, lng = parse_lat_lng(request.data)
         signup_point = make_point_from_lat_lng(lat, lng, srid=4326)
 
@@ -648,6 +670,33 @@ class MobileJoinQueueView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class MobilePushTokenView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        chauffeur = get_current_chauffeur(request.user)
+
+        token = request.data.get("token")
+        platform = request.data.get("platform", "")
+
+        if not token:
+            return Response(
+                {"detail": "Push token ontbreekt."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        MobilePushToken.objects.update_or_create(
+            token=token,
+            defaults={
+                "chauffeur": chauffeur,
+                "platform": platform,
+                "active": True,
+            },
+        )
+
+        return Response({"success": True}, status=status.HTTP_200_OK)
 
 
 class MobileQueueStatusView(APIView):

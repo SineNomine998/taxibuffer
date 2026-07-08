@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_app/core/permissions/queue_permission_gate.dart';
 import 'package:mobile_app/features/queue/queue_state.dart';
 import 'package:provider/provider.dart';
 import '../../../core/dialogs.dart';
@@ -17,17 +19,101 @@ class LocationSelectionScreen extends StatefulWidget {
       _LocationSelectionScreenState();
 }
 
-class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
+class _LocationSelectionScreenState extends State<LocationSelectionScreen>
+    with WidgetsBindingObserver {
   final _locationService = LocationService();
   List<PickupZone> _queues = [];
   bool _isLoading = true;
   String? _loadError;
   int? _submittingQueueId;
+  final _permissionGate = QueuePermissionGate();
+  QueuePermissionStatus? _permissionStatus;
+  bool _isCheckingPermissions = true;
 
   @override
   void initState() {
     super.initState();
-    _loadQueues();
+
+    WidgetsBinding.instance.addObserver(this);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadQueues();
+      _checkQueuePermissions();
+    });
+  }
+
+  Future<void> _checkQueuePermissions() async {
+    setState(() => _isCheckingPermissions = true);
+
+    try {
+      final status = await _permissionGate.check();
+
+      if (!mounted) return;
+
+      setState(() {
+        _permissionStatus = status;
+      });
+
+      if (!status.canJoinQueue) {
+        await _showPermissionRequiredDialog();
+      }
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _permissionStatus = const QueuePermissionStatus(
+          locationGranted: false,
+          locationPermanentlyDenied: false,
+          notificationGranted: false,
+          notificationPermanentlyDenied: false,
+        );
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingPermissions = false);
+      }
+    }
+  }
+
+  Future<void> _showPermissionRequiredDialog() async {
+    if (!mounted) return;
+
+    final accepted = await showAppConfirm(
+      context: context,
+      title: 'Toestemmingen vereist',
+      message:
+          'Voor een eerlijke wachtrij zijn locatie en meldingen verplicht. '
+          'Locatie controleert of u in de bufferzone bent. Meldingen zorgen dat u uw beurt niet mist.',
+      confirmLabel: 'Toestemmingen geven',
+      cancelLabel: 'Later',
+    );
+
+    if (accepted != true || !mounted) return;
+
+    final status = await _permissionGate.requestMissingPermissions();
+
+    if (!mounted) return;
+
+    setState(() {
+      _permissionStatus = status;
+    });
+
+    if (status.canJoinQueue) {
+      return;
+    }
+
+    final openSettings = await showAppConfirm(
+      context: context,
+      title: 'Instellingen openen',
+      message:
+          'Locatie of meldingen zijn nog uitgeschakeld. Open de app-instellingen om dit handmatig aan te zetten.',
+      confirmLabel: 'Open instellingen',
+      cancelLabel: 'Later',
+    );
+
+    if (openSettings == true) {
+      await Geolocator.openAppSettings();
+    }
   }
 
   Future<void> _loadQueues() async {
@@ -59,6 +145,13 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
   }
 
   Future<void> _onRegister(PickupZone zone) async {
+    final permissionStatus = _permissionStatus;
+
+    if (permissionStatus == null || !permissionStatus.canJoinQueue) {
+      await _showPermissionRequiredDialog();
+      return;
+    }
+
     setState(() => _submittingQueueId = zone.queueId);
 
     try {
@@ -109,12 +202,9 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
       await showAppAlert(
         context: context,
         title: 'Fout',
-        message:
-            'Kon uw locatie niet bepalen. Controleer uw apparaatinstellingen en probeer opnieuw.',
+        message: e.toString().replaceFirst('Exception: ', ''),
         svgAsset: 'assets/pop-up-denied.svg',
       );
-    } finally {
-      if (mounted) setState(() => _submittingQueueId = null);
     }
   }
 
@@ -131,8 +221,23 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
   }
 
   @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkQueuePermissions();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final bool alreadyInQueue = context.watch<QueueState>().isInQueue;
+    final permissionStatus = _permissionStatus;
+    final bool permissionsOk = permissionStatus?.canJoinQueue ?? false;
 
     return AppShellScaffold(
       showHelp: true,
@@ -220,7 +325,12 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                 _ErrorState(message: _loadError!, onRetry: _loadQueues)
               else if (_queues.isEmpty)
                 _EmptyState(onBack: _onEmptyBack)
-              else
+              else ...[
+                if (_permissionStatus != null &&
+                    !_permissionStatus!.canJoinQueue)
+                  _PermissionRequiredCard(
+                    onPressed: _showPermissionRequiredDialog,
+                  ),
                 for (final zone in _queues)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -228,9 +338,11 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
                       zone: zone,
                       isSubmitting: _submittingQueueId == zone.queueId,
                       alreadyInQueue: alreadyInQueue,
+                      permissionsOk: permissionsOk,
                       onRegister: () => _onRegister(zone),
                     ),
                   ),
+              ],
             ],
           ),
         ),
@@ -243,18 +355,20 @@ class _LocationCard extends StatelessWidget {
   final PickupZone zone;
   final bool isSubmitting;
   final bool alreadyInQueue;
+  final bool permissionsOk;
   final VoidCallback onRegister;
 
   const _LocationCard({
     required this.zone,
     required this.isSubmitting,
     required this.alreadyInQueue,
+    required this.permissionsOk,
     required this.onRegister,
   });
 
   @override
   Widget build(BuildContext context) {
-    final disabled = !zone.isActive || alreadyInQueue;
+    final disabled = !zone.isActive || alreadyInQueue || !permissionsOk;
     return Opacity(
       opacity: disabled ? 0.55 : 1.0,
       child: Container(
@@ -348,6 +462,8 @@ class _LocationCard extends StatelessWidget {
                                         ? 'Gesloten'
                                         : alreadyInQueue
                                         ? 'Actieve wachtrij'
+                                        : !permissionsOk
+                                        ? 'Toestemming nodig'
                                         : 'Aanmelden',
                                     style: const TextStyle(
                                       fontFamily: 'DM Sans',
@@ -451,6 +567,54 @@ class _ErrorState extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           TextButton(onPressed: onRetry, child: const Text('Opnieuw proberen')),
+        ],
+      ),
+    );
+  }
+}
+
+class _PermissionRequiredCard extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const _PermissionRequiredCard({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7D6),
+        border: Border.all(color: const Color(0xFFE0BD22)),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Toestemmingen vereist',
+            style: TextStyle(
+              fontFamily: 'DM Sans',
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF111827),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'U kunt pas aanmelden wanneer locatie en meldingen zijn ingeschakeld.',
+            style: TextStyle(
+              fontFamily: 'DM Sans',
+              fontSize: 14,
+              color: Color(0xFF4B5563),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextButton(
+            onPressed: onPressed,
+            child: const Text('Toestemmingen instellen'),
+          ),
         ],
       ),
     );
