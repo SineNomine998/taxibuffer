@@ -172,6 +172,7 @@ Future<bool?> showAppConfirm({
             Row(
               children: [
                 Expanded(
+                  flex: 2,
                   child: OutlinedButton(
                     onPressed: () => Navigator.of(dialogContext).pop(false),
                     style: OutlinedButton.styleFrom(
@@ -196,6 +197,7 @@ Future<bool?> showAppConfirm({
                 ),
                 const SizedBox(width: 10),
                 Expanded(
+                  flex: 3,
                   child: Container(
                     decoration: BoxDecoration(
                       gradient: kGradient,
@@ -213,6 +215,9 @@ Future<bool?> showAppConfirm({
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF222222),
                         ),
+                        // textAlign: TextAlign.center,
+                        // maxLines: 2,
+                        // overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),

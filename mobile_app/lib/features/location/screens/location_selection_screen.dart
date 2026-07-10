@@ -28,7 +28,6 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
   int? _submittingQueueId;
   final _permissionGate = QueuePermissionGate();
   QueuePermissionStatus? _permissionStatus;
-  bool _isCheckingPermissions = true;
 
   @override
   void initState() {
@@ -43,8 +42,6 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
   }
 
   Future<void> _checkQueuePermissions() async {
-    setState(() => _isCheckingPermissions = true);
-
     try {
       final status = await _permissionGate.check();
 
@@ -68,10 +65,6 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
           notificationPermanentlyDenied: false,
         );
       });
-    } finally {
-      if (mounted) {
-        setState(() => _isCheckingPermissions = false);
-      }
     }
   }
 
