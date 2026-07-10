@@ -39,6 +39,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadQueues();
       _checkQueuePermissions();
+      context.read<AccountState>().load();
     });
   }
 
@@ -274,6 +275,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
     final bool alreadyInQueue = context.watch<QueueState>().isInQueue;
     final permissionStatus = _permissionStatus;
     final bool permissionsOk = permissionStatus?.canJoinQueue ?? false;
+    final accountState = context.read<AccountState>();
 
     return AppShellScaffold(
       showHelp: true,
@@ -287,8 +289,8 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Welkom terug!',
+              Text(
+                'Welkom terug ${accountState.profile?.firstName ?? ''}!',
                 style: TextStyle(
                   fontFamily: 'DM Sans',
                   fontSize: 22,
