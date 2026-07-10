@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme.dart';
@@ -14,10 +16,12 @@ class SequenceHistoryScreen extends StatefulWidget {
   State<SequenceHistoryScreen> createState() => _SequenceHistoryScreenState();
 }
 
-class _SequenceHistoryScreenState extends State<SequenceHistoryScreen> {
+class _SequenceHistoryScreenState extends State<SequenceHistoryScreen>
+    with WidgetsBindingObserver {
   final _service = SequenceService();
   List<SequenceNotification> _notifications = [];
   bool _isLoading = true;
+  Timer? _refreshTimer;
   String? _error;
 
   String get _todayDate =>
@@ -26,24 +30,53 @@ class _SequenceHistoryScreenState extends State<SequenceHistoryScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) _load(silent: true);
+    });
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
+
     try {
       final results = await _service.fetchTodaysNotifications();
       if (!mounted) return;
-      setState(() => _notifications = results);
+      setState(() {
+        _notifications = results;
+        _error = null;
+      });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      if (!silent) {
+        setState(() => _error = e.toString());
+      }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted && !silent) {
+        setState(() => _isLoading = false);
+      }
     }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _load(silent: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -131,13 +164,37 @@ class _NumberCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shouldDrive = isTopItem && notification.response == 'accepted';
+    final isActiveCall = notification.isActiveCall;
+    final isHandled = notification.isHandled;
+
+    final Color borderColor = isActiveCall
+        ? const Color(0xFF16A34A)
+        : const Color(0xFFE5E7EB);
+
+    final Color backgroundColor = isActiveCall
+        ? const Color(0xFFF0FDF4)
+        : Colors.white;
+
+    final Color badgeColor = isActiveCall
+        ? const Color(0xFF15803D)
+        : const Color(0xFFE5E7EB);
+
+    final Color badgeTextColor = isActiveCall
+        ? Colors.white
+        : const Color(0xFF374151);
+
+    final String badgeText = isActiveCall
+        ? 'Rij door'
+        : isHandled
+        ? 'Afgehandeld'
+        : 'In behandeling';
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor, width: isActiveCall ? 2 : 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
@@ -155,11 +212,13 @@ class _NumberCard extends StatelessWidget {
               children: [
                 Text(
                   '#${notification.sequenceNumber}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'DM Sans',
-                    fontSize: 28,
+                    fontSize: isActiveCall ? 36 : 28,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF111827),
+                    color: isActiveCall
+                        ? const Color(0xFF15803D)
+                        : const Color(0xFF111827),
                     height: 1,
                   ),
                 ),
@@ -191,35 +250,25 @@ class _NumberCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              shouldDrive
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF7D6),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: const Text(
-                        'Rij door',
-                        style: TextStyle(
-                          fontFamily: 'DM Sans',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF2F2F2F),
-                        ),
-                      ),
-                    )
-                  : const Text(
-                      'Afgehandeld',
-                      style: TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: badgeColor,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  badgeText,
+                  style: TextStyle(
+                    fontFamily: 'DM Sans',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: badgeTextColor,
+                  ),
+                ),
+              ),
             ],
           ),
         ],

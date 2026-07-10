@@ -931,7 +931,7 @@ class MobileSequenceHistoryView(APIView):
                     "id": notification.id,
                     "sequence_number": notification.sequence_number,
                     "response": notification.response,
-                    "entry_status": str(notification.queue_entry.status),
+                    "entry_status": notification.queue_entry.status,
                     "notification_time": (
                         notification.notification_time.isoformat()
                         if notification.notification_time
