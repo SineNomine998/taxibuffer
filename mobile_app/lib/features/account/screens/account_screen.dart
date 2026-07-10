@@ -106,92 +106,100 @@ class _AccountScreenState extends State<AccountScreen> {
 
     return AppShellScaffold(
       activeTab: NavTab.account,
-      child: state.isLoading && state.profile == null
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.gradientStart),
-            )
-          : state.loadError != null && state.profile == null
-          ? _ErrorState(
-              message: state.loadError!,
-              onRetry: () => context.read<AccountState>().load(),
-            )
-          : state.profile == null
-          ? _ErrorState(
-              message: "Accountgegevens konden niet worden geladen.",
-              onRetry: () => context.read<AccountState>().load(),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Account',
-                    style: TextStyle(
-                      fontFamily: 'DM Sans',
-                      fontSize: 30,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1A1A1A),
+      child: RefreshIndicator(
+        onRefresh: () => context.read<AccountState>().load(),
+        color: AppColors.gradientStart,
+        child: state.isLoading && state.profile == null
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.gradientStart,
+                ),
+              )
+            : state.loadError != null && state.profile == null
+            ? _ErrorState(
+                message: state.loadError!,
+                onRetry: () => context.read<AccountState>().load(),
+              )
+            : state.profile == null
+            ? _ErrorState(
+                message: "Accountgegevens konden niet worden geladen.",
+                onRetry: () => context.read<AccountState>().load(),
+              )
+            : SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Account',
+                      style: TextStyle(
+                        fontFamily: 'DM Sans',
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1A1A1A),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'Beheer uw profiel en voertuigen',
-                    style: TextStyle(
-                      fontFamily: 'DM Sans',
-                      fontSize: 16,
-                      color: Color(0xFF313131),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Beheer uw profiel en voertuigen',
+                      style: TextStyle(
+                        fontFamily: 'DM Sans',
+                        fontSize: 16,
+                        color: Color(0xFF313131),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
 
-                  ProfileCard(
-                    profile: state.profile!,
-                    currentVehiclePlate: state.currentVehicle?.licensePlate,
-                    editing: _editingProfile,
-                    formKey: _profileFormKey,
-                    firstNameController: _firstNameController,
-                    lastNameController: _lastNameController,
-                    emailController: _emailController,
-                    rtxController: _rtxController,
-                    isSaving: _isSavingProfile,
-                    onEdit: () => setState(() => _editingProfile = true),
-                    onCancel: () {
-                      _syncControllers();
-                      setState(() => _editingProfile = false);
-                    },
-                    onSave: _saveProfile,
-                    onLogout: _logout,
-                  ),
-                  const SizedBox(height: 14),
+                    ProfileCard(
+                      profile: state.profile!,
+                      currentVehiclePlate: state.currentVehicle?.licensePlate,
+                      editing: _editingProfile,
+                      formKey: _profileFormKey,
+                      firstNameController: _firstNameController,
+                      lastNameController: _lastNameController,
+                      emailController: _emailController,
+                      rtxController: _rtxController,
+                      isSaving: _isSavingProfile,
+                      onEdit: () => setState(() => _editingProfile = true),
+                      onCancel: () {
+                        _syncControllers();
+                        setState(() => _editingProfile = false);
+                      },
+                      onSave: _saveProfile,
+                      onLogout: _logout,
+                    ),
+                    const SizedBox(height: 14),
 
-                  VehiclesCard(
-                    vehicles: state.vehicles,
-                    onSetCurrent: (v) => state.setCurrentVehicle(v),
-                    onRemove: (v) => state.removeVehicle(v),
-                  ),
-                  const SizedBox(height: 14),
+                    VehiclesCard(
+                      vehicles: state.vehicles,
+                      onSetCurrent: (v) => state.setCurrentVehicle(v),
+                      onRemove: (v) => state.removeVehicle(v),
+                    ),
+                    const SizedBox(height: 14),
 
-                  AddVehicleCard(
-                    onAdd: (vehicle) async {
-                      try {
-                        await context.read<AccountState>().addVehicle(vehicle);
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        await showAppAlert(
-                          context: context,
-                          title: 'Fout',
-                          message: e.toString(),
-                          svgAsset: "assets/pop-up-denied.svg",
-                        );
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  const FooterNote(),
-                ],
+                    AddVehicleCard(
+                      onAdd: (vehicle) async {
+                        try {
+                          await context.read<AccountState>().addVehicle(
+                            vehicle,
+                          );
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          await showAppAlert(
+                            context: context,
+                            title: 'Fout',
+                            message: e.toString(),
+                            svgAsset: "assets/pop-up-denied.svg",
+                          );
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    const FooterNote(),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 }

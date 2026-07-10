@@ -1,7 +1,5 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/rendering.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mobile_app/core/notifications/notification_service.dart';
 import '../config/api_client.dart';
@@ -110,24 +108,12 @@ class QueuePermissionGate {
 
   Future<void> _registerPushToken() async {
     final token = await FirebaseMessaging.instance.getToken();
-
-    // TODO! Delete debugging lines.
-    debugPrint('FCM TOKEN: $token');
-
-    if (token == null || token.isEmpty) {
-      debugPrint('FCM token is empty');
-      return;
-    }
-
-    final response = await _api.post(
+    await _api.post(
       '/api/mobile/push-token/',
       body: {
         'token': token,
         'platform': Platform.isAndroid ? 'android' : 'ios',
       },
     );
-
-    debugPrint('Push token register status: ${response.statusCode}');
-    debugPrint('Push token register body: ${response.body}');
   }
 }

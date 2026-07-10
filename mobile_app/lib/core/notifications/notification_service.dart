@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../config/api_client.dart';
@@ -81,8 +80,6 @@ class NotificationService {
 
     final token = await _messaging.getToken();
 
-    debugPrint('FCM TOKEN: $token');
-
     if (token == null || token.isEmpty) return false;
 
     await _registerToken(token);
@@ -91,21 +88,16 @@ class NotificationService {
   }
 
   Future<void> _registerToken(String token) async {
-    final response = await _api.post(
+    await _api.post(
       '/api/mobile/push-token/',
       body: {
         'token': token,
         'platform': Platform.isAndroid ? 'android' : 'ios',
       },
     );
-
-    debugPrint('Push token register status: ${response.statusCode}');
-    debugPrint('Push token register body: ${response.body}');
   }
 
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
-    debugPrint('FCM foreground message data: ${message.data}');
-
     final title = message.notification?.title ?? 'U mag doorrijden';
     final body =
         message.notification?.body ??

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/permissions/queue_permission_gate.dart';
+import 'package:mobile_app/features/account/account_state.dart';
 import 'package:mobile_app/features/queue/queue_state.dart';
 import 'package:provider/provider.dart';
 import '../../../core/dialogs.dart';
@@ -76,7 +77,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
       title: 'Toestemmingen vereist',
       message:
           'Voor een eerlijke wachtrij zijn locatie en meldingen verplicht. '
-          'Locatie controleert of u in de bufferzone bent. Meldingen zorgen dat u uw beurt niet mist.',
+          'We gebruiken uw locatie alleen om te controleren of u in de bufferzone bent. Meldingen zorgen dat u uw beurt niet mist.',
       confirmLabel: 'Toestemmingen geven',
       cancelLabel: 'Later',
     );
@@ -145,6 +146,9 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
       return;
     }
 
+    final confirmed = await _confirmCurrentVehicle();
+    if (confirmed != true || !mounted) return;
+
     setState(() => _submittingQueueId = zone.queueId);
 
     try {
@@ -178,9 +182,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
 
       context.read<QueueState>().setActiveEntry(entryUuid);
       context.go('/queue/$entryUuid');
-    }
-    // TODO: Display permission pop-up again if the user tries to sign up for a queue after declining the permission.
-    on LocationPermissionDeniedException catch (e) {
+    } on LocationPermissionDeniedException catch (e) {
       if (!mounted) return;
       await showAppAlert(
         context: context,
@@ -199,6 +201,47 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
         svgAsset: 'assets/pop-up-denied.svg',
       );
     }
+  }
+
+  Future<bool?> _confirmCurrentVehicle() async {
+    final accountState = context.read<AccountState>();
+
+    if (accountState.currentVehicle == null) {
+      await accountState.load();
+    }
+
+    if (!mounted) return false;
+
+    final currentVehicle = accountState.currentVehicle;
+
+    if (currentVehicle == null) {
+      await showAppAlert(
+        context: context,
+        title: 'Geen voertuig geselecteerd',
+        message:
+            'Selecteer eerst een huidig voertuig voordat u zich aanmeldt voor de wachtrij.',
+        svgAsset: 'assets/pop-up-denied.svg',
+      );
+
+      if (!mounted) return false;
+      context.go('/account');
+      return false;
+    }
+
+    final confirmed = await showAppConfirm(
+      context: context,
+      title: 'Voertuig bevestigen',
+      message:
+          'U meldt zich aan met voertuig: ${currentVehicle.licensePlate}. \nKlopt dit?',
+      confirmLabel: 'Aanmelden',
+      cancelLabel: 'Wijzigen',
+    );
+
+    if (confirmed != true && mounted) {
+      context.go('/account');
+    }
+
+    return confirmed;
   }
 
   Future<void> _onEmptyBack() async {

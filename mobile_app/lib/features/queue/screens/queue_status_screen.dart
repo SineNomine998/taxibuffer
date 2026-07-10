@@ -79,8 +79,6 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
     }
 
     // Notification handling
-    // TODO: When FCM is wired, move this trigger to the FCM onMessage handler
-    // so it fires even when the app is backgrounded. For now, triggers on WS push.
     if (status.hasNotification && status.notification != null) {
       final notifId = status.notification!.id;
       if (!_seenNotificationIds.contains(notifId)) {
