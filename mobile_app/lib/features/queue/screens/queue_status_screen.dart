@@ -28,6 +28,10 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
   String? _connectionError;
   final Set<int> _seenNotificationIds = {};
   StreamSubscription? _subscription;
+  Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
+  bool _isDisposed = false;
+  bool _isReconnecting = false;
 
   @override
   void initState() {
@@ -43,49 +47,119 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
     _connect();
   }
 
-  Future<void> _connect() async {
-    setState(() {
-      _isConnecting = true;
-      _connectionError = null;
-    });
+  Future<void> _connect({bool showLoading = true}) async {
+    if (_isDisposed || !mounted) return;
+
+    if (showLoading) {
+      setState(() {
+        _isConnecting = true;
+        _connectionError = null;
+      });
+    }
+
     try {
+      await _subscription?.cancel();
+      _subscription = null;
+
       await _queueService.connect(widget.entryUuid);
+
       _subscription = _queueService.statusStream.listen(
         _onStatus,
         onError: (e) {
-          if (!mounted) return;
-          setState(() => _connectionError = e.toString());
+          if (_isDisposed || !mounted) return;
+
+          setState(() {
+            _connectionError = 'Verbinding verbroken. Opnieuw verbinden...';
+          });
+
+          _scheduleReconnect();
         },
+        onDone: () {
+          if (_isDisposed || !mounted) return;
+
+          setState(() {
+            _connectionError = 'Verbinding verbroken. Opnieuw verbinden...';
+          });
+
+          _scheduleReconnect();
+        },
+        cancelOnError: false,
       );
-    } catch (e) {
+
       if (!mounted) return;
-      setState(() => _connectionError = e.toString());
+
+      setState(() {
+        _connectionError = null;
+      });
+
+      _reconnectAttempts = 0;
+    } catch (e) {
+      if (_isDisposed || !mounted) return;
+
+      setState(() {
+        _connectionError = e.toString();
+      });
+
+      _scheduleReconnect();
     } finally {
-      if (mounted) setState(() => _isConnecting = false);
+      if (mounted && showLoading) {
+        setState(() => _isConnecting = false);
+      }
     }
   }
 
   void _onStatus(QueueStatus status) {
-    if (!mounted) return;
+    if (_isDisposed || !mounted) return;
+
     setState(() {
       _status = status;
       _connectionError = null;
     });
 
-    // Entry no longer active - dequeued externally.
+    // Entry no longer active: officer/system marked chauffeur as handled/dequeued.
     if (!status.active) {
       _exitQueue();
       return;
     }
 
-    // Notification handling
+    // If the chauffeur is called while this screen is open,
+    // WebSocket shows the in-app popup immediately.
     if (status.hasNotification && status.notification != null) {
-      final notifId = status.notification!.id;
+      final notification = status.notification!;
+      final notifId = notification.id;
+
       if (!_seenNotificationIds.contains(notifId)) {
         _seenNotificationIds.add(notifId);
-        _showTurnNotification(status.notification!);
+        _showTurnNotification(notification);
       }
     }
+  }
+
+  void _scheduleReconnect() {
+    if (_isDisposed || !mounted) return;
+    if (_isReconnecting) return;
+
+    _reconnectTimer?.cancel();
+
+    _reconnectAttempts++;
+
+    final delaySeconds = _reconnectAttempts <= 1
+        ? 2
+        : _reconnectAttempts <= 3
+        ? 5
+        : 10;
+
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () async {
+      if (_isDisposed || !mounted) return;
+
+      _isReconnecting = true;
+
+      try {
+        await _reconnect(showLoading: false);
+      } finally {
+        _isReconnecting = false;
+      }
+    });
   }
 
   /// Clears global queue state and navigates away.
@@ -234,28 +308,36 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
 
   @override
   void dispose() {
+    _isDisposed = true;
+    _reconnectTimer?.cancel();
+
     WidgetsBinding.instance.removeObserver(this);
     _subscription?.cancel();
     _queueService.dispose();
+
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _reconnect();
+      _reconnect(showLoading: false);
     }
   }
 
-  Future<void> _reconnect() async {
+  Future<void> _reconnect({bool showLoading = true}) async {
+    _reconnectTimer?.cancel();
+
     await _subscription?.cancel();
     _subscription = null;
+
     _queueService.dispose();
 
-    if (!mounted) return;
+    if (_isDisposed || !mounted) return;
 
     _queueService = QueueService();
-    await _connect();
+
+    await _connect(showLoading: showLoading);
   }
 
   @override
@@ -283,7 +365,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
     final isNotified = status.isNotified;
 
     return RefreshIndicator(
-      onRefresh: _reconnect,
+      onRefresh: () => _reconnect(showLoading: false),
       color: AppColors.gradientStart,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
