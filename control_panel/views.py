@@ -12,7 +12,19 @@ from accounts.models import ChauffeurVehicle, Officer, User
 from control_panel.services import send_notification_to_vehicle
 from queueing.models import QueueNotification, TaxiQueue, QueueEntry, PushSubscription
 from queueing.push_views import send_web_push
-from django.db.models import Subquery, OuterRef, IntegerField, Count, Q, Case, When, F, Value, CharField, DateTimeField
+from django.db.models import (
+    Subquery,
+    OuterRef,
+    IntegerField,
+    Count,
+    Q,
+    Case,
+    When,
+    F,
+    Value,
+    CharField,
+    DateTimeField,
+)
 from django.db.utils import ProgrammingError
 from queueing.constants import CONTROL_DASHBOARD_CALLED_STATUSES
 
@@ -111,29 +123,28 @@ class OfficerDashboardView(ControlLoginRequiredMixin, View):
         today_start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
         today_start_utc = today_start_local.astimezone(pytz.UTC)
 
-        queues = (
-            TaxiQueue.objects.select_related("buffer_zone", "pickup_zone")
-            .annotate(
-                waiting_count=Count(
-                    "queueentry",
-                    filter=Q(
-                        queueentry__status=QueueEntry.Status.WAITING,
-                        queueentry__created_at__gte=today_start_utc,
-                    ),
-                    distinct=True,
+        queues = TaxiQueue.objects.select_related(
+            "buffer_zone", "pickup_zone"
+        ).annotate(
+            waiting_count=Count(
+                "queueentry",
+                filter=Q(
+                    queueentry__status=QueueEntry.Status.WAITING,
+                    queueentry__created_at__gte=today_start_utc,
                 ),
-                called_count=Count(
-                    "queueentry",
-                    filter=(
-                        Q(queueentry__status__in=CONTROL_DASHBOARD_CALLED_STATUSES) &
-                        (
-                            Q(queueentry__notified_at__gte=today_start_utc) |
-                            Q(queueentry__dequeued_at__gte=today_start_utc)
-                        )
-                    ),
-                    distinct=True,
+                distinct=True,
+            ),
+            called_count=Count(
+                "queueentry",
+                filter=(
+                    Q(queueentry__status__in=CONTROL_DASHBOARD_CALLED_STATUSES)
+                    & (
+                        Q(queueentry__notified_at__gte=today_start_utc)
+                        | Q(queueentry__dequeued_at__gte=today_start_utc)
+                    )
                 ),
-            )
+                distinct=True,
+            ),
         )
 
         context = {"officer": request.user.officer, "queues": queues}
@@ -175,7 +186,8 @@ class QueueMonitorView(ControlLoginRequiredMixin, View):
                 status__in=CONTROL_DASHBOARD_CALLED_STATUSES,
             )
             .filter(
-                Q(notified_at__gte=today_start_utc) | Q(dequeued_at__gte=today_start_utc)
+                Q(notified_at__gte=today_start_utc)
+                | Q(dequeued_at__gte=today_start_utc)
             )
             .annotate(
                 sequence_number=latest_notification_seq,
@@ -265,14 +277,14 @@ class QueueStatusAPIView(ControlLoginRequiredMixin, View):
 
             total_waiting_count = waiting_qs.count()
 
-
             called_qs = (
                 QueueEntry.objects.filter(
                     queue=queue,
                     status__in=CONTROL_DASHBOARD_CALLED_STATUSES,
                 )
                 .filter(
-                    Q(notified_at__gte=today_start_utc) | Q(dequeued_at__gte=today_start_utc)
+                    Q(notified_at__gte=today_start_utc)
+                    | Q(dequeued_at__gte=today_start_utc)
                 )
                 .annotate(
                     sequence_number=latest_notification_seq,
@@ -295,11 +307,29 @@ class QueueStatusAPIView(ControlLoginRequiredMixin, View):
                     "id",
                     "uuid",
                     "license_plate",
+                    "status",
                     "sequence_number",
                     "display_status",
                     "display_time",
                 )
             )
+
+            # Aging implementation for notified entries (to prevent and visualise false negatives in unmarked but arrived chauffeurs)
+            now = timezone.now()
+
+            for entry in called_entries:
+                raw_entry = QueueEntry.objects.filter(id=entry["id"]).first()
+
+                if (
+                    raw_entry
+                    and raw_entry.status == QueueEntry.Status.NOTIFIED
+                    and raw_entry.notified_at
+                ):
+                    entry["notified_age_seconds"] = int(
+                        (now - raw_entry.notified_at).total_seconds()
+                    )
+                else:
+                    entry["notified_age_seconds"] = None
 
             # Format datetimes for display
             for entry in waiting_entries:
@@ -422,4 +452,40 @@ class BypassVehicleView(View):
             result = send_notification_to_vehicle(vehicle_entry, False)
             return JsonResponse(result)
         except Exception as e:
+            return JsonResponse({"success": False, "error": str(e)}, status=400)
+
+
+@method_decorator(user_passes_test(is_officer), name="dispatch")
+class MarkEntryDequeuedView(View):
+    """
+    Officer marks a notified chauffeur as arrived/handled at pickup.
+    This is the official NOTIFIED -> DEQUEUED transition.
+    """
+
+    def post(self, request, queue_id, entry_id):
+        try:
+            queue = get_object_or_404(TaxiQueue, id=queue_id)
+
+            entry = get_object_or_404(
+                QueueEntry,
+                id=entry_id,
+                queue=queue,
+                status=QueueEntry.Status.NOTIFIED,
+            )
+
+            entry.status = QueueEntry.Status.DEQUEUED
+            entry.dequeued_at = timezone.now()
+            entry.save(update_fields=["status", "dequeued_at", "updated_at"])
+
+            return JsonResponse(
+                {
+                    "success": True,
+                    "message": f"{entry.license_plate} is gemarkeerd als aangekomen.",
+                    "entry_id": entry.id,
+                    "status": entry.status,
+                }
+            )
+
+        except Exception as e:
+            logger.exception("Failed to mark entry dequeued")
             return JsonResponse({"success": False, "error": str(e)}, status=400)

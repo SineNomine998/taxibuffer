@@ -37,11 +37,17 @@ class SequenceService {
       final items = data['items'];
 
       if (items is List) {
-        return items
+        final sequenceNumbers = items
             .map(
               (e) => SequenceNotification.fromJson(e as Map<String, dynamic>),
             )
             .toList();
+
+        sequenceNumbers.sort(
+          (a, b) => b.sequenceNumber.compareTo(a.sequenceNumber),
+        );
+
+        return sequenceNumbers;
       }
     }
 

@@ -191,21 +191,13 @@
                     </div>
 
                     <div class="operator-action-buttons">
-                        <button
-                            type="button"
-                            id="callVehicleBtn"
-                            class="btn btn-primary operator-action-btn"
-                            data-queue-id="{{ queue.id }}"
-                        >
+                        <button type="button" id="callVehicleBtn" class="btn btn-primary operator-action-btn"
+                            data-queue-id="{{ queue.id }}">
                             Voertuig nodig
                         </button>
 
-                        <button
-                            type="button"
-                            id="bypassBusjeBtn"
-                            class="btn btn-warning operator-action-btn"
-                            data-queue-id="{{ queue.id }}"
-                        >
+                        <button type="button" id="bypassBusjeBtn" class="btn btn-warning operator-action-btn"
+                            data-queue-id="{{ queue.id }}">
                             Busje nodig
                         </button>
                     </div>
@@ -353,6 +345,14 @@
                                 <div class="text-end">
                                     <small class="timestamp">{{ entry.display_time|time:"H:i:s" }}</small><br>
                                     <small class="text-muted">{{ entry.display_status }}</small>
+
+                                    {% if entry.status == "notified" %}
+                                    <br>
+                                    <button type="button" class="btn btn-success btn-sm mt-2 mark-dequeued-btn"
+                                        data-entry-id="{{ entry.id }}" data-queue-id="{{ queue.id }}">
+                                        Aangekomen
+                                    </button>
+                                    {% endif %}
                                 </div>
                             </div>
                             {% empty %}
@@ -425,13 +425,34 @@
                         // Update called list
                         document.getElementById('calledCount').textContent = data.called_count;
                         updateEntryList('calledList', data.called_entries, entry => {
+                            const age = entry.notified_age_seconds || 0;
+                            const agingClass = entry.status === 'notified' && age > 420
+                                ? 'border border-danger bg-danger-subtle'
+                                : entry.status === 'notified' && age > 180
+                                    ? 'border border-warning bg-warning-subtle'
+                                    : '';
+                            const markButton = entry.status === 'notified'
+                                ? `
+                                    <br>
+                                    <button
+                                        type="button"
+                                        class="btn btn-success btn-sm mt-2 mark-dequeued-btn"
+                                        data-entry-id="${entry.id}"
+                                        data-queue-id="${queueId}"
+                                    >
+                                        Aangekomen
+                                    </button>
+                                `
+                                : '';
+
                             return `
-                                <div class="status-item">
+                               <div class="status-item ${agingClass}">
                                     <span class="license-plate">${entry.license_plate}</span>
                                     <span class="sequence-number">#${entry.sequence_number || '--'}</span>
                                     <div class="text-end">
                                         <small class="timestamp">${entry.display_time}</small><br>
                                         <small class="text-muted">${entry.display_status}</small>
+                                        ${markButton}
                                     </div>
                                 </div>
                             `;
@@ -467,6 +488,54 @@
                 });
                 element.innerHTML = html;
             }
+
+            async function markEntryDequeued(queueId, entryId, buttonElement) {
+                const originalText = buttonElement.textContent;
+                buttonElement.disabled = true;
+                buttonElement.textContent = 'Bezig...';
+
+                try {
+                    const response = await fetch(
+                        `/control/queue/${queueId}/entry/${entryId}/dequeue/`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken'),
+                                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                            }
+                        }
+                    );
+
+                    const data = await response.json();
+
+                    if (!data.success) {
+                        alert('Error: ' + (data.error || 'Kon niet markeren.'));
+                        return;
+                    }
+
+                    updateQueueStatus();
+                } catch (err) {
+                    console.error('Mark dequeued failed', err);
+                    alert('Kon chauffeur niet markeren.');
+                } finally {
+                    buttonElement.disabled = false;
+                    buttonElement.textContent = originalText;
+                }
+            }
+
+            document.addEventListener('click', function (event) {
+                const button = event.target.closest('.mark-dequeued-btn');
+                if (!button) return;
+
+                const queueId = button.dataset.queueId;
+                const entryId = button.dataset.entryId;
+
+                if (!confirm('Chauffeur markeren als aangekomen/afgehandeld?')) {
+                    return;
+                }
+
+                markEntryDequeued(queueId, entryId, button);
+            });
 
             // Initial update
             updateQueueStatus();

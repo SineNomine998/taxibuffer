@@ -35,6 +35,7 @@ class QueueNotification {
 class QueueStatus {
   final bool active;
   final int? position;
+  final String? status;
   final String queueName;
   final String? queueAddress;
   final String? imageUrl;
@@ -45,6 +46,7 @@ class QueueStatus {
   const QueueStatus({
     required this.active,
     this.position,
+    this.status,
     required this.queueName,
     this.queueAddress,
     this.imageUrl,
@@ -53,9 +55,12 @@ class QueueStatus {
     this.notification,
   });
 
+  bool get isNotified => status == 'notified';
+
   factory QueueStatus.fromJson(Map<String, dynamic> json) => QueueStatus(
     active: json['active'] as bool? ?? false,
     position: json['position'] as int?,
+    status: json['status'] as String?,
     queueName: json['queue_name'] as String? ?? '',
     queueAddress: json['queue_address'] as String?,
     imageUrl: json['image_url'] as String?,

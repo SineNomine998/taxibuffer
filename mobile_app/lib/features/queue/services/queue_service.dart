@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:mobile_app/core/config/api_client.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../../core/config/api_config.dart';
 import '../../../core/storage/token_storage.dart';
@@ -10,6 +11,8 @@ class QueueService {
   final TokenStorage _tokenStorage;
   WebSocketChannel? _channel;
   final _controller = StreamController<QueueStatus>.broadcast();
+
+  final ApiClient _apiClient = ApiClient();
 
   // Resolved when the server replies to a leave action.
   Completer<bool>? _leaveCompleter;
@@ -33,7 +36,7 @@ class QueueService {
 
     _channel = WebSocketChannel.connect(uri);
 
-    // Single listener — routes every message type from here.
+    // Single listener - routes every message type from here.
     _channel!.stream.listen(
       _onRawMessage,
       onError: (e) => _controller.addError(e),
@@ -79,6 +82,29 @@ class QueueService {
         return false;
       },
     );
+  }
+
+  Future<void> respondToNotification(
+    int notificationId,
+    String response,
+  ) async {
+    final result = await _apiClient.post(
+      '/api/mobile/notifications/respond/',
+      body: {'notification_id': notificationId, 'response': response},
+    );
+
+    if (result.statusCode != 200) {
+      String message = 'Kon oproep niet bevestigen.';
+
+      try {
+        final data = jsonDecode(result.body);
+        if (data is Map<String, dynamic> && data['detail'] != null) {
+          message = data['detail'].toString();
+        }
+      } catch (_) {}
+
+      throw Exception(message);
+    }
   }
 
   void dispose() {

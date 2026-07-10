@@ -110,24 +110,29 @@ class _NumbersList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: notifications
-          .map(
-            (n) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _NumberCard(notification: n),
-            ),
-          )
-          .toList(),
+      children: List.generate(
+        notifications.length,
+        (index) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _NumberCard(
+            notification: notifications[index],
+            isTopItem: index == 0,
+          ),
+        ),
+      ),
     );
   }
 }
 
 class _NumberCard extends StatelessWidget {
   final SequenceNotification notification;
-  const _NumberCard({required this.notification});
+  final bool isTopItem;
+  const _NumberCard({required this.notification, required this.isTopItem});
 
   @override
   Widget build(BuildContext context) {
+    final shouldDrive = isTopItem && notification.response == 'accepted';
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -186,25 +191,35 @@ class _NumberCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: const Text(
-                  'Opgeroepen',
-                  style: TextStyle(
-                    fontFamily: 'DM Sans',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF166534),
-                  ),
-                ),
-              ),
+              shouldDrive
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7D6),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        'Rij door',
+                        style: TextStyle(
+                          fontFamily: 'DM Sans',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF2F2F2F),
+                        ),
+                      ),
+                    )
+                  : const Text(
+                      'Afgehandeld',
+                      style: TextStyle(
+                        fontFamily: 'DM Sans',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
             ],
           ),
         ],

@@ -560,6 +560,11 @@ class MobileJoinQueueView(APIView):
                     "queue_id": existing_entry.queue_id,
                     "status": existing_entry.status,
                     "position": existing_entry.get_queue_position(),
+                    "detail": (
+                        "U bent al opgeroepen. Ga naar de ophaallocatie."
+                        if existing_entry.status == QueueEntry.Status.NOTIFIED
+                        else "U staat al in een wachtrij."
+                    ),
                 },
                 status=status.HTTP_200_OK,
             )
@@ -622,16 +627,27 @@ class MobileJoinQueueView(APIView):
                 missed_entry = QueueEntry.objects.filter(uuid=entry_uuid).first()
 
                 if missed_entry:
-                    missed_entry.dequeue()
+                    return Response(
+                        {
+                            "success": True,
+                            "already_in_queue": True,
+                            "entry_uuid": str(missed_entry.uuid),
+                            "queue_id": missed_entry.queue_id,
+                            "status": missed_entry.status,
+                            "position": missed_entry.get_queue_position(),
+                            "detail": (
+                                "U bent al opgeroepen. Ga naar de wachtrijstatuspagina."
+                                if missed_entry.status == QueueEntry.Status.NOTIFIED
+                                else "U staat al in een wachtrij."
+                            ),
+                        },
+                        status=status.HTTP_200_OK,
+                    )
 
                 return Response(
                     {
-                        "detail": (
-                            "Er is blijkbaar iets misgegaan bij het aanmelden. "
-                            "Probeer het opnieuw."
-                        ),
-                        "retry_allowed": True,
-                        "entry_uuid": str(entry_uuid),
+                        "detail": "Er is iets misgegaan. Open de wachtrijstatuspagina of probeer opnieuw.",
+                        "code": "queue_state_unknown",
                     },
                     status=status.HTTP_409_CONFLICT,
                 )
@@ -915,6 +931,7 @@ class MobileSequenceHistoryView(APIView):
                     "id": notification.id,
                     "sequence_number": notification.sequence_number,
                     "response": notification.response,
+                    "entry_status": str(notification.queue_entry.status),
                     "notification_time": (
                         notification.notification_time.isoformat()
                         if notification.notification_time

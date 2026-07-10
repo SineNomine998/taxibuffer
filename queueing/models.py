@@ -280,10 +280,12 @@ class QueueNotification(models.Model):
 
         self.response = response_type
         self.response_time = timezone.now()
-        self.save()
+        self.save(update_fields=["response", "response_time"])
 
-        if response_type == self.ResponseType.ACCEPTED:
-            self.queue_entry.dequeue()
+        # I commented this out, because this would dequeue the chauffeur only when they accept the response
+        # which doesn't make much sense in the app's flow and is not user-friendly.
+        # if response_type == self.ResponseType.ACCEPTED:
+        #     self.queue_entry.dequeue()
         # elif response_type == self.ResponseType.DECLINED:
         #     self.queue_entry.decline_notification()
         # elif response_type == self.ResponseType.TIMEOUT:

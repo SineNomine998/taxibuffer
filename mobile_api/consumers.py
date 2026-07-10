@@ -80,9 +80,9 @@ class QueueStatusConsumer(AsyncWebsocketConsumer):
             serialize_waiting_entry(e, chauffeur.id) for e in waiting_entries
         ]
 
-        # Check for unacknowledged notification
+        # Check for unacknowledged notification (in the old flow, the user clicking on "Begrepen" button would mean they acknowledge)
         notification = (
-            QueueNotification.objects.filter(queue_entry=entry, response__isnull=True)
+            QueueNotification.objects.filter(queue_entry=entry, response=QueueNotification.ResponseType.PENDING,)
             .order_by("-notification_time")
             .first()
         )
@@ -94,6 +94,7 @@ class QueueStatusConsumer(AsyncWebsocketConsumer):
         return {
             "type": "status",
             "active": True,
+            "status": entry.status,
             "position": position,
             "queue_name": getattr(pickup_zone, "name", str(queue)),
             "queue_address": getattr(pickup_zone, "address", None),

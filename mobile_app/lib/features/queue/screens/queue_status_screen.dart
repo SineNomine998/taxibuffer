@@ -142,7 +142,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
               ),
               const SizedBox(height: 8),
               const Text(
-                'Rij door naar de ophaallocatie. Volg de borden en laat uw nummer zien.',
+                'Rij door naar de ophaallocatie en laat uw nummer zien.',
                 style: TextStyle(
                   fontFamily: 'DM Sans',
                   fontSize: 15,
@@ -159,16 +159,26 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
                   borderRadius: BorderRadius.circular(28),
                 ),
                 child: TextButton(
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.of(dialogContext).pop();
-                    // TODO: call respondToNotification(notification.id, 'accepted') via HTTP or WebSocket? once endpoint exists
-                    _exitQueue();
+
+                    try {
+                      await _queueService.respondToNotification(
+                        notification.id,
+                        'accepted',
+                      );
+                    } catch (_) {
+                      // Not critical. The chauffeur has already been notified.
+                    }
+
+                    if (!mounted) return;
+                    context.go('/numbers');
                   },
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   child: const Text(
-                    'Begrepen',
+                    'Bekijk oproepnummer',
                     style: TextStyle(
                       fontFamily: 'DM Sans',
                       fontWeight: FontWeight.w800,
@@ -272,6 +282,8 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
       );
     }
 
+    final isNotified = status.isNotified;
+
     return RefreshIndicator(
       onRefresh: _reconnect,
       color: AppColors.gradientStart,
@@ -281,9 +293,9 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Aangemeld!',
-              style: TextStyle(
+            Text(
+              isNotified ? 'U bent opgeroepen!' : 'Aangemeld!',
+              style: const TextStyle(
                 fontFamily: 'DM Sans',
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
@@ -291,9 +303,11 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
               ),
             ),
             const SizedBox(height: 2),
-            const Text(
-              'U krijgt een seintje als u door mag rijden.',
-              style: TextStyle(
+            Text(
+              isNotified
+                  ? 'Rij door naar de ophaallocatie en laat uw nummer zien.'
+                  : 'U krijgt een seintje als u door mag rijden.',
+              style: const TextStyle(
                 fontFamily: 'DM Sans',
                 fontSize: 14,
                 color: Color(0xFF6B7280),
@@ -397,7 +411,9 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
                           SizedBox(
                             width: double.infinity,
                             child: OutlinedButton(
-                              onPressed: _isLeaving ? null : _onLeave,
+                              onPressed: _isLeaving || isNotified
+                                  ? null
+                                  : _onLeave,
                               style: OutlinedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 12,
@@ -412,7 +428,11 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
                                 ),
                               ),
                               child: Text(
-                                _isLeaving ? 'Bezig...' : 'Verlaten',
+                                _isLeaving
+                                    ? 'Bezig...'
+                                    : isNotified
+                                    ? 'Oproep actief'
+                                    : 'Verlaten',
                                 style: const TextStyle(
                                   fontFamily: 'DM Sans',
                                   fontSize: 16,

@@ -133,7 +133,7 @@ class NotificationService {
     final entryUuid = data['entry_uuid'];
 
     if (type == 'queue_called' && entryUuid != null) {
-      router.go('/queue/$entryUuid');
+      router.go('/numbers');
     }
   }
 }
