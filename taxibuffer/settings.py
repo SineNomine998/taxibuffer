@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     "control_panel",
     "dashboard",
     "mobile_api",
+    "compliance",
     "django_q",
 ]
 

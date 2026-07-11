@@ -4,6 +4,18 @@ from . import views
 app_name = "mobile_api"
 
 urlpatterns = [
+    # Privacy endpoints
+    path("bootstrap/", views.MobileBootstrapView.as_view(), name="mobile_bootstrap"),
+    path(
+        "privacy-policy/",
+        views.MobilePrivacyPolicyView.as_view(),
+        name="mobile_privacy_policy",
+    ),
+    path(
+        "privacy-policy/accept/",
+        views.MobileAcceptPrivacyPolicyView.as_view(),
+        name="mobile_accept_privacy_policy",
+    ),
     # Login endpoints
     path("auth/login/", views.MobileLoginView.as_view(), name="mobile_login"),
     path(

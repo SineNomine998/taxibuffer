@@ -4,8 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/dialogs.dart';
 import 'package:mobile_app/core/theme.dart';
 import 'package:mobile_app/features/location/services/location_service.dart';
+import 'package:mobile_app/features/privacy/privacy_gate_state.dart';
+import 'package:mobile_app/features/privacy/services/privacy_service.dart';
 import 'package:mobile_app/widgets/app_logo_row.dart';
 import 'package:mobile_app/widgets/footer_note.dart';
+import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -93,18 +96,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
       TextInput.finishAutofillContext();
 
+      final privacyBootstrap = await PrivacyService().fetchBootstrapStatus();
+
+      if (!mounted) return;
+
+      final privacyGate = context.read<PrivacyGateState>();
+
+      final next = GoRouterState.of(context).uri.queryParameters['next'];
+
+      if (privacyBootstrap.privacyPolicyRequired) {
+        privacyGate.reset();
+
+        final target = next?.isNotEmpty == true ? next! : '/locations';
+
+        context.go('/privacy?next=${Uri.encodeComponent(target)}');
+        return;
+      }
+
+      privacyGate.markAccepted();
+
       final queueState = await LocationService().fetchQueuesState();
 
       if (!mounted) return;
 
-      // Navigate after successful login
       if (queueState.hasActiveQueue) {
         context.go('/queue/${queueState.activeEntryUuid}');
       } else {
-        final next = GoRouterState.of(context).uri.queryParameters['next'];
-
-        if (!mounted) return;
-
         context.go(next?.isNotEmpty == true ? next! : '/locations');
       }
     } catch (e) {

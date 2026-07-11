@@ -30,6 +30,13 @@ from queueing.services import QueueService
 from queueing.constants import ACTIVE_QUEUE_STATUSES
 from geofence.services import point_in_buffer, make_point_from_lat_lng
 from queueing.views import _build_unique_username
+from compliance.models import PrivacyPolicyAcceptance
+from compliance.services import (
+    accept_active_privacy_policy,
+    get_active_privacy_policy,
+    has_accepted_active_privacy_policy,
+)
+from compliance.permissions import HasAcceptedPrivacyPolicy
 from mobile_api.models import MobilePushToken
 
 logger = logging.getLogger(__name__)
@@ -55,6 +62,91 @@ def parse_lat_lng(data):
         return float(lat), float(lng)
     except (TypeError, ValueError):
         raise ValidationError({"detail": "Ongeldige locatiegegevens."})
+
+
+class MobileBootstrapView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        chauffeur = get_current_chauffeur(request.user)
+        policy = get_active_privacy_policy()
+
+        privacy_required = not has_accepted_active_privacy_policy(chauffeur)
+
+        return Response(
+            {
+                "privacy_policy_required": privacy_required,
+                "current_privacy_policy_version": policy.version if policy else None,
+            }
+        )
+
+
+class MobilePrivacyPolicyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        chauffeur = get_current_chauffeur(request.user)
+        policy = get_active_privacy_policy()
+
+        if policy is None:
+            return Response(
+                {"detail": "Geen actieve privacyverklaring gevonden."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        accepted = PrivacyPolicyAcceptance.objects.filter(
+            chauffeur=chauffeur,
+            policy=policy,
+        ).exists()
+
+        return Response(
+            {
+                "id": policy.id,
+                "version": policy.version,
+                "title": policy.title,
+                "body_nl": policy.body_nl,
+                "effective_from": policy.effective_from,
+                "accepted": accepted,
+            }
+        )
+
+
+class MobileAcceptPrivacyPolicyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        chauffeur = get_current_chauffeur(request.user)
+        policy = get_active_privacy_policy()
+
+        if policy is None:
+            return Response(
+                {"detail": "Geen actieve privacyverklaring gevonden."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        version = request.data.get("version")
+
+        if version != policy.version:
+            return Response(
+                {
+                    "detail": "Privacyverklaring versie komt niet overeen.",
+                    "current_version": policy.version,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        acceptance = accept_active_privacy_policy(
+            chauffeur=chauffeur,
+            request=request,
+        )
+
+        return Response(
+            {
+                "success": True,
+                "version": policy.version,
+                "accepted_at": acceptance.accepted_at,
+            }
+        )
 
 
 class MobileLoginView(APIView):
@@ -240,7 +332,7 @@ class MobilePasswordResetView(APIView):
 
 
 class MobileAccountView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
     def get(self, request):
         user = request.user
@@ -274,7 +366,7 @@ class MobileAccountView(APIView):
 
 
 class MobileAccountProfileView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
     def patch(self, request):
         user = request.user
@@ -299,7 +391,7 @@ class MobileAccountProfileView(APIView):
 
 
 class MobileVehicleCreateView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
     def post(self, request):
         chauffeur = get_current_chauffeur(request.user)
@@ -350,7 +442,7 @@ class MobileVehicleCreateView(APIView):
 
 
 class MobileVehicleSetCurrentView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
     def post(self, request, vehicle_id):
         chauffeur = get_current_chauffeur(request.user)
@@ -377,7 +469,7 @@ class MobileVehicleSetCurrentView(APIView):
 
 
 class MobileVehicleDeleteView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
     def delete(self, request, vehicle_id):
         chauffeur = get_current_chauffeur(request.user)
@@ -421,7 +513,7 @@ class MobileVehicleDeleteView(APIView):
 
 
 class MobileQueueListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
     def get(self, request):
         chauffeur = get_current_chauffeur(request.user)
@@ -461,7 +553,7 @@ class MobileQueueListView(APIView):
 
 
 class MobileValidateLocationView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
     def post(self, request, queue_id):
         queue = (
@@ -510,7 +602,7 @@ class MobileValidateLocationView(APIView):
 
 
 class MobileJoinQueueView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
     def post(self, request, queue_id):
         chauffeur = get_current_chauffeur(request.user)
@@ -689,7 +781,7 @@ class MobileJoinQueueView(APIView):
 
 
 class MobilePushTokenView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
     def post(self, request):
         chauffeur = get_current_chauffeur(request.user)
@@ -716,7 +808,7 @@ class MobilePushTokenView(APIView):
 
 
 class MobileQueueStatusView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
     def get(self, request):
         chauffeur = get_current_chauffeur(request.user)
@@ -815,7 +907,7 @@ class MobileQueueStatusView(APIView):
 
 
 class MobileLeaveQueueView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
     def post(self, request):
         chauffeur = get_current_chauffeur(request.user)
@@ -848,7 +940,7 @@ class MobileLeaveQueueView(APIView):
 
 
 class MobileNotificationResponseView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
     def post(self, request):
         chauffeur = get_current_chauffeur(request.user)
@@ -893,7 +985,7 @@ class MobileNotificationResponseView(APIView):
 
 
 class MobileSequenceHistoryView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
     def get(self, request):
         chauffeur = get_current_chauffeur(request.user)

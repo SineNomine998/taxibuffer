@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_app/core/notifications/notification_service.dart';
 import 'package:mobile_app/features/info/screens/info_screen.dart';
+import 'package:mobile_app/features/privacy/privacy_gate_state.dart';
 import 'app.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:mobile_app/features/queue/queue_state.dart';
@@ -16,7 +17,13 @@ void main() async {
   await NotificationService.instance.init();
 
   runApp(
-    ChangeNotifierProvider(create: (_) => QueueState(), child: const App()),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => QueueState()),
+        ChangeNotifierProvider(create: (_) => PrivacyGateState()),
+      ],
+      child: const App(),
+    ),
   );
 }
 

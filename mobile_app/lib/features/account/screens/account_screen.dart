@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_app/features/account/widgets/add_vehicle_card.dart';
 import 'package:mobile_app/features/account/widgets/profile_card.dart';
 import 'package:mobile_app/features/account/widgets/vehicles_card.dart';
+import 'package:mobile_app/features/privacy/privacy_gate_state.dart';
 import 'package:provider/provider.dart';
 import '../../../core/dialogs.dart';
 import '../../../core/theme.dart';
@@ -93,10 +94,17 @@ class _AccountScreenState extends State<AccountScreen> {
       message: 'Weet u zeker dat u wilt uitloggen?',
       confirmLabel: 'Uitloggen',
     );
+
     if (confirmed != true || !context.mounted) return;
+
     await AuthService().logout();
-    if (!context.mounted) return;
+
     if (!mounted) return;
+
+    context.read<PrivacyGateState>().reset();
+
+    if (!mounted) return;
+
     context.go('/login');
   }
 
