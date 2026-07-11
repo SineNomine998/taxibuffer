@@ -3,6 +3,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
 from .vehicle import MobileVehicleSerializer
+from compliance.services import get_active_privacy_policy
 
 User = get_user_model()
 
@@ -15,6 +16,8 @@ class MobileSignUpSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True)
     vehicles = MobileVehicleSerializer(many=True)
+    privacy_policy_version = serializers.CharField()
+    privacy_policy_accepted = serializers.BooleanField()
 
     def validate_email(self, value):
         value = value.lower().strip()
@@ -56,6 +59,23 @@ class MobileSignUpSerializer(serializers.Serializer):
         if current_count > 1:
             raise serializers.ValidationError(
                 {"vehicles": "Er mag maar één huidig voertuig zijn."}
+            )
+
+        policy = get_active_privacy_policy()
+
+        if policy is None:
+            raise serializers.ValidationError(
+                {"privacy_policy": "Geen actieve privacyverklaring gevonden."}
+            )
+
+        if not attrs.get("privacy_policy_accepted"):
+            raise serializers.ValidationError(
+                {"privacy_policy": "Privacyverklaring moet worden geaccepteerd."}
+            )
+
+        if attrs.get("privacy_policy_version") != policy.version:
+            raise serializers.ValidationError(
+                {"privacy_policy": "Privacyverklaring versie komt niet overeen."}
             )
 
         return attrs

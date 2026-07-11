@@ -18,6 +18,8 @@ class SignupFormState extends ChangeNotifier {
 
   // Step 3 - vehicles
   final List<Vehicle> vehicles = [];
+  bool privacyPolicyAccepted = false;
+  String? acceptedPrivacyPolicyVersion;
 
   void setPersonalDetails({
     required String firstName,
@@ -75,6 +77,12 @@ class SignupFormState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void acceptPrivacyPolicy(String version) {
+    privacyPolicyAccepted = true;
+    acceptedPrivacyPolicyVersion = version;
+    notifyListeners();
+  }
+
   Vehicle? get currentVehicle =>
       vehicles.where((v) => v.isCurrent).cast<Vehicle?>().firstOrNull;
 
@@ -91,6 +99,8 @@ class SignupFormState extends ChangeNotifier {
     password = '';
     passwordConfirm = '';
     vehicles.clear();
+    privacyPolicyAccepted = false;
+    acceptedPrivacyPolicyVersion = null;
     notifyListeners();
   }
 }

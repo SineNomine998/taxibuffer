@@ -1,6 +1,9 @@
 import 'dart:convert';
 
+import 'package:mobile_app/core/config/api_config.dart';
+
 import '../../../core/config/api_client.dart';
+import 'package:http/http.dart' as http;
 
 class BootstrapStatus {
   final bool privacyPolicyRequired;
@@ -71,6 +74,22 @@ class PrivacyService {
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return PrivacyPolicyData.fromJson(data);
+  }
+
+  Future<PrivacyPolicyData> fetchPublicPrivacyPolicy() async {
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}/api/mobile/privacy-policy/public/',
+    );
+
+    final response = await http.get(uri);
+
+    if (response.statusCode != 200) {
+      throw Exception('Kon privacyverklaring niet laden.');
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+    return PrivacyPolicyData.fromJson({...data, 'id': 0, 'accepted': false});
   }
 
   Future<void> acceptPrivacyPolicy(String version) async {

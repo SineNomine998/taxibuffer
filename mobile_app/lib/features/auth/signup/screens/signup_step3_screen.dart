@@ -3,7 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/dialogs.dart';
 import 'package:mobile_app/features/auth/services/auth_service.dart';
 import 'package:mobile_app/features/auth/signup/signup_form_state.dart';
+import 'package:mobile_app/features/privacy/privacy_gate_state.dart';
+import 'package:mobile_app/features/privacy/services/privacy_service.dart';
 import 'package:provider/provider.dart';
+
 import '../../../../widgets/app_shell_scaffold.dart';
 import '../../../../widgets/primary_pill_button.dart';
 import '../../../../widgets/secondary_pill_button.dart';
@@ -36,7 +39,7 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
         signupFormState.email.isEmpty ||
         signupFormState.taxiLicenseNumber.isEmpty ||
         signupFormState.password.isEmpty) {
-      showAppAlert(
+      await showAppAlert(
         context: context,
         title: "Onvolledige gegevens",
         message: "Er ontbreken gegevens uit een eerdere stap. Begin opnieuw.",
@@ -46,11 +49,23 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
     }
 
     if (signupFormState.vehicles.isEmpty) {
-      showAppAlert(
+      await showAppAlert(
         context: context,
         title: "Voertuig vereist",
         message: "Voeg minstens één voertuig toe om door te gaan.",
         svgAsset: 'assets/warning-badge.svg',
+      );
+      return;
+    }
+
+    if (!signupFormState.privacyPolicyAccepted ||
+        signupFormState.acceptedPrivacyPolicyVersion == null) {
+      await showAppAlert(
+        context: context,
+        title: "Privacyverklaring vereist",
+        message:
+            "Lees en bevestig de privacyverklaring voordat u een account aanmaakt.",
+        svgAsset: "assets/warning-badge.svg",
       );
       return;
     }
@@ -68,20 +83,35 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
         password: password,
         passwordConfirm: passwordConfirm,
         vehicles: vehicles,
+        privacyPolicyVersion: signupFormState.acceptedPrivacyPolicyVersion!,
+        privacyPolicyAccepted: true,
       );
 
       if (!mounted) return;
 
-      // On success:
       signupFormState.reset();
+
+      final bootstrap = await PrivacyService().fetchBootstrapStatus();
+
+      if (!mounted) return;
+
+      final privacyGate = context.read<PrivacyGateState>();
+
+      if (bootstrap.privacyPolicyRequired) {
+        privacyGate.reset();
+        context.go('/privacy?next=${Uri.encodeComponent('/locations')}');
+        return;
+      }
+
+      privacyGate.markAccepted();
       context.go('/locations');
     } catch (e) {
       if (!mounted) return;
 
       await showAppAlert(
         context: context,
-        title: "Account kon niet worden aangemaakt. Probeer opnieuw.",
-        message: "Er is iets misgegaan.",
+        title: "Account kon niet worden aangemaakt",
+        message: "Er is iets misgegaan. Probeer opnieuw.",
         svgAsset: 'assets/pop-up-denied.svg',
       );
     } finally {
@@ -96,8 +126,10 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
   @override
   Widget build(BuildContext context) {
     final formState = context.watch<SignupFormState>();
+    final privacyAccepted = formState.privacyPolicyAccepted;
     final current = formState.currentVehicle;
     final others = formState.otherVehicles;
+
     return AppShellScaffold(
       showBack: true,
       child: SingleChildScrollView(
@@ -199,13 +231,71 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
             ],
 
             const SizedBox(height: 16),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8D8),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE0BD22)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Privacy',
+                    style: TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF222222),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    privacyAccepted
+                        ? 'Privacyverklaring bevestigd.'
+                        : 'Lees en bevestig de privacyverklaring voordat u een account aanmaakt.',
+                    style: const TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 13,
+                      height: 1.35,
+                      color: Color(0xFF4B4B4B),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () {
+                      context.push(
+                        '/privacy-preview',
+                      );
+                    },
+                    child: Text(
+                      privacyAccepted
+                          ? 'Privacyverklaring opnieuw bekijken'
+                          : 'Privacyverklaring bekijken en bevestigen',
+                      style: const TextStyle(
+                        fontFamily: 'DM Sans',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF8A6A00),
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
             SecondaryPillButton(
               label: '+ Voertuig toevoegen',
               onPressed: () => context.push('/signup/vehicle/add'),
             ),
             const SizedBox(height: 12),
             PrimaryPillButton(
-              label: 'Volgende',
+              label: 'Account aanmaken',
               isLoading: _isLoading,
               onPressed: _isLoading ? null : _finish,
             ),

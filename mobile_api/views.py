@@ -111,6 +111,28 @@ class MobilePrivacyPolicyView(APIView):
         )
 
 
+class PublicPrivacyPolicyView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        policy = get_active_privacy_policy()
+
+        if policy is None:
+            return Response(
+                {"detail": "Geen actieve privacyverklaring gevonden."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "version": policy.version,
+                "title": policy.title,
+                "body_nl": policy.body_nl,
+                "effective_from": policy.effective_from,
+            }
+        )
+
+
 class MobileAcceptPrivacyPolicyView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -279,7 +301,10 @@ class MobileSignUpView(APIView):
                         is_active=True,
                     )
 
+                accept_active_privacy_policy(chauffeur=chauffeur, request=request)
+
         except Exception:
+            logger.exception("Mobile signup failed")
             return Response(
                 {"detail": "Account kon niet worden aangemaakt. Probeer opnieuw."},
                 status=status.HTTP_400_BAD_REQUEST,

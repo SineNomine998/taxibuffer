@@ -7,6 +7,11 @@ urlpatterns = [
     # Privacy endpoints
     path("bootstrap/", views.MobileBootstrapView.as_view(), name="mobile_bootstrap"),
     path(
+        "privacy-policy/public/",
+        views.PublicPrivacyPolicyView.as_view(),
+        name="mobile_public_privacy_policy",
+    ),
+    path(
         "privacy-policy/",
         views.MobilePrivacyPolicyView.as_view(),
         name="mobile_privacy_policy",

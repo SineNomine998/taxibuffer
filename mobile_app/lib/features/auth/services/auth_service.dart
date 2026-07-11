@@ -93,6 +93,8 @@ class AuthService {
     required String password,
     required String passwordConfirm,
     required List<Map<String, dynamic>> vehicles,
+    required String privacyPolicyVersion,
+    required bool privacyPolicyAccepted,
   }) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/mobile/auth/signup/');
 
@@ -107,6 +109,8 @@ class AuthService {
         'password': password,
         'password_confirm': passwordConfirm,
         'vehicles': vehicles,
+        'privacy_policy_version': privacyPolicyVersion,
+        'privacy_policy_accepted': privacyPolicyAccepted,
       }),
     );
 

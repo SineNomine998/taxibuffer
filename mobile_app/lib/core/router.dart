@@ -14,6 +14,7 @@ import 'package:mobile_app/features/info/screens/startup_screen.dart';
 import 'package:mobile_app/features/location/screens/location_selection_info_screen.dart';
 import 'package:mobile_app/features/location/screens/location_selection_screen.dart';
 import 'package:mobile_app/features/privacy/privacy_gate_state.dart';
+import 'package:mobile_app/features/privacy/screens/privacy_policy_preview_screen.dart';
 import 'package:mobile_app/features/privacy/screens/privacy_policy_screen.dart';
 import 'package:mobile_app/features/queue/queue_state.dart';
 import 'package:mobile_app/features/queue/screens/queue_status_screen.dart';
@@ -41,6 +42,7 @@ final GoRouter router = GoRouter(
       '/signup/vehicle',
       '/signup/vehicle/add',
       '/privacy',
+      '/privacy-preview',
     };
 
     final isPublicPath = publicPaths.contains(path);
@@ -122,6 +124,10 @@ final GoRouter router = GoRouter(
         GoRoute(
           path: '/signup/vehicle/add',
           builder: (_, _) => const VehicleAddScreen(),
+        ),
+        GoRoute(
+          path: '/privacy-preview',
+          builder: (_, _) => const PrivacyPolicyPreviewScreen(),
         ),
       ],
     ),
