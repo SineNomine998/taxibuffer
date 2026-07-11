@@ -1,10 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:mobile_app/core/router.dart';
 
 class SessionManager {
-  static final navigatorKey = GlobalKey<NavigatorState>();
+  static bool _isHandlingExpiredSession = false;
 
   static void handleAuthExpired() {
-    navigatorKey.currentContext?.go('/login');
+    if (_isHandlingExpiredSession) return;
+    _isHandlingExpiredSession = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final currentLocation = router.routerDelegate.currentConfiguration.uri
+          .toString();
+
+      final next = Uri.encodeComponent(currentLocation);
+
+      router.go('/login?next=$next');
+
+      Future.delayed(const Duration(seconds: 1), () {
+        _isHandlingExpiredSession = false;
+      });
+    });
   }
 }

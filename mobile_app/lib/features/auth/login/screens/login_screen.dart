@@ -101,7 +101,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (queueState.hasActiveQueue) {
         context.go('/queue/${queueState.activeEntryUuid}');
       } else {
-        context.go('/locations');
+        final next = GoRouterState.of(context).uri.queryParameters['next'];
+
+        if (!mounted) return;
+
+        context.go(next?.isNotEmpty == true ? next! : '/locations');
       }
     } catch (e) {
       if (!mounted) return;

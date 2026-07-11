@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:mobile_app/core/config/api_client.dart';
 import '../../../core/theme.dart';
 import '../../../widgets/app_shell_scaffold.dart';
 import '../../../widgets/bottom_nav.dart';
@@ -48,18 +49,25 @@ class _SequenceHistoryScreenState extends State<SequenceHistoryScreen>
 
     try {
       final results = await _service.fetchTodaysNotifications();
+
       if (!mounted) return;
+
       setState(() {
         _notifications = results;
         _error = null;
       });
-    } catch (e) {
+    } on ApiAuthException {
+      // ApiClient already triggered SessionManager.handleAuthExpired().
+      // So don't show an error message here.
+      return;
+    } catch (_) {
       if (!mounted) return;
-      if (!silent) {
-        setState(() => _error = e.toString());
-      }
+
+      setState(() {
+        _error = 'Kon gegevens niet laden. Probeer opnieuw.';
+      });
     } finally {
-      if (mounted && !silent) {
+      if (mounted) {
         setState(() => _isLoading = false);
       }
     }

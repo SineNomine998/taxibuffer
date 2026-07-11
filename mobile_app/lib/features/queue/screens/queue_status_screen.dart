@@ -47,7 +47,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
     _connect();
   }
 
-  Future<void> _connect({bool showLoading = true}) async {
+  Future<void> _connect({bool showLoading = true, bool forceRefreshToken = false}) async {
     if (_isDisposed || !mounted) return;
 
     if (showLoading) {
@@ -61,7 +61,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
       await _subscription?.cancel();
       _subscription = null;
 
-      await _queueService.connect(widget.entryUuid);
+      await _queueService.connect(widget.entryUuid, forceRefreshToken: forceRefreshToken);
 
       _subscription = _queueService.statusStream.listen(
         _onStatus,
@@ -337,7 +337,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
 
     _queueService = QueueService();
 
-    await _connect(showLoading: showLoading);
+    await _connect(showLoading: showLoading, forceRefreshToken: true);
   }
 
   @override

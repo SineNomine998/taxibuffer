@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_app/core/config/api_client.dart';
 import 'package:mobile_app/core/permissions/queue_permission_gate.dart';
 import 'package:mobile_app/features/account/account_state.dart';
 import 'package:mobile_app/features/queue/queue_state.dart';
@@ -131,9 +132,14 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
       }
 
       setState(() => _queues = state.queues);
-    } catch (e) {
+    } on ApiAuthException {
+      // ApiClient already triggered SessionManager.handleAuthExpired().
+      // So don't show an error message here.
+      return;
+    } catch (_) {
       if (!mounted) return;
-      setState(() => _loadError = e.toString().replaceFirst('Exception: ', ''));
+
+      setState(() => _loadError = 'Kon gegevens niet laden. Probeer opnieuw.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

@@ -98,6 +98,36 @@ class ApiClient {
     }
   }
 
+  Future<String> getAccessTokenOrRefresh() async {
+    final accessToken = await _tokenStorage.getAccessToken();
+
+    if (accessToken != null && accessToken.isNotEmpty) {
+      return accessToken;
+    }
+
+    return refreshAndGetAccessToken();
+  }
+
+  Future<String> refreshAndGetAccessToken() async {
+    final refreshed = await _refreshAccessToken();
+
+    if (!refreshed) {
+      await _tokenStorage.clearTokens();
+      SessionManager.handleAuthExpired();
+      throw ApiAuthException();
+    }
+
+    final newAccessToken = await _tokenStorage.getAccessToken();
+
+    if (newAccessToken == null || newAccessToken.isEmpty) {
+      await _tokenStorage.clearTokens();
+      SessionManager.handleAuthExpired();
+      throw ApiAuthException();
+    }
+
+    return newAccessToken;
+  }
+
   Uri _uri(String path, [Map<String, String>? queryParams]) {
     final base = Uri.parse(ApiConfig.baseUrl);
     final uri = base.replace(path: path.startsWith('/') ? path : '/$path');

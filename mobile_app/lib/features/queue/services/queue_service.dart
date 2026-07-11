@@ -4,27 +4,28 @@ import 'package:flutter/foundation.dart';
 import 'package:mobile_app/core/config/api_client.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../../core/config/api_config.dart';
-import '../../../core/storage/token_storage.dart';
 import '../models/queue_status.dart';
 
 class QueueService {
-  final TokenStorage _tokenStorage;
   WebSocketChannel? _channel;
   final _controller = StreamController<QueueStatus>.broadcast();
 
-  final ApiClient _apiClient = ApiClient();
+  final ApiClient _apiClient;
 
   // Resolved when the server replies to a leave action.
   Completer<bool>? _leaveCompleter;
 
-  QueueService({TokenStorage? tokenStorage})
-    : _tokenStorage = tokenStorage ?? TokenStorage();
+  QueueService({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
   Stream<QueueStatus> get statusStream => _controller.stream;
 
-  Future<void> connect(String entryUuid) async {
-    final token = await _tokenStorage.getAccessToken();
-    if (token == null) throw Exception('Niet ingelogd.');
+  Future<void> connect(
+    String entryUuid, {
+    bool forceRefreshToken = false,
+  }) async {
+    final token = forceRefreshToken
+        ? await _apiClient.refreshAndGetAccessToken()
+        : await _apiClient.getAccessTokenOrRefresh();
 
     final wsBase = ApiConfig.baseUrl
         .replaceFirst('https://', 'wss://')
@@ -36,16 +37,22 @@ class QueueService {
 
     _channel = WebSocketChannel.connect(uri);
 
-    // Single listener - routes every message type from here.
     _channel!.stream.listen(
       _onRawMessage,
-      onError: (e) => _controller.addError(e),
+      onError: (e) {
+        if (!_controller.isClosed) {
+          _controller.addError(e);
+        }
+      },
       onDone: () {
         if (!_controller.isClosed) {
           _controller.addError(Exception('Verbinding verbroken.'));
         }
-        // If we were waiting for a leave_result that never came, resolve false.
-        _leaveCompleter?.complete(false);
+
+        if (_leaveCompleter != null && !_leaveCompleter!.isCompleted) {
+          _leaveCompleter!.complete(false);
+        }
+
         _leaveCompleter = null;
       },
     );
@@ -58,14 +65,17 @@ class QueueService {
     switch (data['type']) {
       case 'status':
         _controller.add(QueueStatus.fromJson(data));
+        break;
       case 'leave_result':
         final success = data['success'] as bool? ?? false;
         _leaveCompleter?.complete(success);
         _leaveCompleter = null;
+        break;
       case 'error':
         _controller.addError(
           Exception(data['detail']?.toString() ?? 'WebSocket error'),
         );
+        break;
     }
   }
 
@@ -108,9 +118,17 @@ class QueueService {
   }
 
   void dispose() {
-    _leaveCompleter?.complete(false);
+    if (_leaveCompleter != null && !_leaveCompleter!.isCompleted) {
+      _leaveCompleter!.complete(false);
+    }
+
     _leaveCompleter = null;
     _channel?.sink.close();
-    _controller.close();
+
+    if (!_controller.isClosed) {
+      _controller.close();
+    }
+
+    _apiClient.dispose();
   }
 }
