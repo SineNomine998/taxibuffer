@@ -59,4 +59,16 @@ class AccountService {
       throw Exception(jsonDecode(response.body)['detail']);
     }
   }
+
+  Future<Vehicle> adjustVehicle(Vehicle vehicle) async {
+    final response = await _api.patch(
+      '/api/mobile/account/vehicles/${vehicle.id}/',
+      body: vehicle.toJson(),
+    );
+    if (response.statusCode != 200) {
+      throw Exception(jsonDecode(response.body)['detail'] ?? 'Voertuig bijwerken mislukt.');
+    }
+
+    return Vehicle.fromJson(jsonDecode(response.body));
+  }
 }

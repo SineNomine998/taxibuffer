@@ -61,8 +61,8 @@ urlpatterns = [
     ),
     path(
         "account/vehicles/<int:vehicle_id>/",
-        views.MobileVehicleDeleteView.as_view(),
-        name="mobile_vehicle_delete",
+        views.MobileVehicleDetailView.as_view(),
+        name="mobile_vehicle_delete_and_adjust",
     ),
     # Queue endpoints
     path("queues/", views.MobileQueueListView.as_view(), name="mobile_queue_list"),

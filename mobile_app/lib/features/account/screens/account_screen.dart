@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_app/core/models/vehicle.dart';
 import 'package:mobile_app/features/account/widgets/add_vehicle_card.dart';
+import 'package:mobile_app/features/account/widgets/edit_vehicle_sheet.dart';
 import 'package:mobile_app/features/account/widgets/profile_card.dart';
 import 'package:mobile_app/features/account/widgets/vehicles_card.dart';
 import 'package:mobile_app/features/privacy/privacy_gate_state.dart';
@@ -84,6 +86,45 @@ class _AccountScreenState extends State<AccountScreen> {
       );
     } finally {
       if (mounted) setState(() => _isSavingProfile = false);
+    }
+  }
+
+  Future<void> _openEditVehicleSheet(Vehicle vehicle) async {
+    final editedVehicle = await showModalBottomSheet<Vehicle>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) {
+        return EditVehicleSheet(vehicle: vehicle);
+      },
+    );
+
+    if (editedVehicle == null || !mounted) return;
+
+    try {
+      await context.read<AccountState>().adjustVehicle(editedVehicle);
+
+      if (!mounted) return;
+
+      await showAppAlert(
+        context: context,
+        title: 'Voertuig bijgewerkt',
+        message: 'De voertuiggegevens zijn opgeslagen.',
+        svgAsset: 'assets/check-badge.svg',
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      await showAppAlert(
+        context: context,
+        title: 'Fout',
+        message: e.toString(),
+        svgAsset: 'assets/pop-up-denied.svg',
+      );
     }
   }
 
@@ -205,7 +246,8 @@ class _AccountScreenState extends State<AccountScreen> {
                             svgAsset: "assets/pop-up-denied.svg",
                           );
                         }
-                      }
+                      },
+                      onAdjust: _openEditVehicleSheet,
                     ),
                     const SizedBox(height: 14),
 

@@ -510,7 +510,7 @@ class MobileVehicleSetCurrentView(APIView):
         return Response(MobileVehicleSerializer(vehicle).data)
 
 
-class MobileVehicleDeleteView(APIView):
+class MobileVehicleDetailView(APIView):
     permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
     def delete(self, request, vehicle_id):
@@ -561,6 +561,58 @@ class MobileVehicleDeleteView(APIView):
                     replacement.save(update_fields=["is_current"])
 
         return Response(status=204)
+
+    def patch(self, request, vehicle_id):
+        chauffeur = get_current_chauffeur(request.user)
+
+        try:
+            vehicle = ChauffeurVehicle.objects.get(
+                id=vehicle_id,
+                chauffeur=chauffeur,
+                is_active=True,
+            )
+        except ChauffeurVehicle.DoesNotExist:
+            raise ValidationError({"detail": "Voertuig niet gevonden."})
+
+        serializer = MobileVehicleSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        license_plate = normalize_license_plate(data["license_plate"])
+
+        if (
+            ChauffeurVehicle.objects.filter(
+                chauffeur=chauffeur,
+                license_plate__iexact=license_plate,
+                is_active=True,
+            )
+            .exclude(id=vehicle.id)
+            .exists()
+        ):
+            raise ValidationError({"detail": "Dit kenteken is al toegevoegd."})
+
+        if vehicle.is_current and QueueEntry.objects.filter(
+            chauffeur=chauffeur, status__in=ACTIVE_QUEUE_STATUSES
+        ):
+            raise ValidationError(
+                {
+                    "detail": "Het is niet toegestaan om het voertuig te bewerken waarmee u zich heeft aangemeld voor een actieve wachtrij."
+                }
+            )
+
+        with transaction.atomic():
+            vehicle.license_plate = license_plate
+            vehicle.nickname = data["nickname"]
+            vehicle.vehicle_type = data["vehicle_type"]
+            vehicle.save(update_fields=["license_plate", "nickname", "vehicle_type"])
+
+        return Response(
+            MobileVehicleSerializer(vehicle).data,
+            status=status.HTTP_200_OK,
+        )
 
 
 class MobileQueueListView(APIView):

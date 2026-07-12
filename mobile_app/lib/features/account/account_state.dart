@@ -85,4 +85,17 @@ class AccountState extends ChangeNotifier {
     vehicles.removeWhere((v) => v.id == target.id);
     notifyListeners();
   }
+
+  Future<void> adjustVehicle(Vehicle target) async {
+    final saved = await _accountService.adjustVehicle(target);
+
+    await load();
+
+    vehicles = vehicles.map((v) {
+      if (v.id != saved.id) return v;
+      return saved;
+    }).toList();
+
+    notifyListeners();
+  }
 }

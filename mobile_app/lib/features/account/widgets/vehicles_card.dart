@@ -6,11 +6,13 @@ class VehiclesCard extends StatelessWidget {
   final List<Vehicle> vehicles;
   final void Function(Vehicle) onSetCurrent;
   final void Function(Vehicle) onRemove;
+  final void Function(Vehicle) onAdjust;
 
   const VehiclesCard({
     required this.vehicles,
     required this.onSetCurrent,
     required this.onRemove,
+    required this.onAdjust,
     super.key,
   });
 
@@ -80,9 +82,11 @@ class VehiclesCard extends StatelessWidget {
                             ),
                           if (!v.isCurrent) const SizedBox(width: 8),
                           _ActionChip(
-                            label: 'Verwijder',
+                            label: 'Verwijderen',
                             onTap: () => onRemove(v),
                           ),
+                          const SizedBox(width: 8,),
+                          _ActionChip(label: "Bewerken", onTap: () => onAdjust(v))
                         ],
                       ),
                     ),
