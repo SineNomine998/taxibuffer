@@ -2,13 +2,17 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/api_client.dart';
 import '../router.dart';
 
 class NotificationService {
   static final NotificationService instance = NotificationService._internal();
+  static const _handledNotificationKey = 'handled_notification_ids';
+  bool _initialized = false;
 
   NotificationService._internal();
 
@@ -27,18 +31,33 @@ class NotificationService {
       );
 
   Future<void> init() async {
-    const androidInit = AndroidInitializationSettings('@drawable/ic_notification');
+    if (_initialized) return;
+    _initialized = true;
+    const androidInit = AndroidInitializationSettings(
+      '@drawable/ic_notification',
+    );
 
     const initSettings = InitializationSettings(android: androidInit);
 
     await _localNotifications.initialize(
       settings: initSettings,
-      onDidReceiveNotificationResponse: (response) {
+      onDidReceiveNotificationResponse: (response) async {
         final payload = response.payload;
-        if (payload == null || payload.isEmpty) return;
+        if (payload == null) return;
 
         final data = jsonDecode(payload) as Map<String, dynamic>;
-        _handleNotificationData(data);
+        final notificationId = data['notification_id']?.toString();
+
+        if (notificationId != null && notificationId.isNotEmpty) {
+          await _localNotifications.cancel(id: int.parse(notificationId));
+        }
+
+        if (notificationId != null && notificationId.isNotEmpty) {
+          final shouldHandle = await _markNotificationSeen(notificationId);
+          if (!shouldHandle) return;
+        }
+
+        await _handleNotificationData(data);
       },
     );
 
@@ -48,15 +67,37 @@ class NotificationService {
         >()
         ?.createNotificationChannel(_queueChannel);
 
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    FirebaseMessaging.onMessage.listen((message) async {
+      final notificationId = message.data['notification_id']?.toString();
+      if (notificationId == null || notificationId.isEmpty) return;
 
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      _handleNotificationData(message.data);
+      final shouldShow = await _markNotificationSeen(notificationId);
+      if (!shouldShow) return;
+
+      await _handleForegroundMessage(message);
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((message) async {
+      final notificationId = message.data['notification_id']?.toString();
+
+      if (notificationId != null && notificationId.isNotEmpty) {
+        final shouldHandle = await _markNotificationSeen(notificationId);
+        if (!shouldHandle) return;
+      }
+
+      await _handleNotificationData(message.data);
     });
 
     final initialMessage = await _messaging.getInitialMessage();
     if (initialMessage != null) {
-      _handleNotificationData(initialMessage.data);
+      final notificationId = initialMessage.data['notification_id']?.toString();
+
+      if (notificationId != null && notificationId.isNotEmpty) {
+        final shouldHandle = await _markNotificationSeen(notificationId);
+        if (!shouldHandle) return;
+      }
+
+      await _handleNotificationData(initialMessage.data);
     }
 
     _messaging.onTokenRefresh.listen((newToken) {
@@ -102,9 +143,14 @@ class NotificationService {
     final body =
         message.notification?.body ??
         'U bent aan de beurt. Rij naar de ophaallocatie.';
+    final notificationId = int.tryParse(
+      message.data['notification_id']?.toString() ?? '',
+    );
+
+    if (notificationId == null) return;
 
     await _localNotifications.show(
-      id: message.hashCode,
+      id: notificationId,
       title: title,
       body: body,
       notificationDetails: NotificationDetails(
@@ -121,12 +167,61 @@ class NotificationService {
     );
   }
 
-  void _handleNotificationData(Map<String, dynamic> data) {
+  Future<void> _handleNotificationData(Map<String, dynamic> data) async {
     final type = data['type'];
-    final entryUuid = data['entry_uuid'];
+    if (type != 'queue_called') return;
 
-    if (type == 'queue_called' && entryUuid != null) {
-      router.go('/numbers');
+    final notificationId = data['notification_id']?.toString();
+
+    if (notificationId != null && notificationId.isNotEmpty) {
+      final shouldHandle = await _markNotificationHandled(notificationId);
+      if (!shouldHandle) return;
     }
+
+    try {
+      await _api.refreshAndGetAccessToken();
+    } catch (_) {
+      router.go('/login?next=${Uri.encodeComponent('/numbers')}');
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      router.go('/numbers');
+    });
+  }
+
+  Future<bool> _markNotificationHandled(String notificationId) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final handled = prefs.getStringList(_handledNotificationKey) ?? [];
+
+    if (handled.contains(notificationId)) {
+      return false;
+    }
+
+    handled.add(notificationId);
+
+    // Keep list small.
+    final trimmed = handled.length > 50
+        ? handled.sublist(handled.length - 50)
+        : handled;
+
+    await prefs.setStringList(_handledNotificationKey, trimmed);
+
+    return true;
+  }
+
+  Future<bool> _markNotificationSeen(String notificationId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getStringList('seen_notification_ids') ?? [];
+
+    if (seen.contains(notificationId)) return false;
+
+    seen.add(notificationId);
+
+    final trimmed = seen.length > 50 ? seen.sublist(seen.length - 50) : seen;
+
+    await prefs.setStringList('seen_notification_ids', trimmed);
+    return true;
   }
 }
