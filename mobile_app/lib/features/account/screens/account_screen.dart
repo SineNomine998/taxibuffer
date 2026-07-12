@@ -180,8 +180,32 @@ class _AccountScreenState extends State<AccountScreen> {
 
                     VehiclesCard(
                       vehicles: state.vehicles,
-                      onSetCurrent: (v) => state.setCurrentVehicle(v),
-                      onRemove: (v) => state.removeVehicle(v),
+                      onSetCurrent: (v) async {
+                        try {
+                          await state.setCurrentVehicle(v);
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          await showAppAlert(
+                            context: context,
+                            title: 'Fout',
+                            message: e.toString(),
+                            svgAsset: "assets/pop-up-denied.svg",
+                          );
+                        }
+                      },
+                      onRemove: (v) async {
+                        try {
+                          await state.removeVehicle(v);
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          await showAppAlert(
+                            context: context,
+                            title: 'Fout',
+                            message: e.toString(),
+                            svgAsset: "assets/pop-up-denied.svg",
+                          );
+                        }
+                      }
                     ),
                     const SizedBox(height: 14),
 

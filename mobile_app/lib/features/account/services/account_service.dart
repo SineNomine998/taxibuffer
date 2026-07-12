@@ -45,7 +45,8 @@ class AccountService {
       '/api/mobile/account/vehicles/$vehicleId/set-current/',
     );
     if (response.statusCode != 200) {
-      throw Exception('Kon huidig voertuig niet instellen.');
+      // throw Exception('Kon huidig voertuig niet instellen.');
+      throw Exception(jsonDecode(response.body)['detail']);
     }
   }
 
@@ -54,7 +55,8 @@ class AccountService {
       '/api/mobile/account/vehicles/$vehicleId/',
     );
     if (response.statusCode != 204 && response.statusCode != 200) {
-      throw Exception('Kon voertuig niet verwijderen.');
+      // throw Exception('Kon voertuig niet verwijderen.');
+      throw Exception(jsonDecode(response.body)['detail']);
     }
   }
 }

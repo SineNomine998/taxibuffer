@@ -446,6 +446,14 @@ class MobileVehicleCreateView(APIView):
             make_current = data.get("is_current", False) or not has_vehicle
 
             if make_current:
+                if QueueEntry.objects.filter(
+                    chauffeur=chauffeur, status__in=ACTIVE_QUEUE_STATUSES
+                ):
+                    raise ValidationError(
+                        {
+                            "detail": "Het is niet toegestaan om van voertuig te wisselen tijdens een actieve wachtrij deelname."
+                        }
+                    )
                 ChauffeurVehicle.objects.filter(
                     chauffeur=chauffeur,
                     is_active=True,
@@ -471,6 +479,15 @@ class MobileVehicleSetCurrentView(APIView):
 
     def post(self, request, vehicle_id):
         chauffeur = get_current_chauffeur(request.user)
+
+        if QueueEntry.objects.filter(
+            chauffeur=chauffeur, status__in=ACTIVE_QUEUE_STATUSES
+        ):
+            raise ValidationError(
+                {
+                    "detail": "Het is niet toegestaan om van voertuig te wisselen tijdens een actieve wachtrij deelname."
+                }
+            )
 
         try:
             vehicle = ChauffeurVehicle.objects.get(
@@ -513,6 +530,15 @@ class MobileVehicleDeleteView(APIView):
             raise ValidationError({"detail": "U moet minimaal één voertuig behouden."})
 
         was_current = vehicle.is_current
+
+        if was_current and QueueEntry.objects.filter(
+            chauffeur=chauffeur, status__in=ACTIVE_QUEUE_STATUSES
+        ):
+            raise ValidationError(
+                {
+                    "detail": "Het is niet toegestaan om het voertuig te verwijderen waarmee u zich heeft aangemeld voor een actieve wachtrij."
+                }
+            )
 
         with transaction.atomic():
             vehicle.is_active = False
