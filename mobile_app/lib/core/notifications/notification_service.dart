@@ -27,7 +27,7 @@ class NotificationService {
       );
 
   Future<void> init() async {
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings('@drawable/ic_notification');
 
     const initSettings = InitializationSettings(android: androidInit);
 
@@ -114,6 +114,7 @@ class NotificationService {
           channelDescription: _queueChannel.description,
           importance: Importance.high,
           priority: Priority.high,
+          icon: '@drawable/ic_notification',
         ),
       ),
       payload: jsonEncode(message.data),
