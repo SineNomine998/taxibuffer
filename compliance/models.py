@@ -31,7 +31,6 @@ class PrivacyPolicyAcceptance(models.Model):
     )
 
     accepted_at = models.DateTimeField(auto_now_add=True)
-    accepted_ip = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(blank=True)
 
     class Meta:

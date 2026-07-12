@@ -12,7 +12,7 @@ class PrivacyPolicyAdmin(admin.ModelAdmin):
 
 @admin.register(PrivacyPolicyAcceptance)
 class PrivacyPolicyAcceptanceAdmin(admin.ModelAdmin):
-    list_display = ("chauffeur", "policy", "accepted_at", "accepted_ip")
+    list_display = ("chauffeur", "policy", "accepted_at")
     list_filter = ("policy", "accepted_at")
     search_fields = (
         "chauffeur__user__email",
@@ -23,6 +23,5 @@ class PrivacyPolicyAcceptanceAdmin(admin.ModelAdmin):
         "chauffeur",
         "policy",
         "accepted_at",
-        "accepted_ip",
         "user_agent",
     )

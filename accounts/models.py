@@ -54,7 +54,7 @@ class Chauffeur(models.Model):
 
     def __str__(self):
         plate = self.current_license_plate or "No current vehicle"
-        return f"License plate: {plate} (RTX-nummer: {self.taxi_license_number})"
+        return f"Name: {self.user.first_name} {self.user.last_name}, License plate: {plate} (RTX-nummer: {self.taxi_license_number})"
 
 
 class Officer(models.Model):
