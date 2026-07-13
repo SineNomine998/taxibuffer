@@ -86,6 +86,11 @@ urlpatterns = [
         views.MobileLeaveQueueView.as_view(),
         name="mobile_leave_queue",
     ),
+    path(
+        "queue/<uuid:entry_uuid>/location-report/",
+        views.MobileQueueLocationReportView.as_view(),
+        name="mobile_queue_location_report",
+    ),
     # Notification endpoints
     path(
         "notifications/respond/",

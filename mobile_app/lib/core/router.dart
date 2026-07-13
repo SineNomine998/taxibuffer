@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/features/account/account_state.dart';
 import 'package:mobile_app/features/account/screens/account_screen.dart';
@@ -23,7 +24,10 @@ import 'package:provider/provider.dart';
 
 import 'app_state.dart';
 
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final GoRouter router = GoRouter(
+  navigatorKey: rootNavigatorKey,
   initialLocation: '/',
   refreshListenable: privacyGateState,
   redirect: (context, state) {

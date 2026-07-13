@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_app/core/notifications/notification_service.dart';
 import 'package:mobile_app/features/info/screens/info_screen.dart';
 import 'package:mobile_app/features/privacy/privacy_gate_state.dart';
+import 'package:mobile_app/features/queue/queue_location_tracker.dart';
 import 'app.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:mobile_app/features/queue/queue_state.dart';
@@ -21,6 +22,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => QueueState()),
         ChangeNotifierProvider(create: (_) => PrivacyGateState()),
+        ChangeNotifierProvider(create: (_) => QueueLocationTracker()),
       ],
       child: const App(),
     ),

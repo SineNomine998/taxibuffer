@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_app/core/config/api_client.dart';
+import 'package:mobile_app/features/queue/queue_tracking_sync.dart';
 import '../../../core/theme.dart';
 import '../../../widgets/app_shell_scaffold.dart';
 import '../../../widgets/bottom_nav.dart';
@@ -32,6 +33,10 @@ class _SequenceHistoryScreenState extends State<SequenceHistoryScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await syncQueueTracking(context);
+    });
     _load();
 
     _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {

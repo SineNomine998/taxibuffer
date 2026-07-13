@@ -1,6 +1,7 @@
 import logging
 import pytz
 
+from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 from django.contrib.auth import get_user_model, authenticate
@@ -640,6 +641,15 @@ class MobileQueueListView(APIView):
             .first()
         )
 
+        is_waiting = (
+            QueueEntry.objects.filter(
+                chauffeur=chauffeur, status=QueueEntry.Status.WAITING
+            )
+            .select_related("queue")
+            .order_by("-created_at")
+            .first()
+        )
+
         queues = (
             TaxiQueue.objects.filter(active=True)
             .select_related("buffer_zone", "pickup_zone")
@@ -650,6 +660,7 @@ class MobileQueueListView(APIView):
             {
                 "active_entry_uuid": str(active_entry.uuid) if active_entry else None,
                 "already_in_queue": active_entry is not None,
+                "actively_waiting": is_waiting is not None,
                 "queues": [serialize_queue(queue, request) for queue in queues],
             }
         )
@@ -1143,5 +1154,152 @@ class MobileSequenceHistoryView(APIView):
             {
                 "date": now_local.strftime("%d-%m-%Y"),
                 "items": items,
+            }
+        )
+
+
+class MobileQueueLocationReportView(APIView):
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
+
+    GRACE_PERIOD = timedelta(minutes=1)
+
+    def post(self, request, entry_uuid):
+        chauffeur = get_current_chauffeur(request.user)
+
+        entry = (
+            QueueEntry.objects.select_related("queue", "queue__buffer_zone")
+            .filter(uuid=entry_uuid, chauffeur=chauffeur)
+            .first()
+        )
+
+        if entry is None:
+            raise NotFound("Wachtrij-item niet gevonden.")
+
+        if entry.status != QueueEntry.Status.WAITING:
+            return Response(
+                {
+                    "success": True,
+                    "action": "ignored",
+                    "status": entry.status,
+                }
+            )
+
+        lat = request.data.get("lat")
+        lng = request.data.get("lng")
+
+        if lat is None or lng is None:
+            raise ValidationError({"detail": "Locatiegegevens ontbreken."})
+
+        try:
+            lat = float(lat)
+            lng = float(lng)
+        except ValueError:
+            raise ValidationError({"detail": "Ongeldige locatiegegevens."})
+
+        now = timezone.now()
+
+        entry.last_location_at = now
+        entry.last_location_lat = lat
+        entry.last_location_lng = lng
+
+        buffer_zone = getattr(entry.queue, "buffer_zone", None)
+
+        if buffer_zone is None:
+            entry.save(
+                update_fields=[
+                    "last_location_at",
+                    "last_location_lat",
+                    "last_location_lng",
+                ]
+            )
+            return Response({"success": True, "action": "no_buffer"})
+
+        inside = point_in_buffer(buffer_zone, lat, lng, inclusive=True)
+
+        if inside:
+            entry.location_lost_at = None
+            entry.location_warning_sent_at = None
+            entry.save(
+                update_fields=[
+                    "last_location_at",
+                    "last_location_lat",
+                    "last_location_lng",
+                    "location_lost_at",
+                    "location_warning_sent_at",
+                ]
+            )
+
+            return Response(
+                {
+                    "success": True,
+                    "action": "inside_buffer",
+                    "dequeued": False,
+                }
+            )
+
+        if entry.location_lost_at is None:
+            entry.location_lost_at = now
+            entry.location_warning_sent_at = now
+            entry.save(
+                update_fields=[
+                    "last_location_at",
+                    "last_location_lat",
+                    "last_location_lng",
+                    "location_lost_at",
+                    "location_warning_sent_at",
+                ]
+            )
+
+            return Response(
+                {
+                    "success": True,
+                    "action": "outside_warning",
+                    "dequeued": False,
+                    "grace_seconds": int(self.GRACE_PERIOD.total_seconds()),
+                    "message": "U bent buiten de bufferzone. Keer binnen 4 minuten terug om in de wachtrij te blijven.",
+                }
+            )
+
+        deadline = entry.location_lost_at + self.GRACE_PERIOD
+
+        if now >= deadline:
+            entry.status = QueueEntry.Status.LEFT_ZONE
+            entry.dequeued_at = now
+            entry.save(
+                update_fields=[
+                    "last_location_at",
+                    "last_location_lat",
+                    "last_location_lng",
+                    "status",
+                    "dequeued_at",
+                ]
+            )
+
+            return Response(
+                {
+                    "success": True,
+                    "action": "dequeued_left_zone",
+                    "dequeued": True,
+                    "message": "U bent te lang buiten de bufferzone gebleven en daarom uit de wachtrij verwijderd.",
+                }
+            )
+
+        remaining = int((deadline - now).total_seconds())
+
+        entry.save(
+            update_fields=[
+                "last_location_at",
+                "last_location_lat",
+                "last_location_lng",
+            ]
+        )
+
+        return Response(
+            {
+                "success": True,
+                "action": "outside_grace",
+                "dequeued": False,
+                "remaining_seconds": remaining,
+                "message": "U bent buiten de bufferzone. Keer terug om in de wachtrij te blijven.",
             }
         )

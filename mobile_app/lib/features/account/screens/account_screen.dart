@@ -6,6 +6,8 @@ import 'package:mobile_app/features/account/widgets/edit_vehicle_sheet.dart';
 import 'package:mobile_app/features/account/widgets/profile_card.dart';
 import 'package:mobile_app/features/account/widgets/vehicles_card.dart';
 import 'package:mobile_app/features/privacy/privacy_gate_state.dart';
+import 'package:mobile_app/features/queue/queue_location_tracker.dart';
+import 'package:mobile_app/features/queue/queue_tracking_sync.dart';
 import 'package:provider/provider.dart';
 import '../../../core/dialogs.dart';
 import '../../../core/theme.dart';
@@ -39,8 +41,10 @@ class _AccountScreenState extends State<AccountScreen> {
     _lastNameController = TextEditingController();
     _emailController = TextEditingController();
     _rtxController = TextEditingController();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       context.read<AccountState>().load().then((_) => _syncControllers());
+      if (!mounted) return;
+      await syncQueueTracking(context);
     });
   }
 
@@ -143,8 +147,7 @@ class _AccountScreenState extends State<AccountScreen> {
     if (!mounted) return;
 
     context.read<PrivacyGateState>().reset();
-
-    if (!mounted) return;
+    context.read<QueueLocationTracker>().stop();
 
     context.go('/login');
   }

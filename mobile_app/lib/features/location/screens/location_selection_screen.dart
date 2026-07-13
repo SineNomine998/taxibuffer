@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/config/api_client.dart';
 import 'package:mobile_app/core/permissions/queue_permission_gate.dart';
 import 'package:mobile_app/features/account/account_state.dart';
+import 'package:mobile_app/features/queue/queue_location_tracker.dart';
 import 'package:mobile_app/features/queue/queue_state.dart';
+import 'package:mobile_app/features/queue/queue_tracking_sync.dart';
 import 'package:provider/provider.dart';
 import '../../../core/dialogs.dart';
 import '../../../core/theme.dart';
@@ -152,6 +154,8 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
       }
 
       setState(() => _queues = state.queues);
+
+      await syncQueueTracking(context);
     } on ApiAuthException {
       // ApiClient already triggered SessionManager.handleAuthExpired().
       // So don't show an error message here.
@@ -209,6 +213,8 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
       if (!mounted) return;
 
       context.read<QueueState>().setActiveEntry(entryUuid);
+      context.read<QueueLocationTracker>().start(entryUuid);
+
       context.go('/queue/$entryUuid');
     } on LocationPermissionDeniedException catch (e) {
       if (!mounted) return;

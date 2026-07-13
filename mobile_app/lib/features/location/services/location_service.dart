@@ -20,11 +20,13 @@ class LocationPermissionDeniedException implements Exception {
 class QueueListState {
   final String? activeEntryUuid;
   final bool alreadyInQueue;
+  final bool activelyWaiting;
   final List<PickupZone> queues;
 
   const QueueListState({
     required this.activeEntryUuid,
     required this.alreadyInQueue,
+    required this.activelyWaiting,
     required this.queues,
   });
 
@@ -115,6 +117,7 @@ class LocationService {
       return QueueListState(
         activeEntryUuid: data['active_entry_uuid'] as String?,
         alreadyInQueue: data['already_in_queue'] as bool? ?? false,
+        activelyWaiting: data['actively_waiting'] as bool? ?? false,
         queues: queues,
       );
     }
@@ -128,6 +131,7 @@ class LocationService {
       return QueueListState(
         activeEntryUuid: null,
         alreadyInQueue: false,
+        activelyWaiting: false,
         queues: queues,
       );
     }

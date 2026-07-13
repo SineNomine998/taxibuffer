@@ -132,6 +132,11 @@ class QueueEntry(models.Model):
     dequeued_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     signup_location = models.PointField(null=True, blank=True, srid=4326)
+    location_lost_at = models.DateTimeField(null=True, blank=True)
+    location_warning_sent_at = models.DateTimeField(null=True, blank=True)
+    last_location_at = models.DateTimeField(null=True, blank=True)
+    last_location_lat = models.FloatField(null=True, blank=True)
+    last_location_lng = models.FloatField(null=True, blank=True)
 
     class Meta:
         indexes = [

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_app/features/queue/queue_location_tracker.dart';
 import 'package:mobile_app/features/queue/queue_state.dart';
 import 'package:provider/provider.dart';
 import '../../../core/dialogs.dart';
@@ -47,7 +48,10 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
     _connect();
   }
 
-  Future<void> _connect({bool showLoading = true, bool forceRefreshToken = false}) async {
+  Future<void> _connect({
+    bool showLoading = true,
+    bool forceRefreshToken = false,
+  }) async {
     if (_isDisposed || !mounted) return;
 
     if (showLoading) {
@@ -61,7 +65,10 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
       await _subscription?.cancel();
       _subscription = null;
 
-      await _queueService.connect(widget.entryUuid, forceRefreshToken: forceRefreshToken);
+      await _queueService.connect(
+        widget.entryUuid,
+        forceRefreshToken: forceRefreshToken,
+      );
 
       _subscription = _queueService.statusStream.listen(
         _onStatus,
@@ -116,6 +123,14 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
       _connectionError = null;
     });
 
+    final tracker = context.read<QueueLocationTracker>();
+
+    if (status.status == 'waiting') {
+      tracker.start(widget.entryUuid);
+    } else {
+      tracker.stop();
+    }
+
     // Entry no longer active: officer/system marked chauffeur as handled/dequeued.
     if (!status.active) {
       _exitQueue();
@@ -168,6 +183,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
   void _exitQueue() {
     if (!mounted) return;
     context.read<QueueState>().clearActiveEntry();
+    context.read<QueueLocationTracker>().stop();
     context.go('/locations');
   }
 
@@ -310,7 +326,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
   void dispose() {
     _isDisposed = true;
     _reconnectTimer?.cancel();
-
+    _reconnectTimer = null;
     WidgetsBinding.instance.removeObserver(this);
     _subscription?.cancel();
     _queueService.dispose();
@@ -355,6 +371,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
   }
 
   Widget _buildContent() {
+    final locationTracker = context.watch<QueueLocationTracker>();
     final status = _status;
     if (status == null) {
       return const Center(
@@ -394,6 +411,11 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
               ),
             ),
             const SizedBox(height: 14),
+
+            if (locationTracker.hasWarning)
+              _LocationWarningBanner(
+                remainingSeconds: locationTracker.graceRemainingSeconds!,
+              ),
 
             Container(
               decoration: BoxDecoration(
@@ -617,6 +639,40 @@ class _QueueImage extends StatelessWidget {
       );
     }
     return Image.asset('assets/cruise-terminal.png', fit: BoxFit.cover);
+  }
+}
+
+class _LocationWarningBanner extends StatelessWidget {
+  final int remainingSeconds;
+
+  const _LocationWarningBanner({required this.remainingSeconds});
+
+  @override
+  Widget build(BuildContext context) {
+    final minutes = remainingSeconds ~/ 60;
+    final seconds = remainingSeconds % 60;
+
+    final timeText = '$minutes:${seconds.toString().padLeft(2, '0')}';
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7D6),
+        border: Border.all(color: const Color(0xFFE0BD22)),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        'U bent buiten de bufferzone. Keer terug binnen $timeText om in de wachtrij te blijven.',
+        style: const TextStyle(
+          fontFamily: 'DM Sans',
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF4B3A00),
+        ),
+      ),
+    );
   }
 }
 
