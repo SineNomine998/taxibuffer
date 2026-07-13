@@ -883,6 +883,17 @@ class MobileJoinQueueView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+        entry.last_location_at = timezone.now()
+        entry.last_location_lat = lat
+        entry.last_location_lng = lng
+        entry.save(
+            update_fields=[
+                "last_location_at",
+                "last_location_lat",
+                "last_location_lng",
+            ]
+        )
+
         return Response(
             {
                 "success": True,
