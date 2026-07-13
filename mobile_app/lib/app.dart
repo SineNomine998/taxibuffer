@@ -167,7 +167,7 @@ class _OutsideBufferWarningDialog extends StatelessWidget {
                 Image.asset(
                   'assets/warning-badge.svg',
                   height: 76,
-                  errorBuilder: (_, __, ___) {
+                  errorBuilder: (_, _, _) {
                     return const Icon(
                       Icons.warning_rounded,
                       size: 72,
