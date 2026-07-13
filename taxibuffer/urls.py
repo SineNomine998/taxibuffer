@@ -19,6 +19,8 @@ from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect
 from queueing.views import service_worker, InfoPagesView
+from django.conf import settings
+from django.conf.urls.static import static
 
 
 def redirect_to_signup(request):
@@ -36,3 +38,6 @@ urlpatterns = [
     path("", include("sensors.urls")),
     path("api/mobile/", include("mobile_api.urls")),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

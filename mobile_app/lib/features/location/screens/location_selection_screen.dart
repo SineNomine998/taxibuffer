@@ -53,10 +53,6 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
       setState(() {
         _permissionStatus = status;
       });
-
-      if (!status.canJoinQueue) {
-        await _showPermissionRequiredDialog();
-      }
     } catch (_) {
       if (!mounted) return;
 
@@ -71,22 +67,51 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
     }
   }
 
+  // Future<void> _showPermissionRequiredDialog() async {
+  //   if (!mounted) return;
+
+  //   final accepted = await showAppConfirm(
+  //     context: context,
+  //     title: 'Toestemmingen vereist',
+  //     message:
+  //         'Voor een eerlijke wachtrij zijn locatie en meldingen verplicht. '
+  //         'We gebruiken uw locatie alleen om te controleren of u in de bufferzone bent. Meldingen zorgen dat u uw beurt niet mist.',
+  //     confirmLabel: 'Toestemmingen geven',
+  //     cancelLabel: 'Later',
+  //   );
+
+  //   if (accepted != true || !mounted) return;
+
+  //   final status = await _permissionGate.requestMissingPermissions();
+
+  //   if (!mounted) return;
+
+  //   setState(() {
+  //     _permissionStatus = status;
+  //   });
+
+  //   if (status.canJoinQueue) {
+  //     return;
+  //   }
+
+  //   final openSettings = await showAppConfirm(
+  //     context: context,
+  //     title: 'Instellingen openen',
+  //     message:
+  //         'Locatie of meldingen zijn nog uitgeschakeld. Open de app-instellingen om dit handmatig aan te zetten.',
+  //     confirmLabel: 'Open instellingen',
+  //     cancelLabel: 'Later',
+  //   );
+
+  //   if (openSettings == true) {
+  //     await Geolocator.openAppSettings();
+  //   }
+  // }
+
   Future<void> _showPermissionRequiredDialog() async {
     if (!mounted) return;
 
-    final accepted = await showAppConfirm(
-      context: context,
-      title: 'Toestemmingen vereist',
-      message:
-          'Voor een eerlijke wachtrij zijn locatie en meldingen verplicht. '
-          'We gebruiken uw locatie alleen om te controleren of u in de bufferzone bent. Meldingen zorgen dat u uw beurt niet mist.',
-      confirmLabel: 'Toestemmingen geven',
-      cancelLabel: 'Later',
-    );
-
-    if (accepted != true || !mounted) return;
-
-    final status = await _permissionGate.requestMissingPermissions();
+    var status = await _permissionGate.check();
 
     if (!mounted) return;
 
@@ -94,9 +119,45 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
       _permissionStatus = status;
     });
 
-    if (status.canJoinQueue) {
-      return;
+    if (status.canJoinQueue) return;
+
+    final needsSettings =
+        status.locationPermanentlyDenied ||
+        status.notificationPermanentlyDenied;
+
+    if (!needsSettings) {
+      final accepted = await showAppConfirm(
+        context: context,
+        title: 'Toestemmingen vereist',
+        message:
+            'Voor een eerlijke wachtrij zijn locatie en meldingen verplicht. '
+            'We gebruiken uw locatie alleen om te controleren of u in de bufferzone bent. Meldingen zorgen dat u uw beurt niet mist.',
+        confirmLabel: 'Toestemmingen geven',
+        cancelLabel: 'Later',
+      );
+
+      if (accepted != true || !mounted) return;
+
+      status = await _permissionGate.requestMissingPermissions();
+
+      if (!mounted) return;
+
+      setState(() {
+        _permissionStatus = status;
+      });
+
+      if (status.canJoinQueue) return;
     }
+
+    final latestStatus = await _permissionGate.check();
+
+    if (!mounted) return;
+
+    setState(() {
+      _permissionStatus = latestStatus;
+    });
+
+    if (latestStatus.canJoinQueue) return;
 
     final openSettings = await showAppConfirm(
       context: context,
@@ -647,7 +708,7 @@ class _PermissionRequiredCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           const Text(
-            'U kunt pas aanmelden wanneer locatie en meldingen zijn ingeschakeld.',
+            'U kunt zich pas aanmelden wanneer locatie en meldingen zijn ingeschakeld.',
             style: TextStyle(
               fontFamily: 'DM Sans',
               fontSize: 14,
