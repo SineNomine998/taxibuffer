@@ -67,47 +67,6 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
     }
   }
 
-  // Future<void> _showPermissionRequiredDialog() async {
-  //   if (!mounted) return;
-
-  //   final accepted = await showAppConfirm(
-  //     context: context,
-  //     title: 'Toestemmingen vereist',
-  //     message:
-  //         'Voor een eerlijke wachtrij zijn locatie en meldingen verplicht. '
-  //         'We gebruiken uw locatie alleen om te controleren of u in de bufferzone bent. Meldingen zorgen dat u uw beurt niet mist.',
-  //     confirmLabel: 'Toestemmingen geven',
-  //     cancelLabel: 'Later',
-  //   );
-
-  //   if (accepted != true || !mounted) return;
-
-  //   final status = await _permissionGate.requestMissingPermissions();
-
-  //   if (!mounted) return;
-
-  //   setState(() {
-  //     _permissionStatus = status;
-  //   });
-
-  //   if (status.canJoinQueue) {
-  //     return;
-  //   }
-
-  //   final openSettings = await showAppConfirm(
-  //     context: context,
-  //     title: 'Instellingen openen',
-  //     message:
-  //         'Locatie of meldingen zijn nog uitgeschakeld. Open de app-instellingen om dit handmatig aan te zetten.',
-  //     confirmLabel: 'Open instellingen',
-  //     cancelLabel: 'Later',
-  //   );
-
-  //   if (openSettings == true) {
-  //     await Geolocator.openAppSettings();
-  //   }
-  // }
-
   Future<void> _showPermissionRequiredDialog() async {
     if (!mounted) return;
 
@@ -230,6 +189,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
 
       if (!result.isValid) {
         if (!mounted) return;
+
         await showAppAlert(
           context: context,
           title: 'Geweigerd',
@@ -252,6 +212,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
       context.go('/queue/$entryUuid');
     } on LocationPermissionDeniedException catch (e) {
       if (!mounted) return;
+
       await showAppAlert(
         context: context,
         title: 'Locatie Fout',
@@ -262,12 +223,17 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
       );
     } catch (e) {
       if (!mounted) return;
+
       await showAppAlert(
         context: context,
         title: 'Fout',
         message: e.toString().replaceFirst('Exception: ', ''),
         svgAsset: 'assets/pop-up-denied.svg',
       );
+    } finally {
+      if (mounted) {
+        setState(() => _submittingQueueId = null);
+      }
     }
   }
 
@@ -342,6 +308,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
     final bool alreadyInQueue = context.watch<QueueState>().isInQueue;
     final permissionStatus = _permissionStatus;
     final bool permissionsOk = permissionStatus?.canJoinQueue ?? false;
+    final bool isSubmittingAnyQueue = _submittingQueueId != null;
     final accountState = context.read<AccountState>();
 
     return AppShellScaffold(
@@ -444,6 +411,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
                       isSubmitting: _submittingQueueId == zone.queueId,
                       alreadyInQueue: alreadyInQueue,
                       permissionsOk: permissionsOk,
+                      isSubmittingAnyQueue: isSubmittingAnyQueue,
                       onRegister: () => _onRegister(zone),
                     ),
                   ),
@@ -461,6 +429,7 @@ class _LocationCard extends StatelessWidget {
   final bool isSubmitting;
   final bool alreadyInQueue;
   final bool permissionsOk;
+  final bool isSubmittingAnyQueue;
   final VoidCallback onRegister;
 
   const _LocationCard({
@@ -468,12 +437,17 @@ class _LocationCard extends StatelessWidget {
     required this.isSubmitting,
     required this.alreadyInQueue,
     required this.permissionsOk,
+    required this.isSubmittingAnyQueue,
     required this.onRegister,
   });
 
   @override
   Widget build(BuildContext context) {
-    final disabled = !zone.isActive || alreadyInQueue || !permissionsOk;
+    final disabled =
+        !zone.isActive ||
+        alreadyInQueue ||
+        !permissionsOk ||
+        isSubmittingAnyQueue;
     return Opacity(
       opacity: disabled ? 0.55 : 1.0,
       child: Container(
@@ -569,6 +543,8 @@ class _LocationCard extends StatelessWidget {
                                         ? 'Actieve wachtrij'
                                         : !permissionsOk
                                         ? 'Toestemming nodig'
+                                        : isSubmittingAnyQueue
+                                        ? 'Bezig...'
                                         : 'Aanmelden',
                                     style: const TextStyle(
                                       fontFamily: 'DM Sans',
