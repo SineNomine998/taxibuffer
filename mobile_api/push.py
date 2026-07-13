@@ -5,7 +5,7 @@ from django.conf import settings
 from firebase_admin import credentials, messaging
 
 from mobile_api.models import MobilePushToken
-from queueing.models import QueueNotification
+from queueing.models import QueueNotification, QueueEntry
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,51 @@ def send_queue_called_push(notification_id):
 
     logger.info(
         "FCM queue_called sent entry_uuid=%s success=%s failure=%s",
+        entry.uuid,
+        response.success_count,
+        response.failure_count,
+    )
+
+
+def send_location_lost_push(entry_id):
+    ensure_firebase_initialized()
+
+    entry = QueueEntry.objects.select_related("chauffeur", "queue").get(id=entry_id)
+    chauffeur = entry.chauffeur
+
+    tokens = list(
+        MobilePushToken.objects.filter(
+            chauffeur=chauffeur,
+            active=True,
+        ).values_list("token", flat=True)
+    )
+
+    if not tokens:
+        logger.warning(
+            "No active FCM tokens for location lost chauffeur_id=%s entry_uuid=%s",
+            chauffeur.id,
+            entry.uuid,
+        )
+        return
+
+    message = messaging.MulticastMessage(
+        tokens=tokens,
+        notification=messaging.Notification(
+            title="Locatie niet beschikbaar",
+            body=("Open TaxiBuffer en zet locatie aan om in de wachtrij te blijven."),
+        ),
+        data={
+            "type": "location_lost",
+            "entry_uuid": str(entry.uuid),
+            "queue_id": str(entry.queue_id),
+            "reason": "location_unavailable",
+        },
+    )
+
+    response = messaging.send_each_for_multicast(message)
+
+    logger.info(
+        "FCM location_lost sent entry_uuid=%s success=%s failure=%s",
         entry.uuid,
         response.success_count,
         response.failure_count,

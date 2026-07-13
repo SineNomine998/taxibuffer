@@ -51,6 +51,7 @@ dependencies:
   firebase_messaging: ^16.4.1
   flutter_local_notifications: ^22.0.1
   shared_preferences: ^2.5.5
+  flutter_background_geolocation: ^5.4.0
 
 dev_dependencies:
   flutter_test:

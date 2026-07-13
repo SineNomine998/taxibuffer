@@ -115,7 +115,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
     }
   }
 
-  void _onStatus(QueueStatus status) {
+  Future<void> _onStatus(QueueStatus status) async {
     if (_isDisposed || !mounted) return;
 
     setState(() {
@@ -125,17 +125,19 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
 
     final tracker = context.read<QueueLocationTracker>();
 
-    if (status.status == 'waiting') {
-      tracker.start(widget.entryUuid);
-    } else {
-      tracker.stop();
-    }
-
     // Entry no longer active: officer/system marked chauffeur as handled/dequeued.
     if (!status.active) {
       _exitQueue();
       return;
     }
+
+    if (status.status == 'waiting') {
+      await tracker.start(widget.entryUuid);
+    } else {
+      await tracker.stop();
+    }
+
+    if (!mounted) return;
 
     // If the chauffeur is called while this screen is open,
     // WebSocket shows the in-app popup immediately.
@@ -180,10 +182,12 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
   /// Clears global queue state and navigates away.
   /// Call this whenever the user is no longer in the queue,
   /// whether by leaving voluntarily or being dequeued externally.
-  void _exitQueue() {
+  void _exitQueue() async {
+    if (!mounted) return;
+    await context.read<QueueLocationTracker>().stop();
+
     if (!mounted) return;
     context.read<QueueState>().clearActiveEntry();
-    context.read<QueueLocationTracker>().stop();
     context.go('/locations');
   }
 

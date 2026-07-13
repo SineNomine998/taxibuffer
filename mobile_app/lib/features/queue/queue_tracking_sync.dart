@@ -17,12 +17,12 @@ Future<void> syncQueueTracking(BuildContext context) async {
     queueState.setActiveEntry(state.activeEntryUuid!);
 
     if (state.activelyWaiting) {
-      tracker.start(state.activeEntryUuid!);
+      await tracker.start(state.activeEntryUuid!);
     } else {
-      tracker.stop();
+      await tracker.stop();
     }
   } else {
     queueState.clearActiveEntry();
-    tracker.stop();
+    await tracker.stop();
   }
 }

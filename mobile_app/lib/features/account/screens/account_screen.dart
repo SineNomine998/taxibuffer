@@ -147,8 +147,9 @@ class _AccountScreenState extends State<AccountScreen> {
     if (!mounted) return;
 
     context.read<PrivacyGateState>().reset();
-    context.read<QueueLocationTracker>().stop();
+    await context.read<QueueLocationTracker>().stop();
 
+    if (!mounted) return;
     context.go('/login');
   }
 

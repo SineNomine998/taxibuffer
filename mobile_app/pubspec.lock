@@ -230,6 +230,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_background_geolocation:
+    dependency: "direct main"
+    description:
+      name: flutter_background_geolocation
+      sha256: "828f97d8567813c687e758e35ae5d7e2bc31fcab2c548e3f11ef1582693d5d75"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.4.0"
   flutter_launcher_icons:
     dependency: "direct dev"
     description:

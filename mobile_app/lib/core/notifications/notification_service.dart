@@ -68,8 +68,9 @@ class NotificationService {
         ?.createNotificationChannel(_queueChannel);
 
     FirebaseMessaging.onMessage.listen((message) async {
-      final notificationId = message.data['notification_id']?.toString();
-      if (notificationId == null || notificationId.isEmpty) return;
+      final notificationId =
+          message.data['notification_id']?.toString() ??
+          '${message.data['type']}_${message.data['entry_uuid']}';
 
       final shouldShow = await _markNotificationSeen(notificationId);
       if (!shouldShow) return;
@@ -169,6 +170,26 @@ class NotificationService {
 
   Future<void> _handleNotificationData(Map<String, dynamic> data) async {
     final type = data['type'];
+
+    if (type == 'location_lost') {
+      final entryUuid = data['entry_uuid']?.toString();
+
+      if (entryUuid == null || entryUuid.isEmpty) return;
+
+      try {
+        await _api.refreshAndGetAccessToken();
+      } catch (_) {
+        router.go('/login?next=${Uri.encodeComponent('/queue/$entryUuid')}');
+        return;
+      }
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        router.go('/queue/$entryUuid');
+      });
+
+      return;
+    }
+
     if (type != 'queue_called') return;
 
     final notificationId = data['notification_id']?.toString();

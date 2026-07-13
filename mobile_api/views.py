@@ -39,6 +39,7 @@ from compliance.services import (
 )
 from compliance.permissions import HasAcceptedPrivacyPolicy
 from mobile_api.models import MobilePushToken
+from mobile_api.push import send_location_lost_push
 
 logger = logging.getLogger(__name__)
 
@@ -1161,7 +1162,8 @@ class MobileSequenceHistoryView(APIView):
 class MobileQueueLocationReportView(APIView):
     permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
 
-    GRACE_PERIOD = timedelta(minutes=1)
+    # TODO: timeout = 4 mins?
+    GRACE_PERIOD = timedelta(minutes=4)
 
     def post(self, request, entry_uuid):
         chauffeur = get_current_chauffeur(request.user)
@@ -1188,7 +1190,7 @@ class MobileQueueLocationReportView(APIView):
         lng = request.data.get("lng")
 
         if lat is None or lng is None:
-            raise ValidationError({"detail": "Locatiegegevens ontbreken."})
+            return self._handle_location_unavailable(entry)
 
         try:
             lat = float(lat)
@@ -1250,13 +1252,20 @@ class MobileQueueLocationReportView(APIView):
                 ]
             )
 
+            transaction.on_commit(
+                lambda entry_id=entry.id: send_location_lost_push(entry_id)
+            )
+
             return Response(
                 {
                     "success": True,
                     "action": "outside_warning",
                     "dequeued": False,
                     "grace_seconds": int(self.GRACE_PERIOD.total_seconds()),
-                    "message": "U bent buiten de bufferzone. Keer binnen 4 minuten terug om in de wachtrij te blijven.",
+                    "message": (
+                        "U bent buiten de bufferzone. Keer binnen 4 minuten terug "
+                        "om in de wachtrij te blijven."
+                    ),
                 }
             )
 
@@ -1301,5 +1310,82 @@ class MobileQueueLocationReportView(APIView):
                 "dequeued": False,
                 "remaining_seconds": remaining,
                 "message": "U bent buiten de bufferzone. Keer terug om in de wachtrij te blijven.",
+            }
+        )
+
+    def _handle_location_unavailable(self, entry):
+        now = timezone.now()
+
+        if entry.status != QueueEntry.Status.WAITING:
+            return Response(
+                {
+                    "success": True,
+                    "action": "ignored",
+                    "status": entry.status,
+                }
+            )
+
+        if entry.location_lost_at is None:
+            entry.location_lost_at = now
+            entry.location_warning_sent_at = now
+            entry.save(
+                update_fields=[
+                    "location_lost_at",
+                    "location_warning_sent_at",
+                ]
+            )
+
+            transaction.on_commit(
+                lambda entry_id=entry.id: send_location_lost_push(entry_id)
+            )
+
+            return Response(
+                {
+                    "success": True,
+                    "action": "location_unavailable_warning",
+                    "dequeued": False,
+                    "grace_seconds": int(self.GRACE_PERIOD.total_seconds()),
+                    "message": (
+                        "Locatie is uitgeschakeld of niet beschikbaar. "
+                        "Zet locatie binnen 4 minuten weer aan om in de wachtrij te blijven."
+                    ),
+                }
+            )
+
+        deadline = entry.location_lost_at + self.GRACE_PERIOD
+
+        if now >= deadline:
+            entry.status = QueueEntry.Status.LEFT_ZONE
+            entry.dequeued_at = now
+            entry.save(
+                update_fields=[
+                    "status",
+                    "dequeued_at",
+                ]
+            )
+
+            return Response(
+                {
+                    "success": True,
+                    "action": "dequeued_location_unavailable",
+                    "dequeued": True,
+                    "message": (
+                        "U bent uit de wachtrij verwijderd omdat uw locatie te lang "
+                        "niet beschikbaar was."
+                    ),
+                }
+            )
+
+        remaining = int((deadline - now).total_seconds())
+
+        return Response(
+            {
+                "success": True,
+                "action": "location_unavailable_grace",
+                "dequeued": False,
+                "remaining_seconds": remaining,
+                "message": (
+                    "Locatie is nog steeds niet beschikbaar. Zet locatie aan om in de wachtrij te blijven."
+                ),
             }
         )

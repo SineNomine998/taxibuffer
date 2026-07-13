@@ -63,7 +63,9 @@ class LocationService {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
     if (!serviceEnabled) {
-      throw Exception('Locatievoorziening is uitgeschakeld.');
+      throw const LocationUnavailableException(
+        'Locatievoorziening is uitgeschakeld.',
+      );
     }
 
     var permission = await Geolocator.checkPermission();
@@ -193,4 +195,13 @@ class LocationService {
 
     return entryUuid.toString();
   }
+}
+
+class LocationUnavailableException implements Exception {
+  final String message;
+
+  const LocationUnavailableException(this.message);
+
+  @override
+  String toString() => message;
 }

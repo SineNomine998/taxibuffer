@@ -81,8 +81,8 @@ class _GlobalQueueListener extends StatefulWidget {
 }
 
 class _GlobalQueueListenerState extends State<_GlobalQueueListener> {
-  int _lastHandledDequeueEventId = 0;
   int _lastHandledOutsideWarningEventId = 0;
+  int _lastHandledDequeueEventId = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -91,14 +91,31 @@ class _GlobalQueueListenerState extends State<_GlobalQueueListener> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
 
+      if (tracker.outsideWarningActive &&
+          tracker.outsideWarningEventId != _lastHandledOutsideWarningEventId) {
+        _lastHandledOutsideWarningEventId = tracker.outsideWarningEventId;
+
+        final dialogContext = rootNavigatorKey.currentContext;
+        if (dialogContext == null) return;
+
+        await showDialog(
+          context: dialogContext,
+          barrierDismissible: true,
+          builder: (_) => _OutsideBufferWarningDialog(tracker: tracker),
+        );
+
+        tracker.acknowledgeOutsideWarning();
+      }
+
       if (tracker.dequeued &&
           tracker.dequeueEventId != _lastHandledDequeueEventId) {
         _lastHandledDequeueEventId = tracker.dequeueEventId;
 
+        if (!context.mounted) return;
+
         context.read<QueueState>().clearActiveEntry();
 
         final dialogContext = rootNavigatorKey.currentContext;
-
         if (dialogContext == null) return;
 
         await showAppAlert(
@@ -114,24 +131,6 @@ class _GlobalQueueListenerState extends State<_GlobalQueueListener> {
 
         tracker.acknowledgeDequeued();
         router.go('/locations');
-      }
-
-      if (tracker.outsideWarningActive &&
-          tracker.outsideWarningEventId != _lastHandledOutsideWarningEventId) {
-        _lastHandledOutsideWarningEventId = tracker.outsideWarningEventId;
-
-        final dialogContext = rootNavigatorKey.currentContext;
-        if (dialogContext == null || !dialogContext.mounted) return;
-
-        await showDialog(
-          context: dialogContext,
-          barrierDismissible: true,
-          builder: (_) {
-            return _OutsideBufferWarningDialog(tracker: tracker);
-          },
-        );
-
-        tracker.acknowledgeOutsideWarning();
       }
     });
 

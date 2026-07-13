@@ -148,4 +148,19 @@ class QueueService {
 
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
+
+  Future<Map<String, dynamic>> reportQueueLocationUnavailable({
+    required String entryUuid,
+  }) async {
+    final response = await _apiClient.post(
+      '/api/mobile/queue/$entryUuid/location-report/',
+      body: {},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Locatiecontrole mislukt.');
+    }
+
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
 }

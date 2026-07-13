@@ -213,8 +213,9 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
       if (!mounted) return;
 
       context.read<QueueState>().setActiveEntry(entryUuid);
-      context.read<QueueLocationTracker>().start(entryUuid);
+      await context.read<QueueLocationTracker>().start(entryUuid);
 
+      if (!mounted) return;
       context.go('/queue/$entryUuid');
     } on LocationPermissionDeniedException catch (e) {
       if (!mounted) return;

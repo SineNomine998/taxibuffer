@@ -1,68 +1,76 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_background_geolocation/flutter_background_geolocation.dart'
+    as bg;
 
-import '../location/services/location_service.dart';
 import 'services/queue_service.dart';
 
 class QueueLocationTracker extends ChangeNotifier {
   final QueueService _queueService;
-  final LocationService _locationService;
 
-  QueueLocationTracker({
-    QueueService? queueService,
-    LocationService? locationService,
-  }) : _queueService = queueService ?? QueueService(),
-       _locationService = locationService ?? LocationService();
+  QueueLocationTracker({QueueService? queueService})
+    : _queueService = queueService ?? QueueService();
 
-  Timer? _pingTimer;
-  Timer? _countdownTimer;
   String? _entryUuid;
+
   bool _isRunning = false;
   bool _isReporting = false;
+  bool _configured = false;
+  bool _expiredReportTriggered = false;
+
+  Timer? _countdownTimer;
+
   int? _graceRemainingSeconds;
   String? _warningMessage;
-  bool _dequeued = false;
-  String? _dequeueMessage;
-  bool _expiredReportTriggered = false;
-  int _dequeueEventId = 0;
+
   bool _outsideWarningActive = false;
   int _outsideWarningEventId = 0;
 
-  bool get outsideWarningActive => _outsideWarningActive;
-  int get outsideWarningEventId => _outsideWarningEventId;
-  bool get dequeued => _dequeued;
-  String? get dequeueMessage => _dequeueMessage;
-  int get dequeueEventId => _dequeueEventId;
+  bool _dequeued = false;
+  String? _dequeueMessage;
+  int _dequeueEventId = 0;
+
   bool get isRunning => _isRunning;
+
   int? get graceRemainingSeconds => _graceRemainingSeconds;
   String? get warningMessage => _warningMessage;
   bool get hasWarning => _graceRemainingSeconds != null;
 
-  void start(String entryUuid) {
+  bool get outsideWarningActive => _outsideWarningActive;
+  int get outsideWarningEventId => _outsideWarningEventId;
+
+  bool get dequeued => _dequeued;
+  String? get dequeueMessage => _dequeueMessage;
+  int get dequeueEventId => _dequeueEventId;
+
+  Future<void> start(String entryUuid) async {
     if (_isRunning && _entryUuid == entryUuid) return;
 
-    stop();
+    await stop();
 
     _entryUuid = entryUuid;
     _isRunning = true;
+    _isReporting = false;
     _dequeued = false;
     _dequeueMessage = null;
     _expiredReportTriggered = false;
 
-    _reportNow();
-
-    _pingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      _reportNow();
-    });
-
     notifyListeners();
+
+    await _configureIfNeeded();
+
+    try {
+      await bg.BackgroundGeolocation.start();
+    } catch (_) {
+      await _reportLocationUnavailable();
+      return;
+    }
+
+    await _reportCurrentPositionOnce();
   }
 
-  void stop() {
-    _pingTimer?.cancel();
-    _pingTimer = null;
-
+  Future<void> stop() async {
     _countdownTimer?.cancel();
     _countdownTimer = null;
 
@@ -71,37 +79,124 @@ class QueueLocationTracker extends ChangeNotifier {
     _isReporting = false;
     _graceRemainingSeconds = null;
     _warningMessage = null;
+    _outsideWarningActive = false;
     _dequeued = false;
     _dequeueMessage = null;
+    _expiredReportTriggered = false;
+
+    try {
+      await bg.BackgroundGeolocation.stop();
+    } catch (_) {}
 
     notifyListeners();
   }
 
-  Future<void> _reportNow({bool force = false}) async {
+  Future<void> _configureIfNeeded() async {
+    if (_configured) return;
+
+    bg.BackgroundGeolocation.onLocation(
+      (bg.Location location) {
+        unawaited(_handleNativeLocation(location));
+      },
+      (bg.LocationError error) {
+        unawaited(_reportLocationUnavailable());
+      },
+    );
+
+    bg.BackgroundGeolocation.onProviderChange((bg.ProviderChangeEvent event) {
+      if (!event.enabled) {
+        unawaited(_reportLocationUnavailable());
+      }
+    });
+
+    await bg.BackgroundGeolocation.ready(
+      bg.Config(
+        desiredAccuracy: bg.Config.DESIRED_ACCURACY_HIGH,
+
+        // Test/strict mode: tries to update about every 10 seconds.
+        locationUpdateInterval: 30000,
+        fastestLocationUpdateInterval: 15000,
+        distanceFilter: 0,
+
+        foregroundService: true,
+        stopOnTerminate: false,
+        startOnBoot: false,
+        enableHeadless: false,
+
+        pausesLocationUpdatesAutomatically: false,
+        disableStopDetection: true,
+
+        notification: bg.Notification(
+          title: 'TaxiBuffer actief',
+          text: 'Uw wachtrijlocatie wordt gecontroleerd.',
+          channelName: 'TaxiBuffer locatiecontrole',
+          smallIcon: 'drawable/ic_notification',
+        ),
+
+        debug: false,
+        logLevel: bg.Config.LOG_LEVEL_OFF,
+      ),
+    );
+
+    _configured = true;
+  }
+
+  Future<void> _reportCurrentPositionOnce() async {
     if (!_isRunning || _entryUuid == null) return;
-    if (_isReporting && !force) return;
+
+    try {
+      final location = await bg.BackgroundGeolocation.getCurrentPosition(
+        samples: 1,
+        persist: false,
+        timeout: 30,
+      );
+
+      await _handleNativeLocation(location);
+    } catch (_) {
+      await _reportLocationUnavailable();
+    }
+  }
+
+  Future<void> _handleNativeLocation(bg.Location location) async {
+    if (!_isRunning || _entryUuid == null || _isReporting) return;
 
     _isReporting = true;
 
     try {
-      final position = await _locationService.getCurrentPosition();
-
       final result = await _queueService.reportQueueLocation(
         entryUuid: _entryUuid!,
-        lat: position.latitude,
-        lng: position.longitude,
+        lat: location.coords.latitude,
+        lng: location.coords.longitude,
       );
 
       _handleResult(result);
     } catch (_) {
-      // Do not dequeue on GPS/API failure.
+      // Do not crash. Native background location will retry.
+    } finally {
+      _isReporting = false;
+    }
+  }
+
+  Future<void> _reportLocationUnavailable() async {
+    if (!_isRunning || _entryUuid == null || _isReporting) return;
+
+    _isReporting = true;
+
+    try {
+      final result = await _queueService.reportQueueLocationUnavailable(
+        entryUuid: _entryUuid!,
+      );
+
+      _handleResult(result);
+    } catch (_) {
+      // Do not crash. Next native event will retry.
     } finally {
       _isReporting = false;
     }
   }
 
   void _handleResult(Map<String, dynamic> result) {
-    final action = result['action'];
+    final action = result['action']?.toString();
 
     if (action == 'inside_buffer') {
       _clearWarning();
@@ -109,7 +204,10 @@ class QueueLocationTracker extends ChangeNotifier {
       return;
     }
 
-    if (action == 'outside_warning' || action == 'outside_grace') {
+    if (action == 'outside_warning' ||
+        action == 'outside_grace' ||
+        action == 'location_unavailable_warning' ||
+        action == 'location_unavailable_grace') {
       final seconds =
           result['remaining_seconds'] as int? ??
           result['grace_seconds'] as int? ??
@@ -117,10 +215,9 @@ class QueueLocationTracker extends ChangeNotifier {
 
       _warningMessage =
           result['message']?.toString() ??
-          'U bent buiten de bufferzone. Keer terug om in de wachtrij te blijven.';
+          'Keer terug naar de bufferzone om in de wachtrij te blijven.';
 
       final wasAlreadyWarning = _outsideWarningActive;
-
       _outsideWarningActive = true;
 
       if (!wasAlreadyWarning) {
@@ -140,23 +237,16 @@ class QueueLocationTracker extends ChangeNotifier {
       _dequeueEventId++;
 
       _clearWarning();
-      _pingTimer?.cancel();
-      _pingTimer = null;
+
       _isRunning = false;
+      _isReporting = false;
+
+      try {
+        bg.BackgroundGeolocation.stop();
+      } catch (_) {}
 
       notifyListeners();
-      return;
     }
-  }
-
-  void acknowledgeDequeued() {
-    _dequeued = false;
-    _dequeueMessage = null;
-    notifyListeners();
-  }
-
-  void acknowledgeOutsideWarning() {
-    notifyListeners();
   }
 
   void _startCountdown(int seconds) {
@@ -178,7 +268,7 @@ class QueueLocationTracker extends ChangeNotifier {
         timer.cancel();
         notifyListeners();
 
-        _forceExpireNow();
+        unawaited(_forceExpireNow());
         return;
       }
 
@@ -189,25 +279,43 @@ class QueueLocationTracker extends ChangeNotifier {
 
   Future<void> _forceExpireNow() async {
     if (_expiredReportTriggered) return;
+
     _expiredReportTriggered = true;
 
-    await _reportNow(force: true);
+    await _reportCurrentPositionOnce();
   }
 
   void _clearWarning() {
     _countdownTimer?.cancel();
     _countdownTimer = null;
+
     _graceRemainingSeconds = null;
     _warningMessage = null;
-    _expiredReportTriggered = false;
     _outsideWarningActive = false;
+    _expiredReportTriggered = false;
+  }
+
+  void acknowledgeOutsideWarning() {
+    notifyListeners();
+  }
+
+  void acknowledgeDequeued() {
+    _dequeued = false;
+    _dequeueMessage = null;
+    notifyListeners();
   }
 
   @override
   void dispose() {
-    _pingTimer?.cancel();
     _countdownTimer?.cancel();
+
+    try {
+      bg.BackgroundGeolocation.stop();
+      bg.BackgroundGeolocation.removeListeners();
+    } catch (_) {}
+
     _queueService.dispose();
+
     super.dispose();
   }
 }
