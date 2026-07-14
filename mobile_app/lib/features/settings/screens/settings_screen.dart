@@ -131,7 +131,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _SettingsStatusTile(
                 icon: Icons.location_on_outlined,
                 title: 'Locatiestatus',
-                status: locationAvailable ? 'Actief' : 'Niet actief',
+                status: locationAvailable ? 'Aan' : 'Uit',
                 active: locationAvailable,
               ),
               _SettingsStatusTile(
