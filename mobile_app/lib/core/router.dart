@@ -20,6 +20,7 @@ import 'package:mobile_app/features/privacy/screens/privacy_policy_screen.dart';
 import 'package:mobile_app/features/queue/queue_state.dart';
 import 'package:mobile_app/features/queue/screens/queue_status_screen.dart';
 import 'package:mobile_app/features/sequence/screens/sequence_history_screen.dart';
+import 'package:mobile_app/features/settings/screens/settings_screens.dart';
 import 'package:provider/provider.dart';
 
 import 'app_state.dart';
@@ -161,6 +162,10 @@ final GoRouter router = GoRouter(
           builder: (_, _) => const LocationSelectionInfoScreen(),
         ),
         GoRoute(path: '/account', builder: (_, _) => const AccountScreen()),
+        GoRoute(
+          path: '/account/settings',
+          builder: (_, _) => const SettingsScreen(),
+        ),
         GoRoute(
           path: '/numbers',
           builder: (_, _) => const SequenceHistoryScreen(),

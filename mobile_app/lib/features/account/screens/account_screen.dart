@@ -183,14 +183,30 @@ class _AccountScreenState extends State<AccountScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Account',
-                      style: TextStyle(
-                        fontFamily: 'DM Sans',
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF1A1A1A),
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Account',
+                            style: TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1A1A1A),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => context.push('/account/settings'),
+                          tooltip: 'Instellingen',
+                          icon: const Icon(
+                            Icons.settings_outlined,
+                            size: 27,
+                            color: Color(0xFF1A1A1A),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 2),
                     const Text(
