@@ -547,7 +547,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
                                 _isLeaving
                                     ? 'Bezig...'
                                     : isNotified
-                                    ? 'Oproep actief'
+                                    ? 'Opgeroepen'
                                     : 'Verlaten',
                                 style: const TextStyle(
                                   fontFamily: 'DM Sans',
