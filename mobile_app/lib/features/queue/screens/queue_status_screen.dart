@@ -342,6 +342,9 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _reconnect(showLoading: false);
+
+      final tracker = context.read<QueueLocationTracker>();
+      unawaited(tracker.reportNow());
     }
   }
 
@@ -358,6 +361,10 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
     _queueService = QueueService();
 
     await _connect(showLoading: showLoading, forceRefreshToken: true);
+
+    if (!mounted) return;
+
+    await context.read<QueueLocationTracker>().reportNow();
   }
 
   @override
@@ -386,7 +393,10 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
     final isNotified = status.isNotified;
 
     return RefreshIndicator(
-      onRefresh: () => _reconnect(showLoading: false),
+      onRefresh: () async {
+        await context.read<QueueLocationTracker>().reportNow();
+        await _reconnect(showLoading: false);
+      },
       color: AppColors.gradientStart,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),

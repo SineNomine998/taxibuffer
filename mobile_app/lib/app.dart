@@ -84,57 +84,94 @@ class _GlobalQueueListenerState extends State<_GlobalQueueListener> {
   int _lastHandledOutsideWarningEventId = 0;
   int _lastHandledDequeueEventId = 0;
 
+  bool _handlingWarning = false;
+  bool _handlingDequeue = false;
+
   @override
   Widget build(BuildContext context) {
-    final tracker = context.watch<QueueLocationTracker>();
+    context.watch<QueueLocationTracker>();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-
-      if (tracker.outsideWarningActive &&
-          tracker.outsideWarningEventId != _lastHandledOutsideWarningEventId) {
-        _lastHandledOutsideWarningEventId = tracker.outsideWarningEventId;
-
-        final dialogContext = rootNavigatorKey.currentContext;
-        if (dialogContext == null) return;
-
-        await showDialog(
-          context: dialogContext,
-          barrierDismissible: true,
-          builder: (_) => _OutsideBufferWarningDialog(tracker: tracker),
-        );
-
-        tracker.acknowledgeOutsideWarning();
-      }
-
-      if (tracker.dequeued &&
-          tracker.dequeueEventId != _lastHandledDequeueEventId) {
-        _lastHandledDequeueEventId = tracker.dequeueEventId;
-
-        if (!context.mounted) return;
-
-        context.read<QueueState>().clearActiveEntry();
-
-        final dialogContext = rootNavigatorKey.currentContext;
-        if (dialogContext == null) return;
-
-        await showAppAlert(
-          context: dialogContext,
-          title: 'Uit wachtrij verwijderd',
-          message:
-              tracker.dequeueMessage ??
-              'U bent uit de wachtrij verwijderd omdat u buiten de bufferzone bent gebleven.',
-          svgAsset: 'assets/pop-up-denied.svg',
-        );
-
-        if (!mounted) return;
-
-        tracker.acknowledgeDequeued();
-        router.go('/locations');
-      }
+      _handleQueueEvents();
     });
 
     return widget.child;
+  }
+
+  Future<void> _handleQueueEvents() async {
+    if (!mounted) return;
+
+    final tracker = context.read<QueueLocationTracker>();
+
+    if (tracker.outsideWarningActive &&
+        tracker.outsideWarningEventId != _lastHandledOutsideWarningEventId &&
+        !_handlingWarning) {
+      await _showOutsideWarning(tracker);
+    }
+
+    if (!mounted) return;
+
+    if (tracker.dequeued &&
+        tracker.dequeueEventId != _lastHandledDequeueEventId &&
+        !_handlingDequeue) {
+      await _showDequeuedMessage(tracker);
+    }
+  }
+
+  Future<void> _showOutsideWarning(QueueLocationTracker tracker) async {
+    final dialogContext =
+        rootNavigatorKey.currentState?.overlay?.context ??
+        rootNavigatorKey.currentContext;
+
+    // Do not mark the event handled. A future rebuild can retry.
+    if (dialogContext == null) return;
+
+    _handlingWarning = true;
+    _lastHandledOutsideWarningEventId = tracker.outsideWarningEventId;
+
+    try {
+      await showDialog<void>(
+        context: dialogContext,
+        useRootNavigator: true,
+        barrierDismissible: true,
+        builder: (_) => _OutsideBufferWarningDialog(tracker: tracker),
+      );
+    } finally {
+      _handlingWarning = false;
+      tracker.acknowledgeOutsideWarning();
+    }
+  }
+
+  Future<void> _showDequeuedMessage(QueueLocationTracker tracker) async {
+    final dialogContext =
+        rootNavigatorKey.currentState?.overlay?.context ??
+        rootNavigatorKey.currentContext;
+
+    if (dialogContext == null) return;
+
+    _handlingDequeue = true;
+    _lastHandledDequeueEventId = tracker.dequeueEventId;
+
+    context.read<QueueState>().clearActiveEntry();
+
+    try {
+      await showAppAlert(
+        context: dialogContext,
+        title: 'Uit wachtrij verwijderd',
+        message:
+            tracker.dequeueMessage ??
+            'U bent uit de wachtrij verwijderd omdat u buiten de bufferzone bent gebleven.',
+        svgAsset: 'assets/pop-up-denied.svg',
+      );
+
+      if (!mounted) return;
+
+      tracker.acknowledgeDequeued();
+      router.go('/locations');
+    } finally {
+      _handlingDequeue = false;
+    }
   }
 }
 

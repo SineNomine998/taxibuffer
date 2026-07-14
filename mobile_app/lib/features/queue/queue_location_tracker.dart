@@ -96,27 +96,38 @@ class QueueLocationTracker extends ChangeNotifier {
 
     bg.BackgroundGeolocation.onLocation(
       (bg.Location location) {
+        debugPrint('DEBUG: BG location event received');
         unawaited(_handleNativeLocation(location));
       },
       (bg.LocationError error) {
+        debugPrint('DEBUG: BG location error: ${error.code} ${error.message}');
         unawaited(_reportLocationUnavailable());
       },
     );
 
     bg.BackgroundGeolocation.onProviderChange((bg.ProviderChangeEvent event) {
+      debugPrint('DEBUG: BG provider changed enabled=${event.enabled}');
+
       if (!event.enabled) {
         unawaited(_reportLocationUnavailable());
       }
+    });
+
+    bg.BackgroundGeolocation.onHeartbeat((bg.HeartbeatEvent event) {
+      debugPrint('DEBUG: BG heartbeat event received');
+      unawaited(_reportCurrentPositionOnce());
     });
 
     await bg.BackgroundGeolocation.ready(
       bg.Config(
         desiredAccuracy: bg.Config.DESIRED_ACCURACY_HIGH,
 
-        // Test/strict mode: tries to update about every 10 seconds.
+        // Test/strict mode: tries to update about every 30 seconds.
         locationUpdateInterval: 30000,
         fastestLocationUpdateInterval: 15000,
         distanceFilter: 0,
+
+        heartbeatInterval: 30,
 
         foregroundService: true,
         stopOnTerminate: false,
@@ -139,6 +150,12 @@ class QueueLocationTracker extends ChangeNotifier {
     );
 
     _configured = true;
+  }
+
+  Future<void> reportNow() async {
+    if (!_isRunning || _entryUuid == null) return;
+
+    await _reportCurrentPositionOnce();
   }
 
   Future<void> _reportCurrentPositionOnce() async {
@@ -170,8 +187,9 @@ class QueueLocationTracker extends ChangeNotifier {
       );
 
       _handleResult(result);
-    } catch (_) {
-      // Do not crash. Native background location will retry.
+    } catch (error, stackTrace) {
+      debugPrint('Queue location report failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
     } finally {
       _isReporting = false;
     }
@@ -188,14 +206,16 @@ class QueueLocationTracker extends ChangeNotifier {
       );
 
       _handleResult(result);
-    } catch (_) {
-      // Do not crash. Next native event will retry.
+    } catch (error, stackTrace) {
+      debugPrint('Queue location report failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
     } finally {
       _isReporting = false;
     }
   }
 
   void _handleResult(Map<String, dynamic> result) {
+    debugPrint('Queue location result: $result');
     final action = result['action']?.toString();
 
     if (action == 'inside_buffer') {
@@ -209,8 +229,8 @@ class QueueLocationTracker extends ChangeNotifier {
         action == 'location_unavailable_warning' ||
         action == 'location_unavailable_grace') {
       final seconds =
-          result['remaining_seconds'] as int? ??
-          result['grace_seconds'] as int? ??
+          (result['remaining_seconds'] as num?)?.toInt() ??
+          (result['grace_seconds'] as num?)?.toInt() ??
           240;
 
       _warningMessage =
