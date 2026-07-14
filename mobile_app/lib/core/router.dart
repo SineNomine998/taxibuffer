@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/features/account/account_state.dart';
 import 'package:mobile_app/features/account/screens/account_screen.dart';
+import 'package:mobile_app/features/activity/screens/activity_screen.dart';
 import 'package:mobile_app/features/auth/login/screens/login_screen.dart';
 import 'package:mobile_app/features/auth/password_reset/screens/password_reset_screen.dart';
 import 'package:mobile_app/features/auth/password_reset/screens/password_reset_sent_screen.dart';
@@ -165,6 +166,10 @@ final GoRouter router = GoRouter(
         GoRoute(
           path: '/account/settings',
           builder: (_, _) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/settings/activity',
+          builder: (_, _) => const ActivityScreen(),
         ),
         GoRoute(
           path: '/numbers',

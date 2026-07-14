@@ -1,6 +1,7 @@
 import logging
 import pytz
 
+from collections import defaultdict
 from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
@@ -31,6 +32,8 @@ from queueing.services import QueueService
 from queueing.constants import ACTIVE_QUEUE_STATUSES
 from geofence.services import point_in_buffer, make_point_from_lat_lng
 from queueing.views import _build_unique_username
+from queueing.activity import log_chauffeur_activity
+from queueing.models import ChauffeurActivityLog
 from compliance.models import PrivacyPolicyAcceptance
 from compliance.services import (
     accept_active_privacy_policy,
@@ -894,6 +897,18 @@ class MobileJoinQueueView(APIView):
             ]
         )
 
+        log_chauffeur_activity(
+            chauffeur=chauffeur,
+            queue=queue,
+            queue_entry=entry,
+            event_type=ChauffeurActivityLog.EventType.QUEUE_JOINED,
+            title="Aangemeld bij wachtrij",
+            message=f"U bent aangemeld bij {queue.name}.",
+            queue_position=entry.get_queue_position(),
+            lat=lat,
+            lng=lng,
+        )
+
         return Response(
             {
                 "success": True,
@@ -1043,6 +1058,7 @@ class MobileLeaveQueueView(APIView):
                 chauffeur=chauffeur,
                 status__in=ACTIVE_QUEUE_STATUSES,
             )
+            .select_related("queue", "chauffeur")
             .order_by("-created_at")
             .first()
         )
@@ -1053,9 +1069,20 @@ class MobileLeaveQueueView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        entry.status = QueueEntry.Status.LEFT_ZONE
+        queue_position = entry.get_queue_position()
+        entry.status = QueueEntry.Status.LEFT_QUEUE
         entry.dequeued_at = timezone.now()
         entry.save(update_fields=["status", "dequeued_at"])
+
+        log_chauffeur_activity(
+            chauffeur=entry.chauffeur,
+            queue=entry.queue,
+            queue_entry=entry,
+            event_type=ChauffeurActivityLog.EventType.QUEUE_LEFT,
+            title="Wachtrij verlaten",
+            message="U heeft de wachtrij verlaten.",
+            queue_position=queue_position,
+        )
 
         return Response(
             {
@@ -1201,6 +1228,19 @@ class MobileQueueLocationReportView(APIView):
         lng = request.data.get("lng")
 
         if lat is None or lng is None:
+            log_chauffeur_activity(
+                chauffeur=entry.chauffeur,
+                queue=entry.queue,
+                queue_entry=entry,
+                event_type=ChauffeurActivityLog.EventType.LOCATION_UNAVAILABLE,
+                title="Locatie niet beschikbaar",
+                message="Locatie was niet beschikbaar. Waarschuwing gestart.",
+                queue_position=entry.get_queue_position(),
+                metadata={
+                    "grace_seconds": int(self.GRACE_PERIOD.total_seconds()),
+                },
+            )
+
             return self._handle_location_unavailable(entry)
 
         try:
@@ -1229,7 +1269,22 @@ class MobileQueueLocationReportView(APIView):
 
         inside = point_in_buffer(buffer_zone, lat, lng, inclusive=True)
 
+        had_warning = entry.location_lost_at is not None
+
         if inside:
+            if had_warning:
+                log_chauffeur_activity(
+                    chauffeur=chauffeur,
+                    queue=entry.queue,
+                    queue_entry=entry,
+                    event_type=ChauffeurActivityLog.EventType.LOCATION_RECOVERED,
+                    title="Terug in bufferzone",
+                    message="U bent op tijd teruggekeerd naar de bufferzone.",
+                    queue_position=entry.get_queue_position(),
+                    lat=lat,
+                    lng=lng,
+                )
+
             entry.location_lost_at = None
             entry.location_warning_sent_at = None
             entry.save(
@@ -1263,6 +1318,21 @@ class MobileQueueLocationReportView(APIView):
                 ]
             )
 
+            log_chauffeur_activity(
+                chauffeur=chauffeur,
+                queue=entry.queue,
+                queue_entry=entry,
+                event_type=ChauffeurActivityLog.EventType.LOCATION_OUTSIDE_WARNING,
+                title="Buiten bufferzone",
+                message="U bent buiten de bufferzone. Keer binnen 4 minuten terug.",
+                queue_position=entry.get_queue_position(),
+                lat=lat,
+                lng=lng,
+                metadata={
+                    "grace_seconds": int(self.GRACE_PERIOD.total_seconds()),
+                },
+            )
+
             transaction.on_commit(
                 lambda entry_id=entry.id: send_location_lost_push(entry_id)
             )
@@ -1293,6 +1363,19 @@ class MobileQueueLocationReportView(APIView):
                     "status",
                     "dequeued_at",
                 ]
+            )
+
+            log_chauffeur_activity(
+                chauffeur=entry.chauffeur,
+                queue=entry.queue,
+                queue_entry=entry,
+                event_type=ChauffeurActivityLog.EventType.LOCATION_TIMEOUT_DEQUEUED,
+                title="Verwijderd uit wachtrij",
+                message="U bent verwijderd omdat locatie te lang buiten/niet beschikbaar was.",
+                queue_position=entry.get_queue_position(),
+                metadata={
+                    "reason": "location_timeout",
+                },
             )
 
             return Response(
@@ -1375,6 +1458,19 @@ class MobileQueueLocationReportView(APIView):
                 ]
             )
 
+            log_chauffeur_activity(
+                chauffeur=entry.chauffeur,
+                queue=entry.queue,
+                queue_entry=entry,
+                event_type=ChauffeurActivityLog.EventType.LOCATION_TIMEOUT_DEQUEUED,
+                title="Verwijderd uit wachtrij",
+                message="U bent verwijderd omdat locatie te lang buiten/niet beschikbaar was.",
+                queue_position=entry.get_queue_position(),
+                metadata={
+                    "reason": "location_timeout",
+                },
+            )
+
             return Response(
                 {
                     "success": True,
@@ -1398,5 +1494,49 @@ class MobileQueueLocationReportView(APIView):
                 "message": (
                     "Locatie is nog steeds niet beschikbaar. Zet locatie aan om in de wachtrij te blijven."
                 ),
+            }
+        )
+
+
+class MobileActivityLogView(APIView):
+    permission_classes = [IsAuthenticated, HasAcceptedPrivacyPolicy]
+
+    def get(self, request):
+        chauffeur = get_current_chauffeur(request.user)
+
+        logs = (
+            ChauffeurActivityLog.objects.filter(chauffeur=chauffeur)
+            .select_related("queue", "queue_entry")
+            .order_by("-created_at")[:200]
+        )
+
+        europe = pytz.timezone("Europe/Amsterdam")
+        results = []
+
+        for log in logs:
+            results.append(
+                {
+                    "id": log.id,
+                    "event_type": log.event_type,
+                    "title": log.title,
+                    "message": log.message,
+                    "queue_name": log.queue.name if log.queue else None,
+                    "queue_position": log.queue_position,
+                    "previous_queue_position": log.previous_queue_position,
+                    "sequence_number": log.sequence_number,
+                    "lat": log.lat,
+                    "lng": log.lng,
+                    "metadata": log.metadata,
+                    "created_at": log.created_at,
+                    "local_date": log.created_at.astimezone(europe).strftime(
+                        "%Y-%m-%d"
+                    ),
+                    "local_time": log.created_at.astimezone(europe).strftime("%H:%M"),
+                }
+            )
+
+        return Response(
+            {
+                "results": results,
             }
         )

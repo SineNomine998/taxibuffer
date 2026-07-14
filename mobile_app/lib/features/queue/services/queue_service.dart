@@ -80,18 +80,9 @@ class QueueService {
   }
 
   Future<bool> leaveQueue() async {
-    if (_channel == null) return false;
+    final response = await _apiClient.post('/api/mobile/queue/leave/');
 
-    _leaveCompleter = Completer<bool>();
-    _channel!.sink.add(jsonEncode({'action': 'leave'}));
-
-    return _leaveCompleter!.future.timeout(
-      const Duration(seconds: 5),
-      onTimeout: () {
-        _leaveCompleter = null;
-        return false;
-      },
-    );
+    return response.statusCode == 200;
   }
 
   Future<void> respondToNotification(

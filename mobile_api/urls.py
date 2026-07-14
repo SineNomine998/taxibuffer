@@ -104,4 +104,10 @@ urlpatterns = [
         views.MobileSequenceHistoryView.as_view(),
         name="mobile_sequence_history",
     ),
+    # User activity endpoints
+    path(
+        "activity/",
+        views.MobileActivityLogView.as_view(),
+        name="mobile_activity",
+    ),
 ]

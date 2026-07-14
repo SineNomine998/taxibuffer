@@ -112,7 +112,7 @@ class QueueStatusConsumer(AsyncWebsocketConsumer):
                 status__in=ACTIVE_QUEUE_STATUSES,
                 chauffeur__user=self.scope["user"],
             )
-            entry.status = QueueEntry.Status.LEFT_ZONE
+            entry.status = QueueEntry.Status.LEFT_QUEUE
             entry.dequeued_at = timezone.now()
             entry.save()
             return True

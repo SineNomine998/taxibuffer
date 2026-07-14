@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/theme.dart';
 import 'package:mobile_app/features/queue/queue_location_tracker.dart';
+import 'package:mobile_app/widgets/screen_header.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
@@ -56,156 +58,118 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.cardBg,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(110),
-        child: Container(
-          decoration: const BoxDecoration(gradient: kGradient),
-          padding: const EdgeInsets.fromLTRB(16, 42, 16, 12),
-          child: Row(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: const Icon(
-                  Icons.arrow_back_ios_new,
-                  size: 18,
-                  color: Color(0xFF333333),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+          children: [
+            ScreenHeader(
+              title: 'Instellingen',
+              subtitle: 'Pas de app naar wens aan',
+              onBack: () => Navigator.pop(context),
+            ),
+            const SizedBox(height: 18),
+            _SettingsHeaderCard(
+              version: _versionText,
+              trackingActive: locationTracker.isRunning,
+            ),
+            _SettingsSection(
+              title: 'Meldingen en locatie',
+              description: 'Beheer meldingen en live tracking.',
+              children: [
+                _SettingsSwitchTile(
+                  icon: Icons.volume_up_outlined,
+                  title: 'Meldingsgeluid',
+                  value: _notificationSoundEnabled,
+                  onChanged: (value) {
+                    setState(() {
+                      _notificationSoundEnabled = value;
+                    });
+                  },
                 ),
-              ),
-
-              const SizedBox(width: 14),
-
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Instellingen',
-                    style: TextStyle(
-                      fontFamily: 'DM Sans',
-                      fontWeight: FontWeight.w800,
-                      fontSize: 22,
-                      color: Color(0xFF333333),
-                    ),
-                  ),
-
-                  Text(
-                    'Pas de app naar wens aan',
-                    style: TextStyle(
-                      fontFamily: 'DM Sans',
-                      fontSize: 13,
-                      color: Color(0xFF555555),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                _SettingsNavigationTile(
+                  icon: Icons.notifications_active_outlined,
+                  title: 'Pushmeldingen testen',
+                  onTap: () => _showNotImplemented('Pushmeldingen testen'),
+                ),
+                _SettingsStatusTile(
+                  icon: Icons.location_on_outlined,
+                  title: 'Locatiestatus',
+                  status: locationAvailable ? 'Aan' : 'Uit',
+                  active: locationAvailable,
+                ),
+                _SettingsStatusTile(
+                  icon: Icons.my_location_outlined,
+                  title: "Locatietracking",
+                  status: locationTracker.isRunning ? 'Actief' : 'Niet actief',
+                  active: locationTracker.isRunning,
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _SettingsSection(
+              title: 'Taal',
+              description: 'Pas de taal van de app aan.',
+              children: [
+                _SettingsNavigationTile(
+                  icon: Icons.language_outlined,
+                  title: 'Taal',
+                  trailingText: 'Nederlands',
+                  onTap: () => _showNotImplemented('Taal wijzigen'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _SettingsSection(
+              title: 'Privacy en gegevens',
+              description: 'Privacyverklaring en voorwaarden.',
+              children: [
+                _SettingsNavigationTile(
+                  icon: Icons.privacy_tip_outlined,
+                  title: 'Privacyverklaring',
+                  onTap: () => _showNotImplemented('Privacyverklaring'),
+                ),
+                _SettingsNavigationTile(
+                  icon: Icons.description_outlined,
+                  title: 'Gebruiksvoorwaarden',
+                  onTap: () => _showNotImplemented('Gebruiksvoorwaarden'),
+                ),
+                _SettingsNavigationTile(
+                  icon: Icons.history_outlined,
+                  title: 'Mijn activiteiten',
+                  onTap: () => context.push('/settings/activity'),
+                ),
+                _SettingsNavigationTile(
+                  icon: Icons.delete_outline_rounded,
+                  title: "Verwijder mijn gegevens",
+                  destructive: true,
+                  onTap: () => _showNotImplemented("Gegevens verwijderen"),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _SettingsSection(
+              title: 'Help en over',
+              description: 'Ondersteuning en informatie.',
+              children: [
+                _SettingsNavigationTile(
+                  icon: Icons.help_outline_rounded,
+                  title: 'Veelgestelde vragen',
+                  onTap: () => _showNotImplemented('Veelgestelde vragen'),
+                ),
+                _SettingsNavigationTile(
+                  icon: Icons.report_problem_outlined,
+                  title: 'Probleem melden',
+                  onTap: () => _showNotImplemented('Probleem melden'),
+                ),
+                _SettingsInfoTile(
+                  icon: Icons.info_outline_rounded,
+                  title: 'Over de app',
+                  value: _versionText,
+                ),
+              ],
+            ),
+          ],
         ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-        children: [
-          _SettingsHeaderCard(
-            version: _versionText,
-            trackingActive: locationTracker.isRunning,
-          ),
-          _SettingsSection(
-            title: 'Meldingen en locatie',
-            description: 'Beheer meldingen en live tracking.',
-            children: [
-              _SettingsSwitchTile(
-                icon: Icons.volume_up_outlined,
-                title: 'Meldingsgeluid',
-                value: _notificationSoundEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    _notificationSoundEnabled = value;
-                  });
-                },
-              ),
-              _SettingsNavigationTile(
-                icon: Icons.notifications_active_outlined,
-                title: 'Pushmeldingen testen',
-                onTap: () => _showNotImplemented('Pushmeldingen testen'),
-              ),
-              _SettingsStatusTile(
-                icon: Icons.location_on_outlined,
-                title: 'Locatiestatus',
-                status: locationAvailable ? 'Aan' : 'Uit',
-                active: locationAvailable,
-              ),
-              _SettingsStatusTile(
-                icon: Icons.my_location_outlined,
-                title: "Locatietracking",
-                status: locationTracker.isRunning ? 'Actief' : 'Niet actief',
-                active: locationTracker.isRunning,
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          _SettingsSection(
-            title: 'Taal',
-            description: 'Pas de taal van de app aan.',
-            children: [
-              _SettingsNavigationTile(
-                icon: Icons.language_outlined,
-                title: 'Taal',
-                trailingText: 'Nederlands',
-                onTap: () => _showNotImplemented('Taal wijzigen'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          _SettingsSection(
-            title: 'Privacy en gegevens',
-            description: 'Privacyverklaring en voorwaarden.',
-            children: [
-              _SettingsNavigationTile(
-                icon: Icons.privacy_tip_outlined,
-                title: 'Privacyverklaring',
-                onTap: () => _showNotImplemented('Privacyverklaring'),
-              ),
-              _SettingsNavigationTile(
-                icon: Icons.description_outlined,
-                title: 'Gebruiksvoorwaarden',
-                onTap: () => _showNotImplemented('Gebruiksvoorwaarden'),
-              ),
-              _SettingsNavigationTile(
-                icon: Icons.history_outlined,
-                title: 'Mijn activiteit',
-                onTap: () => _showNotImplemented('Mijn activiteit'),
-              ),
-              _SettingsNavigationTile(
-                icon: Icons.delete_outline_rounded,
-                title: "Verwijder mijn gegevens",
-                destructive: true,
-                onTap: () => _showNotImplemented("Gegevens verwijderen"),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          _SettingsSection(
-            title: 'Help en over',
-            description: 'Ondersteuning en informatie.',
-            children: [
-              _SettingsNavigationTile(
-                icon: Icons.help_outline_rounded,
-                title: 'Veelgestelde vragen',
-                onTap: () => _showNotImplemented('Veelgestelde vragen'),
-              ),
-              _SettingsNavigationTile(
-                icon: Icons.report_problem_outlined,
-                title: 'Probleem melden',
-                onTap: () => _showNotImplemented('Probleem melden'),
-              ),
-              _SettingsInfoTile(
-                icon: Icons.info_outline_rounded,
-                title: 'Over de app',
-                value: _versionText,
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

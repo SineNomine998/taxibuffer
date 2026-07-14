@@ -115,6 +115,7 @@ class QueueEntry(models.Model):
         # TIMEOUT = "timeout", "Notification Timeout"
         QUEUE_CLOSED = "queue_closed", "Queue Closed"
         LEFT_ZONE = "left_zone", "Left Buffer Zone"
+        LEFT_QUEUE = "left_queue", "Left Queue"
 
     uuid = models.UUIDField(default=uuid.uuid4, null=False, blank=False, editable=False)
     queue = models.ForeignKey(TaxiQueue, on_delete=models.CASCADE)
@@ -164,6 +165,7 @@ class QueueEntry(models.Model):
         super().save(*args, **kwargs)
 
     def notify(self):
+        from .activity import log_chauffeur_activity
         """Mark entry as notified and create notification record."""
         if self.status != self.Status.WAITING:
             raise ValidationError(f"Cannot notify chauffeur with status: {self.status}")
@@ -180,6 +182,17 @@ class QueueEntry(models.Model):
                 notification_time=timezone.now(),
                 response=QueueNotification.ResponseType.PENDING,
                 sequence_number=sequence,
+            )
+
+            log_chauffeur_activity(
+                chauffeur=self.chauffeur,
+                queue=self.queue,
+                queue_entry=self,
+                event_type=ChauffeurActivityLog.EventType.NOTIFIED,
+                title="U bent opgeroepen",
+                message="Rij door naar de ophaallocatie.",
+                queue_position=self.get_queue_position(),
+                sequence_number=notification.sequence_number,
             )
 
             self.status = QueueEntry.Status.NOTIFIED
@@ -332,3 +345,75 @@ class PushSubscription(models.Model):
 
     def __str__(self):
         return f"PushSubscription {self.id} for chauffeur {self.chauffeur}"
+
+
+class ChauffeurActivityLog(models.Model):
+    class EventType(models.TextChoices):
+        QUEUE_JOINED = "queue_joined", "Aangemeld"
+        QUEUE_LEFT = "queue_left", "Wachtrij verlaten"
+        QUEUE_POSITION_CHANGED = "queue_position_changed", "Positie gewijzigd"
+        LOCATION_INSIDE = "location_inside", "Binnen bufferzone"
+        LOCATION_OUTSIDE_WARNING = "location_outside_warning", "Buiten bufferzone"
+        LOCATION_RECOVERED = "location_recovered", "Terug in bufferzone"
+        LOCATION_UNAVAILABLE = "location_unavailable", "Locatie niet beschikbaar"
+        LOCATION_TIMEOUT_DEQUEUED = (
+            "location_timeout_dequeued",
+            "Verwijderd door locatiecontrole",
+        )
+        NOTIFIED = "notified", "Opgroepen"
+        NOTIFICATION_ACCEPTED = "notification_accepted", "Oproep bevestigd"
+        OFFICER_DEQUEUED = "officer_dequeued", "Afgehandeld"
+        SYSTEM_DEQUEUED = "system_dequeued", "Systeemverwijdering"
+
+    chauffeur = models.ForeignKey(
+        "accounts.Chauffeur",
+        on_delete=models.CASCADE,
+        related_name="activity_logs",
+    )
+
+    queue = models.ForeignKey(
+        "queueing.TaxiQueue",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="activity_logs",
+    )
+
+    queue_entry = models.ForeignKey(
+        "queueing.QueueEntry",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="activity_logs",
+    )
+
+    event_type = models.CharField(
+        max_length=50,
+        choices=EventType.choices,
+    )
+
+    title = models.CharField(max_length=120)
+    message = models.TextField(blank=True)
+
+    queue_position = models.PositiveIntegerField(null=True, blank=True)
+    previous_queue_position = models.PositiveIntegerField(null=True, blank=True)
+
+    sequence_number = models.PositiveIntegerField(null=True, blank=True)
+
+    lat = models.FloatField(null=True, blank=True)
+    lng = models.FloatField(null=True, blank=True)
+
+    metadata = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["chauffeur", "-created_at"]),
+            models.Index(fields=["queue_entry", "-created_at"]),
+            models.Index(fields=["event_type", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.chauffeur_id} - {self.event_type} - {self.created_at}"

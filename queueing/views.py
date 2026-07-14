@@ -1014,7 +1014,7 @@ class LeaveQueueBeforeNotificationAPIView(View):
 
             # Check if entry is active (i.e. waiting or notified)
             if entry.status in ACTIVE_QUEUE_STATUSES:
-                entry.status = QueueEntry.Status.LEFT_ZONE
+                entry.status = QueueEntry.Status.LEFT_QUEUE
                 entry.dequeued_at = timezone.now()
                 entry.save()
 
