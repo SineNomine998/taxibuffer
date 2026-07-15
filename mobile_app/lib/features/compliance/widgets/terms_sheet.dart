@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme.dart';
-import '../services/privacy_service.dart';
+import 'package:mobile_app/features/compliance/terms_of_use/models/terms_of_use_data.dart';
+import 'package:mobile_app/features/compliance/terms_of_use/services/terms_service.dart';
+import '../../../core/theme.dart';
 
-class PrivacyNoticeSheet extends StatefulWidget {
-  final PrivacyPolicyData? policy;
-  final PrivacyService? service;
+class TermsOfUseSheet extends StatefulWidget {
+  final TermsOfUseData? policy;
+  final TermsService? service;
 
-  const PrivacyNoticeSheet({this.policy, this.service, super.key});
+  const TermsOfUseSheet({this.policy, this.service, super.key});
 
   static Future<bool?> show(
     BuildContext context, {
-    PrivacyService? service,
+    TermsService? service,
   }) async {
-    final svc = service ?? PrivacyService();
-    final policy = await svc.fetchPublicPrivacyPolicy();
+    final svc = service ?? TermsService();
+    final policy = await svc.fetchPublicTermsOfUse();
 
     if (!context.mounted) return null;
 
@@ -22,15 +23,15 @@ class PrivacyNoticeSheet extends StatefulWidget {
       isScrollControlled: true,
       isDismissible: true,
       enableDrag: true,
-      builder: (_) => PrivacyNoticeSheet(policy: policy, service: svc),
+      builder: (_) => TermsOfUseSheet(policy: policy, service: svc),
     );
   }
 
   @override
-  State<PrivacyNoticeSheet> createState() => _PrivacyNoticeSheetState();
+  State<TermsOfUseSheet> createState() => _TermsOfUseSheetState();
 }
 
-class _PrivacyNoticeSheetState extends State<PrivacyNoticeSheet> {
+class _TermsOfUseSheetState extends State<TermsOfUseSheet> {
   String? _error;
 
   @override

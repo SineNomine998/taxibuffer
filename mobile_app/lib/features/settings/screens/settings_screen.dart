@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/theme.dart';
-import 'package:mobile_app/features/compliance/privacy/widgets/privacy_sheet.dart';
+import 'package:mobile_app/features/compliance/widgets/privacy_sheet.dart';
+import 'package:mobile_app/features/compliance/widgets/terms_sheet.dart';
 import 'package:mobile_app/features/queue/queue_location_tracker.dart';
 import 'package:mobile_app/widgets/screen_header.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -56,6 +57,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await PrivacyNoticeSheet.show(context);
   }
 
+  Future<void> _showTermsOfUse() async {
+    await TermsOfUseSheet.show(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     final locationTracker = context.watch<QueueLocationTracker>();
@@ -100,19 +105,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             const SizedBox(height: 18),
-            _SettingsSection(
-              title: 'Taal',
-              description: 'Pas de taal van de app aan.',
-              children: [
-                _SettingsNavigationTile(
-                  icon: Icons.language_outlined,
-                  title: 'Taal',
-                  trailingText: 'Nederlands',
-                  onTap: () => _showNotImplemented('Taal wijzigen'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
+            // _SettingsSection(
+            //   title: 'Taal',
+            //   description: 'Pas de taal van de app aan.',
+            //   children: [
+            //     _SettingsNavigationTile(
+            //       icon: Icons.language_outlined,
+            //       title: 'Taal',
+            //       trailingText: 'Nederlands',
+            //       onTap: () => _showNotImplemented('Taal wijzigen'),
+            //     ),
+            //   ],
+            // ),
+            // const SizedBox(height: 18),
             _SettingsSection(
               title: 'Privacy en gegevens',
               description: 'Privacyverklaring en voorwaarden.',
@@ -125,19 +130,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SettingsNavigationTile(
                   icon: Icons.description_outlined,
                   title: 'Gebruiksvoorwaarden',
-                  onTap: () => _showNotImplemented('Gebruiksvoorwaarden'),
+                  onTap: () async => await _showTermsOfUse(),
                 ),
                 _SettingsNavigationTile(
                   icon: Icons.history_outlined,
                   title: 'Mijn activiteiten',
                   onTap: () => context.push('/settings/activity'),
                 ),
-                _SettingsNavigationTile(
-                  icon: Icons.delete_outline_rounded,
-                  title: "Verwijder mijn gegevens",
-                  destructive: true,
-                  onTap: () => _showNotImplemented("Gegevens verwijderen"),
-                ),
+                // _SettingsNavigationTile(
+                //   icon: Icons.delete_outline_rounded,
+                //   title: "Verwijder mijn gegevens",
+                //   destructive: true,
+                //   onTap: () => _showNotImplemented("Gegevens verwijderen"),
+                // ),
               ],
             ),
             const SizedBox(height: 18),
@@ -150,11 +155,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'Veelgestelde vragen',
                   onTap: () => _showNotImplemented('Veelgestelde vragen'),
                 ),
-                _SettingsNavigationTile(
-                  icon: Icons.report_problem_outlined,
-                  title: 'Probleem melden',
-                  onTap: () => _showNotImplemented('Probleem melden'),
-                ),
+                // _SettingsNavigationTile(
+                //   icon: Icons.report_problem_outlined,
+                //   title: 'Probleem melden',
+                //   onTap: () => _showNotImplemented('Probleem melden'),
+                // ),
                 _SettingsInfoTile(
                   icon: Icons.info_outline_rounded,
                   title: 'Over de app',
@@ -171,9 +176,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
 class _SettingsIcon extends StatelessWidget {
   final IconData icon;
-  final bool destructive;
+  final bool destructive = false;
+  // final bool destructive;
 
-  const _SettingsIcon(this.icon, {this.destructive = false});
+  // const _SettingsIcon(this.icon, {this.destructive = false});
+  const _SettingsIcon(this.icon);
 
   @override
   Widget build(BuildContext context) {
@@ -375,9 +382,9 @@ class _SettingsSection extends StatelessWidget {
                               color: Color(0xFF111827),
                             ),
                           ),
-          
+
                           const SizedBox(height: 3),
-          
+
                           Text(
                             description,
                             style: const TextStyle(
@@ -392,7 +399,7 @@ class _SettingsSection extends StatelessWidget {
                   ],
                 ),
               ),
-          
+
               for (int i = 0; i < children.length; i++) ...[
                 children[i],
                 if (i != children.length - 1)
@@ -409,16 +416,16 @@ class _SettingsSection extends StatelessWidget {
 class _SettingsNavigationTile extends StatelessWidget {
   final IconData icon;
   final String title;
-  final String? trailingText;
-  final bool destructive;
+  final String? trailingText = null;
+  // final bool destructive;
   final VoidCallback onTap;
 
   const _SettingsNavigationTile({
     required this.icon,
     required this.title,
     required this.onTap,
-    this.trailingText,
-    this.destructive = false,
+    // this.trailingText,
+    // this.destructive = false,
   });
 
   @override
@@ -426,7 +433,8 @@ class _SettingsNavigationTile extends StatelessWidget {
     return ListTile(
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-      leading: _SettingsIcon(icon, destructive: destructive),
+      // leading: _SettingsIcon(icon, destructive: destructive),
+      leading: _SettingsIcon(icon),
       title: Text(
         title,
         style: const TextStyle(
