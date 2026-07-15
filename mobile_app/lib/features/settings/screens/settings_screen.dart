@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/theme.dart';
+import 'package:mobile_app/features/privacy/widgets/privacy_sheet.dart';
 import 'package:mobile_app/features/queue/queue_location_tracker.dart';
 import 'package:mobile_app/widgets/screen_header.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -15,7 +16,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _notificationSoundEnabled = true;
   String _versionText = '';
   bool locationAvailable = false;
 
@@ -52,6 +52,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _showPrivacyPolicy() async {
+    await PrivacyNoticeSheet.show(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     final locationTracker = context.watch<QueueLocationTracker>();
@@ -76,16 +80,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'Meldingen en locatie',
               description: 'Beheer meldingen en live tracking.',
               children: [
-                _SettingsSwitchTile(
-                  icon: Icons.volume_up_outlined,
-                  title: 'Meldingsgeluid',
-                  value: _notificationSoundEnabled,
-                  onChanged: (value) {
-                    setState(() {
-                      _notificationSoundEnabled = value;
-                    });
-                  },
-                ),
                 _SettingsNavigationTile(
                   icon: Icons.notifications_active_outlined,
                   title: 'Pushmeldingen testen',
@@ -126,7 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SettingsNavigationTile(
                   icon: Icons.privacy_tip_outlined,
                   title: 'Privacyverklaring',
-                  onTap: () => _showNotImplemented('Privacyverklaring'),
+                  onTap: () async => await _showPrivacyPolicy(),
                 ),
                 _SettingsNavigationTile(
                   icon: Icons.description_outlined,
@@ -148,7 +142,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 18),
             _SettingsSection(
-              title: 'Help en over',
+              title: 'Hulp & info',
               description: 'Ondersteuning en informatie.',
               children: [
                 _SettingsNavigationTile(
@@ -356,49 +350,57 @@ class _SettingsSection extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontFamily: 'DM Sans',
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF111827),
-                        ),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+          
+                          const SizedBox(height: 3),
+          
+                          Text(
+                            description,
+                            style: const TextStyle(
+                              fontFamily: 'DM Sans',
+                              fontSize: 13,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
                       ),
-
-                      const SizedBox(height: 3),
-
-                      Text(
-                        description,
-                        style: const TextStyle(
-                          fontFamily: 'DM Sans',
-                          fontSize: 13,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
+          
+              for (int i = 0; i < children.length; i++) ...[
+                children[i],
+                if (i != children.length - 1)
+                  const Divider(height: 1, indent: 70, endIndent: 20),
               ],
-            ),
+            ],
           ),
-
-          for (int i = 0; i < children.length; i++) ...[
-            children[i],
-            if (i != children.length - 1)
-              const Divider(height: 1, indent: 70, endIndent: 20),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -455,39 +457,39 @@ class _SettingsNavigationTile extends StatelessWidget {
   }
 }
 
-class _SettingsSwitchTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final bool value;
-  final ValueChanged<bool> onChanged;
+// class _SettingsSwitchTile extends StatelessWidget {
+//   final IconData icon;
+//   final String title;
+//   final bool value;
+//   final ValueChanged<bool> onChanged;
 
-  const _SettingsSwitchTile({
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.onChanged,
-  });
+//   const _SettingsSwitchTile({
+//     required this.icon,
+//     required this.title,
+//     required this.value,
+//     required this.onChanged,
+//   });
 
-  @override
-  Widget build(BuildContext context) {
-    return SwitchListTile(
-      value: value,
-      onChanged: onChanged,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-      secondary: Icon(icon, color: const Color(0xFF4B5563)),
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontFamily: 'DM Sans',
-          fontSize: 15,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF1F2937),
-        ),
-      ),
-      activeThumbColor: AppColors.gradientStart,
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return SwitchListTile(
+//       value: value,
+//       onChanged: onChanged,
+//       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+//       secondary: Icon(icon, color: const Color(0xFF4B5563)),
+//       title: Text(
+//         title,
+//         style: const TextStyle(
+//           fontFamily: 'DM Sans',
+//           fontSize: 15,
+//           fontWeight: FontWeight.w700,
+//           color: Color(0xFF1F2937),
+//         ),
+//       ),
+//       activeThumbColor: AppColors.gradientStart,
+//     );
+//   }
+// }
 
 class _SettingsStatusTile extends StatelessWidget {
   final IconData icon;
