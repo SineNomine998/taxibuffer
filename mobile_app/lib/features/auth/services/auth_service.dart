@@ -95,6 +95,8 @@ class AuthService {
     required List<Map<String, dynamic>> vehicles,
     required String privacyPolicyVersion,
     required bool privacyPolicyAccepted,
+    required String termsOfUseVersion,
+    required bool termsOfUseAccepted
   }) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/mobile/auth/signup/');
 
@@ -111,6 +113,8 @@ class AuthService {
         'vehicles': vehicles,
         'privacy_policy_version': privacyPolicyVersion,
         'privacy_policy_accepted': privacyPolicyAccepted,
+        'terms_of_use_version': termsOfUseVersion,
+        'terms_of_use_accepted': termsOfUseAccepted,
       }),
     );
 

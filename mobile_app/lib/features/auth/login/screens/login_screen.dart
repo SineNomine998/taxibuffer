@@ -3,9 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/dialogs.dart';
 import 'package:mobile_app/core/theme.dart';
-import 'package:mobile_app/features/location/services/location_service.dart';
-import 'package:mobile_app/features/privacy/privacy_gate_state.dart';
-import 'package:mobile_app/features/privacy/services/privacy_service.dart';
+import 'package:mobile_app/features/auth/auth_gate_state.dart';
+import 'package:mobile_app/features/compliance/terms_of_use/terms_gate_state.dart';
+import 'package:mobile_app/features/compliance/privacy/privacy_gate_state.dart';
+import 'package:mobile_app/features/compliance/privacy/services/privacy_service.dart';
 import 'package:mobile_app/widgets/app_logo_row.dart';
 import 'package:mobile_app/widgets/footer_note.dart';
 import 'package:provider/provider.dart';
@@ -59,35 +60,49 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    if (_isLoading) return;
+
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    if (email.isEmpty) {
+    if (email.isEmpty || password.isEmpty) {
       await showAppAlert(
         context: context,
-        title: 'Emailadres vereist',
-        message: 'Vul uw emailadres in.',
-        svgAsset: 'assets/warning-badge.svg',
-      );
-      return;
-    }
-    if (password.isEmpty) {
-      await showAppAlert(
-        context: context,
-        title: 'Wachtwoord vereist',
-        message: 'Vul uw wachtwoord in.',
+        title: 'Gegevens vereist',
+        message: 'Vul uw emailadres en wachtwoord in.',
         svgAsset: 'assets/warning-badge.svg',
       );
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
+
+    final authGate = context.read<AuthGateState>();
+    final privacyGate = context.read<PrivacyGateState>();
+    final termsGate = context.read<TermsGateState>();
 
     try {
       await _authService.login(email: email, password: password);
+    } catch (_) {
+      if (!mounted) return;
 
+      authGate.markUnauthenticated();
+      privacyGate.reset();
+      termsGate.reset();
+
+      setState(() => _isLoading = false);
+
+      await showAppAlert(
+        context: context,
+        title: 'Toegang geweigerd',
+        message: 'Ongeldige inloggegevens.',
+        svgAsset: 'assets/pop-up-denied.svg',
+      );
+
+      return;
+    }
+
+    try {
       if (_rememberEmail) {
         await _secureStorage.write(key: _rememberedEmailKey, value: email);
       } else {
@@ -96,18 +111,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
       TextInput.finishAutofillContext();
 
-      final privacyBootstrap = await PrivacyService().fetchBootstrapStatus();
+      final bootstrap = await PrivacyService().fetchBootstrapStatus();
 
       if (!mounted) return;
 
-      final privacyGate = context.read<PrivacyGateState>();
-
       final next = GoRouterState.of(context).uri.queryParameters['next'];
+      final target = next?.isNotEmpty == true ? next! : '/locations';
 
-      if (privacyBootstrap.privacyPolicyRequired) {
+      if (bootstrap.privacyPolicyRequired) {
         privacyGate.reset();
-
-        final target = next?.isNotEmpty == true ? next! : '/locations';
+        termsGate.reset();
+        authGate.markAuthenticated();
 
         context.go('/privacy?next=${Uri.encodeComponent(target)}');
         return;
@@ -115,30 +129,33 @@ class _LoginScreenState extends State<LoginScreen> {
 
       privacyGate.markAccepted();
 
-      final queueState = await LocationService().fetchQueuesState();
+      if (bootstrap.termsOfUseRequired) {
+        termsGate.reset();
+        authGate.markAuthenticated();
 
-      if (!mounted) return;
-
-      if (queueState.hasActiveQueue) {
-        context.go('/queue/${queueState.activeEntryUuid}');
-      } else {
-        context.go(next?.isNotEmpty == true ? next! : '/locations');
+        context.go('/terms?next=${Uri.encodeComponent(target)}');
+        return;
       }
-    } catch (e) {
+
+      termsGate.markAccepted();
+
+      authGate.markAuthenticated();
+
+      context.go(target);
+    } catch (e, stackTrace) {
+      debugPrint('Post-login flow failed: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
 
-      // on failure:
-      await showAppAlert(
-        context: context,
-        title: 'Toegang Geweigerd',
-        message: 'Ongeldige inloggegevens.',
-        svgAsset: 'assets/pop-up-denied.svg',
-      );
+      authGate.markAuthenticated();
+      privacyGate.reset();
+      termsGate.reset();
+
+      context.go('/locations');
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }

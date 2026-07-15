@@ -21,6 +21,22 @@ urlpatterns = [
         views.MobileAcceptPrivacyPolicyView.as_view(),
         name="mobile_accept_privacy_policy",
     ),
+    # Terms of use endpoints
+    path(
+        "terms-of-use/",
+        views.MobileTermsOfUseView.as_view(),
+        name="mobile_terms_of_use",
+    ),
+    path(
+        "terms-of-use/public/",
+        views.PublicTermsOfUseView.as_view(),
+        name="mobile_public_terms_of_use",
+    ),
+    path(
+        "terms-of-use/accept/",
+        views.MobileAcceptTermsOfUseView.as_view(),
+        name="mobile_accept_terms_of_use",
+    ),
     # Login endpoints
     path("auth/login/", views.MobileLoginView.as_view(), name="mobile_login"),
     path(

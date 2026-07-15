@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_app/features/account/account_state.dart';
 import 'package:mobile_app/features/account/screens/account_screen.dart';
 import 'package:mobile_app/features/activity/screens/activity_screen.dart';
+import 'package:mobile_app/features/auth/auth_gate_state.dart';
 import 'package:mobile_app/features/auth/login/screens/login_screen.dart';
 import 'package:mobile_app/features/auth/password_reset/screens/password_reset_screen.dart';
 import 'package:mobile_app/features/auth/password_reset/screens/password_reset_sent_screen.dart';
@@ -11,13 +12,16 @@ import 'package:mobile_app/features/auth/signup/screens/signup_step2_screen.dart
 import 'package:mobile_app/features/auth/signup/screens/signup_step3_screen.dart';
 import 'package:mobile_app/features/auth/signup/screens/vehicle_add_screen.dart';
 import 'package:mobile_app/features/auth/signup/signup_form_state.dart';
+import 'package:mobile_app/features/compliance/terms_of_use/screens/terms_of_use_preview_screen.dart';
+import 'package:mobile_app/features/compliance/terms_of_use/screens/terms_of_use_screen.dart';
+import 'package:mobile_app/features/compliance/terms_of_use/terms_gate_state.dart';
 import 'package:mobile_app/features/info/screens/info_screen.dart';
 import 'package:mobile_app/features/info/screens/startup_screen.dart';
 import 'package:mobile_app/features/location/screens/location_selection_info_screen.dart';
 import 'package:mobile_app/features/location/screens/location_selection_screen.dart';
-import 'package:mobile_app/features/privacy/privacy_gate_state.dart';
-import 'package:mobile_app/features/privacy/screens/privacy_policy_preview_screen.dart';
-import 'package:mobile_app/features/privacy/screens/privacy_policy_screen.dart';
+import 'package:mobile_app/features/compliance/privacy/privacy_gate_state.dart';
+import 'package:mobile_app/features/compliance/privacy/screens/privacy_policy_preview_screen.dart';
+import 'package:mobile_app/features/compliance/privacy/screens/privacy_policy_screen.dart';
 import 'package:mobile_app/features/queue/queue_state.dart';
 import 'package:mobile_app/features/queue/screens/queue_status_screen.dart';
 import 'package:mobile_app/features/sequence/screens/sequence_history_screen.dart';
@@ -31,13 +35,20 @@ final rootNavigatorKey = GlobalKey<NavigatorState>();
 final GoRouter router = GoRouter(
   navigatorKey: rootNavigatorKey,
   initialLocation: '/',
-  refreshListenable: privacyGateState,
+  refreshListenable: Listenable.merge([
+    authGateState,
+    privacyGateState,
+    termsGateState,
+  ]),
   redirect: (context, state) {
+    final auth = authGateState;
     final privacy = privacyGateState;
+    final terms = termsGateState;
+
     final location = state.uri.toString();
     final path = state.uri.path;
 
-    final publicPaths = <String>{
+    final authFreePaths = <String>{
       '/',
       '/info',
       '/login',
@@ -47,49 +58,77 @@ final GoRouter router = GoRouter(
       '/signup/password',
       '/signup/vehicle',
       '/signup/vehicle/add',
-      '/privacy',
       '/privacy-preview',
+      '/terms-preview',
     };
 
-    final isPublicPath = publicPaths.contains(path);
-    final isPrivacyPath = path == '/privacy';
+    final compliancePaths = <String>{'/privacy', '/terms'};
 
-    // Let public onboarding/auth screens work without privacy acceptance.
-    // Exception: if the user tries to leave privacy while required, protected routes below will redirect back.
-    if (path == '/' ||
-        path == '/info' ||
-        path == '/login' ||
-        path == '/password-reset' ||
-        path == '/password-reset/sent' ||
-        path.startsWith('/signup')) {
+    final isAuthFreePath =
+        authFreePaths.contains(path) || path.startsWith('/signup');
+    final isCompliancePath = compliancePaths.contains(path);
+
+    if (auth.status == AuthGateStatus.unknown) {
+      auth.check();
       return null;
     }
 
-    // Privacy screen itself is allowed, otherwise user could never accept.
-    if (isPrivacyPath) {
+    if (auth.status == AuthGateStatus.checking) {
       return null;
     }
 
-    // For protected app screens, check privacy status.
-    if (!isPublicPath) {
-      if (privacy.status == PrivacyGateStatus.unknown) {
-        privacy.check();
-        return null;
-      }
+    if (auth.status == AuthGateStatus.unauthenticated) {
+      if (isAuthFreePath) return null;
 
-      if (privacy.status == PrivacyGateStatus.checking) {
-        return null;
-      }
+      final next = Uri.encodeComponent(location);
+      return '/login?next=$next';
+    }
 
-      if (privacy.status == PrivacyGateStatus.required) {
-        final next = Uri.encodeComponent(location);
-        return '/privacy?next=$next';
+    // User is authenticated. Do not let authenticated users sit on login/signup.
+    if (auth.status == AuthGateStatus.authenticated) {
+      if (path == '/login' || path.startsWith('/signup')) {
+        return '/locations';
       }
+    }
 
-      if (privacy.status == PrivacyGateStatus.error) {
-        final next = Uri.encodeComponent(location);
-        return '/privacy?next=$next';
-      }
+    // Allow privacy/terms screens so user can accept.
+    if (isCompliancePath) {
+      return null;
+    }
+
+    // Public non-auth app screens can continue.
+    if (isAuthFreePath) {
+      return null;
+    }
+
+    if (privacy.status == PrivacyGateStatus.unknown) {
+      privacy.check();
+      return null;
+    }
+
+    if (privacy.status == PrivacyGateStatus.checking) {
+      return null;
+    }
+
+    if (privacy.status == PrivacyGateStatus.required ||
+        privacy.status == PrivacyGateStatus.error) {
+      final next = Uri.encodeComponent(location);
+      return '/privacy?next=$next';
+    }
+
+    if (terms.status == TermsGateStatus.unknown) {
+      terms.check();
+      return null;
+    }
+
+    if (terms.status == TermsGateStatus.checking) {
+      return null;
+    }
+
+    if (terms.status == TermsGateStatus.required ||
+        terms.status == TermsGateStatus.error) {
+      final next = Uri.encodeComponent(location);
+      return '/terms?next=$next';
     }
 
     return null;
@@ -135,6 +174,10 @@ final GoRouter router = GoRouter(
           path: '/privacy-preview',
           builder: (_, _) => const PrivacyPolicyPreviewScreen(),
         ),
+        GoRoute(
+          path: '/terms-preview',
+          builder: (_, _) => const TermsOfUsePreviewScreen(),
+        ),
       ],
     ),
 
@@ -143,6 +186,14 @@ final GoRouter router = GoRouter(
       builder: (context, state) {
         final next = state.uri.queryParameters['next'];
         return PrivacyPolicyScreen(next: next);
+      },
+    ),
+
+    GoRoute(
+      path: '/terms',
+      builder: (context, state) {
+        final next = state.uri.queryParameters['next'];
+        return TermsOfUseScreen(next: next);
       },
     ),
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme.dart';
+import '../../../../core/theme.dart';
 import '../services/privacy_service.dart';
 
 class PrivacyNoticeSheet extends StatefulWidget {

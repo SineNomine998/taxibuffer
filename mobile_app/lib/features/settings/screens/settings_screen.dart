@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/theme.dart';
-import 'package:mobile_app/features/privacy/widgets/privacy_sheet.dart';
+import 'package:mobile_app/features/compliance/privacy/widgets/privacy_sheet.dart';
 import 'package:mobile_app/features/queue/queue_location_tracker.dart';
 import 'package:mobile_app/widgets/screen_header.dart';
 import 'package:package_info_plus/package_info_plus.dart';

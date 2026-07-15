@@ -2,22 +2,30 @@ import 'dart:convert';
 
 import 'package:mobile_app/core/config/api_config.dart';
 
-import '../../../core/config/api_client.dart';
+import '../../../../core/config/api_client.dart';
 import 'package:http/http.dart' as http;
 
 class BootstrapStatus {
   final bool privacyPolicyRequired;
   final String? currentPrivacyPolicyVersion;
 
+  final bool termsOfUseRequired;
+  final String? currentTermsOfUseVersion;
+
   const BootstrapStatus({
     required this.privacyPolicyRequired,
     required this.currentPrivacyPolicyVersion,
+    required this.termsOfUseRequired,
+    required this.currentTermsOfUseVersion,
   });
 
   factory BootstrapStatus.fromJson(Map<String, dynamic> json) {
     return BootstrapStatus(
       privacyPolicyRequired: json['privacy_policy_required'] == true,
       currentPrivacyPolicyVersion: json['current_privacy_policy_version']
+          ?.toString(),
+      termsOfUseRequired: json['terms_of_use_required'] == true,
+      currentTermsOfUseVersion: json['current_terms_of_use_version']
           ?.toString(),
     );
   }

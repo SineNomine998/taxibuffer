@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/config/api_client.dart';
-import '../../../core/theme.dart';
+import '../../../../core/config/api_client.dart';
+import '../../../../core/theme.dart';
 import '../privacy_gate_state.dart';
 import '../services/privacy_service.dart';
 

@@ -40,6 +40,15 @@ class PrivacyGateState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setFromBootstrap(BootstrapStatus bootstrap) {
+    _status = bootstrap.privacyPolicyRequired
+        ? PrivacyGateStatus.required
+        : PrivacyGateStatus.accepted;
+
+    _error = null;
+    notifyListeners();
+  }
+
   void markAccepted() {
     _status = PrivacyGateStatus.accepted;
     _error = null;

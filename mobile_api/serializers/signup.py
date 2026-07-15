@@ -3,7 +3,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
 from .vehicle import MobileVehicleSerializer
-from compliance.services import get_active_privacy_policy
+from compliance.services import get_active_privacy_policy, get_active_terms_of_use
 
 User = get_user_model()
 
@@ -18,6 +18,8 @@ class MobileSignUpSerializer(serializers.Serializer):
     vehicles = MobileVehicleSerializer(many=True)
     privacy_policy_version = serializers.CharField()
     privacy_policy_accepted = serializers.BooleanField()
+    terms_of_use_version = serializers.CharField()
+    terms_of_use_accepted = serializers.BooleanField()
 
     def validate_email(self, value):
         value = value.lower().strip()
@@ -76,6 +78,23 @@ class MobileSignUpSerializer(serializers.Serializer):
         if attrs.get("privacy_policy_version") != policy.version:
             raise serializers.ValidationError(
                 {"privacy_policy": "Privacyverklaring versie komt niet overeen."}
+            )
+
+        terms_of_use = get_active_terms_of_use()
+
+        if terms_of_use is None:
+            raise serializers.ValidationError(
+                {"terms_of_use": "Geen actieve gebruiksvoorwaarden gevonden."}
+            )
+
+        if not attrs.get("terms_of_use_accepted"):
+            raise serializers.ValidationError(
+                {"terms_of_use": "Gebruiksvoorwaarden moet worden geaccepteerd."}
+            )
+
+        if attrs.get("terms_of_use_version") != terms_of_use.version:
+            raise serializers.ValidationError(
+                {"terms_of_use": "Gebruiksvoorwaarden versie komt niet overeen."}
             )
 
         return attrs

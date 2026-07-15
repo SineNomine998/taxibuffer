@@ -5,7 +5,9 @@ import 'package:mobile_app/features/account/widgets/add_vehicle_card.dart';
 import 'package:mobile_app/features/account/widgets/edit_vehicle_sheet.dart';
 import 'package:mobile_app/features/account/widgets/profile_card.dart';
 import 'package:mobile_app/features/account/widgets/vehicles_card.dart';
-import 'package:mobile_app/features/privacy/privacy_gate_state.dart';
+import 'package:mobile_app/features/auth/auth_gate_state.dart';
+import 'package:mobile_app/features/compliance/privacy/privacy_gate_state.dart';
+import 'package:mobile_app/features/compliance/terms_of_use/terms_gate_state.dart';
 import 'package:mobile_app/features/queue/queue_location_tracker.dart';
 import 'package:mobile_app/features/queue/queue_tracking_sync.dart';
 import 'package:provider/provider.dart';
@@ -146,7 +148,9 @@ class _AccountScreenState extends State<AccountScreen> {
 
     if (!mounted) return;
 
+    context.read<AuthGateState>().markUnauthenticated();
     context.read<PrivacyGateState>().reset();
+    context.read<TermsGateState>().reset();
     await context.read<QueueLocationTracker>().stop();
 
     if (!mounted) return;

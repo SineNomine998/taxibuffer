@@ -3,8 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/dialogs.dart';
 import 'package:mobile_app/features/auth/services/auth_service.dart';
 import 'package:mobile_app/features/auth/signup/signup_form_state.dart';
-import 'package:mobile_app/features/privacy/privacy_gate_state.dart';
-import 'package:mobile_app/features/privacy/services/privacy_service.dart';
+import 'package:mobile_app/features/compliance/privacy/privacy_gate_state.dart';
+import 'package:mobile_app/features/compliance/privacy/services/privacy_service.dart';
+import 'package:mobile_app/features/compliance/terms_of_use/terms_gate_state.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../widgets/app_shell_scaffold.dart';
@@ -70,6 +71,18 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
       return;
     }
 
+    if (!signupFormState.termsOfUseAccepted ||
+        signupFormState.acceptedTermsOfUseVersion == null) {
+      await showAppAlert(
+        context: context,
+        title: "Gebruiksvoorwaarden vereist",
+        message:
+            "Lees en bevestig de gebruiksvoorwaarden voordat u een account aanmaakt.",
+        svgAsset: "assets/warning-badge.svg",
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -85,6 +98,8 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
         vehicles: vehicles,
         privacyPolicyVersion: signupFormState.acceptedPrivacyPolicyVersion!,
         privacyPolicyAccepted: true,
+        termsOfUseVersion: signupFormState.acceptedTermsOfUseVersion!,
+        termsOfUseAccepted: true,
       );
 
       if (!mounted) return;
@@ -96,14 +111,23 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
       if (!mounted) return;
 
       final privacyGate = context.read<PrivacyGateState>();
+      final termsGate = context.read<TermsGateState>();
 
       if (bootstrap.privacyPolicyRequired) {
         privacyGate.reset();
+        termsGate.reset();
         context.go('/privacy?next=${Uri.encodeComponent('/locations')}');
         return;
       }
 
+      if (bootstrap.termsOfUseRequired) {
+        termsGate.reset();
+        context.go('/terms?next=${Uri.encodeComponent('/locations')}');
+        return;
+      }
+
       privacyGate.markAccepted();
+      termsGate.markAccepted();
       context.go('/locations');
     } catch (e) {
       if (!mounted) return;
@@ -127,6 +151,7 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
   Widget build(BuildContext context) {
     final formState = context.watch<SignupFormState>();
     final privacyAccepted = formState.privacyPolicyAccepted;
+    final termsAccepted = formState.termsOfUseAccepted;
     final current = formState.currentVehicle;
     final others = formState.otherVehicles;
 
@@ -267,14 +292,54 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
                   const SizedBox(height: 8),
                   GestureDetector(
                     onTap: () {
-                      context.push(
-                        '/privacy-preview',
-                      );
+                      context.push('/privacy-preview');
                     },
                     child: Text(
                       privacyAccepted
                           ? 'Privacyverklaring opnieuw bekijken'
                           : 'Privacyverklaring bekijken en bevestigen',
+                      style: const TextStyle(
+                        fontFamily: 'DM Sans',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF8A6A00),
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  const Text(
+                    'Gebruiksvoorwaarden',
+                    style: TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF222222),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    termsAccepted
+                        ? 'Gebruiksvoorwaarden bevestigd.'
+                        : 'Lees en bevestig de gebruiksvoorwaarden voordat u een account aanmaakt.',
+                    style: const TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontSize: 13,
+                      height: 1.35,
+                      color: Color(0xFF4B4B4B),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () {
+                      context.push('/terms-preview');
+                    },
+                    child: Text(
+                      termsAccepted
+                          ? 'Gebruiksvoorwaarden opnieuw bekijken'
+                          : 'Gebruiksvoorwaarden bekijken en bevestigen',
                       style: const TextStyle(
                         fontFamily: 'DM Sans',
                         fontSize: 13,
