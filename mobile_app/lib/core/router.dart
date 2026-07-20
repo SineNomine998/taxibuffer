@@ -84,12 +84,17 @@ final GoRouter router = GoRouter(
       return '/login?next=$next';
     }
 
-    // User is authenticated. Do not let authenticated users sit on login/signup.
-    if (auth.status == AuthGateStatus.authenticated) {
-      if (path == '/login' || path.startsWith('/signup')) {
-        return '/locations';
-      }
-    }
+    // TODO: Let LoginScreen decide where to go after login
+    // // User is authenticated. Do not let authenticated users sit on login/signup.
+    // if (auth.status == AuthGateStatus.authenticated) {
+    //   final onAuthScreen = path == '/login' || path.startsWith('/signup');
+
+    //   if (onAuthScreen &&
+    //       privacy.status == PrivacyGateStatus.accepted &&
+    //       terms.status == TermsGateStatus.accepted) {
+    //     return '/locations';
+    //   }
+    // }
 
     // Allow privacy/terms screens so user can accept.
     if (isCompliancePath) {

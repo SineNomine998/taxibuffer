@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_app/features/auth/auth_gate_state.dart';
+import 'package:mobile_app/features/compliance/terms_of_use/terms_gate_state.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/config/api_client.dart';
@@ -61,7 +63,24 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
       }
 
       setState(() => _policy = policy);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+
+        if (_scrollController.position.maxScrollExtent <= 0) {
+          setState(() => _hasScrolledToBottom = true);
+        }
+      });
     } on ApiAuthException {
+      if (!mounted) return;
+
+      context.read<AuthGateState>().markUnauthenticated();
+      context.read<PrivacyGateState>().reset();
+      context.read<TermsGateState>().reset();
+
+      final next = widget.next?.isNotEmpty == true
+          ? widget.next!
+          : '/locations';
+      context.go('/login?next=${Uri.encodeComponent(next)}');
       return;
     } catch (_) {
       if (!mounted) return;
@@ -113,6 +132,21 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
   Widget build(BuildContext context) {
     final policy = _policy;
 
+    if (policy == null || policy.bodyNl.trim().isEmpty) {
+      return PopScope(
+        canPop: false,
+        child: Scaffold(
+          backgroundColor: const Color(0xFFF7F7F7),
+          body: SafeArea(
+            child: _ErrorState(
+              message: 'Privacyverklaring kon niet worden geladen.',
+              onRetry: _load,
+            ),
+          ),
+        ),
+      );
+    }
+
     return PopScope(
       canPop: false,
       child: Scaffold(
@@ -134,7 +168,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            policy?.title ?? 'Privacyverklaring',
+                            policy.title,
                             style: const TextStyle(
                               fontFamily: 'DM Sans',
                               fontSize: 24,
@@ -172,7 +206,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                         child: SingleChildScrollView(
                           controller: _scrollController,
                           child: Text(
-                            policy?.bodyNl ?? '',
+                            policy.bodyNl,
                             style: const TextStyle(
                               fontFamily: 'DM Sans',
                               fontSize: 14,
