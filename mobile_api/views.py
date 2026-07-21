@@ -33,6 +33,7 @@ from queueing.constants import ACTIVE_QUEUE_STATUSES
 from geofence.services import point_in_buffer, make_point_from_lat_lng
 from queueing.views import _build_unique_username
 from queueing.activity import log_chauffeur_activity
+from queueing.license_plate_policy import get_active_license_plate_restriction
 from queueing.models import ChauffeurActivityLog
 from compliance.models import PrivacyPolicyAcceptance
 from compliance.services import (
@@ -876,6 +877,21 @@ class MobileJoinQueueView(APIView):
             )
 
         license_plate = current_vehicle.license_plate
+
+        restriction = get_active_license_plate_restriction(license_plate)
+
+        if restriction is not None:
+            return Response(
+                {
+                    "detail": (
+                        "Dit kenteken is tijdelijk geblokkeerd voor de wachtrij. "
+                        "Neem contact op met de medewerker op locatie."
+                    ),
+                    "code": "license_plate_blocked",
+                    "license_plate": license_plate,
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         existing_entry = (
             QueueEntry.objects.filter(

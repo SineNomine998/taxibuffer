@@ -183,7 +183,11 @@ class LocationService {
 
     if (response.statusCode != 200 && response.statusCode != 201) {
       final data = jsonDecode(response.body);
-      throw Exception(data['detail'] ?? 'Aanmelden bij wachtrij mislukt.');
+
+      throw QueueJoinException(
+        code: data['code'],
+        message: data['detail'] ?? 'Aanmelden bij wachtrij mislukt.',
+      );
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -201,6 +205,16 @@ class LocationUnavailableException implements Exception {
   final String message;
 
   const LocationUnavailableException(this.message);
+
+  @override
+  String toString() => message;
+}
+
+class QueueJoinException implements Exception {
+  final String? code;
+  final String message;
+
+  QueueJoinException({required this.code, required this.message});
 
   @override
   String toString() => message;

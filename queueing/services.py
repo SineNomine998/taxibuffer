@@ -8,6 +8,7 @@ import logging
 
 from .models import TaxiQueue, QueueEntry, QueueNotification, PushSubscription
 from .push_views import send_web_push
+from .license_plate_policy import normalize_license_plate_for_policy
 from accounts.models import Chauffeur, ChauffeurVehicle
 from geofence.models import BufferZone
 from geofence.services import point_in_buffer
@@ -130,6 +131,7 @@ class QueueService:
                     status=QueueEntry.Status.WAITING,
                     vehicle=vehicle,
                     license_plate_snapshot=license_plate_snapshot,
+                    normalized_license_plate_snapshot=normalize_license_plate_for_policy(license_plate_snapshot),
                 )
 
                 position = entry.get_queue_position()

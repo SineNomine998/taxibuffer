@@ -10,8 +10,16 @@ from django.utils.decorators import method_decorator
 from django.contrib.auth.mixins import LoginRequiredMixin
 from accounts.models import ChauffeurVehicle, Officer, User
 from control_panel.services import send_notification_to_vehicle
-from queueing.models import QueueNotification, TaxiQueue, QueueEntry, PushSubscription
-from queueing.push_views import send_web_push
+from queueing.models import (
+    QueueNotification,
+    TaxiQueue,
+    QueueEntry,
+    LicensePlateRestriction,
+)
+from queueing.license_plate_policy import (
+    block_license_plate,
+    lift_license_plate_restriction,
+)
 from django.db.models import (
     Subquery,
     OuterRef,
@@ -209,7 +217,7 @@ class QueueMonitorView(ControlLoginRequiredMixin, View):
             called_qs.values(
                 "id",
                 "uuid",
-                "license_plate",
+                "license_plate_snapshot",
                 "status",
                 "display_status",
                 "sequence_number",
@@ -269,7 +277,7 @@ class QueueStatusAPIView(ControlLoginRequiredMixin, View):
                 waiting_qs.values(
                     "id",
                     "uuid",
-                    "license_plate",
+                    "license_plate_snapshot",
                     "created_at",
                     "status",
                 )
@@ -306,7 +314,7 @@ class QueueStatusAPIView(ControlLoginRequiredMixin, View):
                 called_qs.values(
                     "id",
                     "uuid",
-                    "license_plate",
+                    "license_plate_snapshot",
                     "status",
                     "sequence_number",
                     "display_status",
@@ -480,7 +488,7 @@ class MarkEntryDequeuedView(View):
             return JsonResponse(
                 {
                     "success": True,
-                    "message": f"{entry.license_plate} is gemarkeerd als aangekomen.",
+                    "message": f"{entry.license_plate_snapshot} is gemarkeerd als aangekomen.",
                     "entry_id": entry.id,
                     "status": entry.status,
                 }
@@ -489,3 +497,144 @@ class MarkEntryDequeuedView(View):
         except Exception as e:
             logger.exception("Failed to mark entry dequeued")
             return JsonResponse({"success": False, "error": str(e)}, status=400)
+
+
+@method_decorator(user_passes_test(is_officer), name="dispatch")
+class LicensePlateRestrictionListView(View):
+    def get(self, request):
+        active_restrictions = (
+            LicensePlateRestriction.objects.filter(active=True)
+            .select_related("created_by_officer", "source_queue_entry")
+            .order_by("-created_at")
+        )
+
+        lifted_restrictions = (
+            LicensePlateRestriction.objects.filter(active=False)
+            .select_related("created_by_officer", "lifted_by_officer")
+            .order_by("-lifted_at", "-created_at")[:100]
+        )
+
+        return render(
+            request,
+            "control_panel/license_plate_restrictions.html",
+            {
+                "active_restrictions": active_restrictions,
+                "lifted_restrictions": lifted_restrictions,
+            },
+        )
+
+    def post(self, request):
+        license_plate = request.POST.get("license_plate", "").strip()
+        reason = request.POST.get("reason", "").strip()
+        remove_waiting_entries = request.POST.get("remove_waiting_entries") == "on"
+
+        if not license_plate:
+            messages.error(request, "Kenteken is verplicht.")
+            return redirect("control_panel:license_plate_restrictions")
+
+        try:
+            restriction, created, removed_count = block_license_plate(
+                license_plate=license_plate,
+                officer=request.user.officer,
+                reason=reason,
+                remove_waiting_entries=remove_waiting_entries,
+            )
+
+            if created:
+                messages.success(
+                    request,
+                    f"{restriction.display_license_plate} is geblokkeerd. "
+                    f"{removed_count} actieve wachtrij-item(s) verwijderd.",
+                )
+            else:
+                messages.info(
+                    request,
+                    f"{restriction.display_license_plate} was al geblokkeerd.",
+                )
+
+        except Exception as exc:
+            logger.exception("Failed to create license plate restriction")
+            messages.error(request, f"Kon kenteken niet blokkeren: {exc}")
+
+        return redirect("control_panel:license_plate_restrictions")
+
+
+@method_decorator(user_passes_test(is_officer), name="dispatch")
+class LiftLicensePlateRestrictionView(View):
+    def post(self, request, restriction_id):
+        restriction = get_object_or_404(
+            LicensePlateRestriction,
+            id=restriction_id,
+            active=True,
+        )
+
+        lift_license_plate_restriction(
+            restriction=restriction,
+            officer=request.user.officer,
+        )
+
+        messages.success(
+            request,
+            f"Blokkade voor {restriction.display_license_plate} is opgeheven.",
+        )
+
+        return redirect("control_panel:license_plate_restrictions")
+
+
+@method_decorator(user_passes_test(is_officer), name="dispatch")
+class FlagEntryLicensePlateView(View):
+    def post(self, request, queue_id, entry_id):
+        queue = get_object_or_404(TaxiQueue, id=queue_id)
+
+        entry = get_object_or_404(
+            QueueEntry,
+            id=entry_id,
+            queue=queue,
+        )
+
+        license_plate = (entry.license_plate_snapshot or "").strip()
+
+        if not license_plate:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "Geen kenteken gevonden voor deze chauffeur.",
+                },
+                status=400,
+            )
+
+        reason = request.POST.get("reason", "").strip()
+        remove_waiting_entries = request.POST.get("remove_waiting_entries") == "1"
+
+        try:
+            restriction, created, removed_count = block_license_plate(
+                license_plate=license_plate,
+                officer=request.user.officer,
+                reason=reason,
+                source_queue_entry=entry,
+                remove_waiting_entries=remove_waiting_entries,
+            )
+
+            return JsonResponse(
+                {
+                    "success": True,
+                    "created": created,
+                    "removed_count": removed_count,
+                    "message": (
+                        f"{restriction.display_license_plate} is geblokkeerd. "
+                        f"{removed_count} actieve wachtrij-item(s) verwijderd."
+                        if created
+                        else f"{restriction.display_license_plate} was al geblokkeerd."
+                    ),
+                }
+            )
+
+        except Exception as exc:
+            logger.exception("Failed to flag license plate")
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": str(exc),
+                },
+                status=400,
+            )

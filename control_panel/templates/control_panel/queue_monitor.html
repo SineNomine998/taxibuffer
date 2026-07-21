@@ -158,6 +158,11 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'control_panel:dashboard' %}">Dashboard</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'control_panel:license_plate_restrictions' %}">
+                            Blokkades
+                        </a>
+                    </li>
                 </ul>
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
@@ -340,13 +345,20 @@
                         <div id="calledList">
                             {% for entry in called_entries %}
                             <div class="status-item">
-                                <span class="license-plate">{{ entry.license_plate }}</span>
+                                <span class="license-plate">{{ entry.license_plate_snapshot }}</span>
                                 <span class="sequence-number">#{{ entry.sequence_number|default:'--' }}</span>
                                 <div class="text-end">
                                     <small class="timestamp">{{ entry.display_time|time:"H:i:s" }}</small><br>
                                     <small class="text-muted">{{ entry.display_status }}</small>
 
                                     {% if entry.status == "notified" %}
+                                    <br>
+                                    <button type="button"
+                                        class="btn btn-outline-danger btn-sm mt-2 flag-license-plate-btn"
+                                        data-entry-id="{{ entry.id }}" data-queue-id="{{ queue.id }}"
+                                        data-license-plate="{{ entry.license_plate_snapshot }}">
+                                        Kenteken blokkeren
+                                    </button>
                                     <br>
                                     <button type="button" class="btn btn-success btn-sm mt-2 mark-dequeued-btn"
                                         data-entry-id="{{ entry.id }}" data-queue-id="{{ queue.id }}">
@@ -374,8 +386,18 @@
                         <div id="waitingList">
                             {% for entry in waiting_entries %}
                             <div class="status-item">
-                                <span class="license-plate">{{ entry.license_plate }}</span>
-                                <small class="timestamp">{{ entry.created_at|time:"H:i:s" }}</small>
+                                <span class="license-plate">{{ entry.license_plate_snapshot }}</span>
+
+                                <div class="text-end">
+                                    <small class="timestamp">{{ entry.created_at|time:"H:i:s" }}</small><br>
+
+                                    <button type="button"
+                                        class="btn btn-outline-danger btn-sm mt-2 flag-license-plate-btn"
+                                        data-entry-id="{{ entry.id }}" data-queue-id="{{ queue.id }}"
+                                        data-license-plate="{{ entry.license_plate_snapshot }}">
+                                        Kenteken blokkeren
+                                    </button>
+                                </div>
                             </div>
                             {% empty %}
                             <p class="text-muted">No chauffeurs waiting</p>
@@ -416,8 +438,19 @@
                         updateEntryList('waitingList', data.waiting_entries, entry => {
                             return `
                                 <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="license-plate">${entry.license_plate}</span>
-                                    <small class="timestamp">${entry.created_at}</small>
+                                    <span class="license-plate">${entry.license_plate_snapshot}</span>
+                                    <div class="text-end">
+                                        <small class="timestamp">${entry.created_at}</small><br>
+                                        <button
+                                            type="button"
+                                            class="btn btn-outline-danger btn-sm mt-2 flag-license-plate-btn"
+                                            data-entry-id="${entry.id}"
+                                            data-queue-id="${queueId}"
+                                            data-license-plate="${entry.license_plate_snapshot}"
+                                        >
+                                            Kenteken blokkeren
+                                        </button>
+                                    </div>
                                 </div>
                             `;
                         });
@@ -444,14 +477,29 @@
                                     </button>
                                 `
                                 : '';
+                            const flagButton = entry.status === 'notified'
+                                ? `
+                                    <br>
+                                    <button
+                                        type="button"
+                                        class="btn btn-outline-danger btn-sm mt-2 flag-license-plate-btn"
+                                        data-entry-id="${entry.id}"
+                                        data-queue-id="${queueId}"
+                                        data-license-plate="${entry.license_plate_snapshot}"
+                                    >
+                                        Kenteken blokkeren
+                                    </button>
+                                `
+                                : '';
 
                             return `
                                <div class="status-item ${agingClass}">
-                                    <span class="license-plate">${entry.license_plate}</span>
+                                    <span class="license-plate">${entry.license_plate_snapshot}</span>
                                     <span class="sequence-number">#${entry.sequence_number || '--'}</span>
                                     <div class="text-end">
                                         <small class="timestamp">${entry.display_time}</small><br>
                                         <small class="text-muted">${entry.display_status}</small>
+                                        ${flagButton}
                                         ${markButton}
                                     </div>
                                 </div>
@@ -523,18 +571,81 @@
                 }
             }
 
-            document.addEventListener('click', function (event) {
-                const button = event.target.closest('.mark-dequeued-btn');
-                if (!button) return;
+            async function flagLicensePlate(queueId, entryId, licensePlate) {
+                const reason = prompt(
+                    `Waarom wilt u kenteken ${licensePlate} blokkeren?`,
+                    ''
+                );
 
-                const queueId = button.dataset.queueId;
-                const entryId = button.dataset.entryId;
-
-                if (!confirm('Chauffeur markeren als aangekomen/afgehandeld?')) {
+                if (reason === null) {
                     return;
                 }
 
-                markEntryDequeued(queueId, entryId, button);
+                const removeWaitingEntries = confirm(
+                    'Wilt u actieve wachtende chauffeurs met dit kenteken direct uit de wachtrij verwijderen?'
+                );
+
+                try {
+                    const body = new URLSearchParams();
+                    body.set('reason', reason);
+                    body.set('remove_waiting_entries', removeWaitingEntries ? '1' : '0');
+
+                    const response = await fetch(
+                        `/control/queue/${queueId}/entry/${entryId}/flag-license-plate/`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken'),
+                                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                            },
+                            body: body.toString(),
+                        }
+                    );
+
+                    const data = await response.json();
+
+                    if (!data.success) {
+                        alert('Error: ' + (data.error || 'Kon kenteken niet blokkeren.'));
+                        return;
+                    }
+
+                    alert(data.message || 'Kenteken is geblokkeerd.');
+                    updateQueueStatus();
+
+                } catch (err) {
+                    console.error('Flag license plate failed', err);
+                    alert('Kon kenteken niet blokkeren.');
+                }
+            }
+
+            document.addEventListener('click', function (event) {
+                const markButton = event.target.closest('.mark-dequeued-btn');
+
+                if (markButton) {
+                    const queueId = markButton.dataset.queueId;
+                    const entryId = markButton.dataset.entryId;
+
+                    if (!confirm('Chauffeur markeren als aangekomen/afgehandeld?')) {
+                        return;
+                    }
+
+                    markEntryDequeued(queueId, entryId, markButton);
+                    return;
+                }
+
+                const flagButton = event.target.closest('.flag-license-plate-btn');
+
+                if (flagButton) {
+                    const queueId = flagButton.dataset.queueId;
+                    const entryId = flagButton.dataset.entryId;
+                    const licensePlate = flagButton.dataset.licensePlate;
+
+                    if (!confirm(`Kenteken ${licensePlate} blokkeren?`)) {
+                        return;
+                    }
+
+                    flagLicensePlate(queueId, entryId, licensePlate);
+                }
             });
 
             // Initial update

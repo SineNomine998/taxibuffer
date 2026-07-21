@@ -2,6 +2,7 @@ from django.contrib.gis.db import models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import Q
 import uuid
 from accounts.models import Chauffeur, VehicleType
 from geofence.models import BufferZone, PickupZone
@@ -116,6 +117,7 @@ class QueueEntry(models.Model):
         QUEUE_CLOSED = "queue_closed", "Queue Closed"
         LEFT_ZONE = "left_zone", "Left Buffer Zone"
         LEFT_QUEUE = "left_queue", "Left Queue"
+        BLOCKED = "blocked", "Blocked"
 
     uuid = models.UUIDField(default=uuid.uuid4, null=False, blank=False, editable=False)
     queue = models.ForeignKey(TaxiQueue, on_delete=models.CASCADE)
@@ -133,6 +135,11 @@ class QueueEntry(models.Model):
         max_length=10, choices=VehicleType.choices, null=True, blank=True
     )
     license_plate_snapshot = models.CharField(max_length=20, null=True, blank=True)
+    normalized_license_plate_snapshot = models.CharField(
+        max_length=20,
+        blank=True,
+        db_index=True,
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     notified_at = models.DateTimeField(null=True, blank=True)
@@ -255,7 +262,7 @@ class QueueEntry(models.Model):
 
     @property
     def display_license_plate(self):
-        return self.license_plate or "unknown license plate in the queue entry"
+        return self.license_plate_snapshot or "unknown license plate in the queue entry"
 
     def get_status_display(self):
         """Get a human-readable status display."""
@@ -371,6 +378,7 @@ class ChauffeurActivityLog(models.Model):
         NOTIFICATION_ACCEPTED = "notification_accepted", "Oproep bevestigd"
         OFFICER_DEQUEUED = "officer_dequeued", "Afgehandeld"
         SYSTEM_DEQUEUED = "system_dequeued", "Systeemverwijdering"
+        BLOCKED = "blocked", "Blocked"
 
     chauffeur = models.ForeignKey(
         "accounts.Chauffeur",
@@ -424,3 +432,92 @@ class ChauffeurActivityLog(models.Model):
 
     def __str__(self):
         return f"{self.chauffeur_id} - {self.event_type} - {self.created_at}"
+
+
+class LicensePlateRestriction(models.Model):
+    normalized_license_plate = models.CharField(
+        max_length=20,
+        db_index=True,
+    )
+    display_license_plate = models.CharField(
+        max_length=20,
+    )
+
+    reason = models.TextField(blank=True)
+
+    active = models.BooleanField(default=True)
+
+    created_by_officer = models.ForeignKey(
+        "accounts.Officer",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_license_plate_restrictions",
+    )
+
+    lifted_by_officer = models.ForeignKey(
+        "accounts.Officer",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lifted_license_plate_restrictions",
+    )
+
+    source_queue_entry = models.ForeignKey(
+        "queueing.QueueEntry",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="license_plate_restrictions",
+    )
+
+    starts_at = models.DateTimeField(default=timezone.now)
+    ends_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    lifted_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["normalized_license_plate"],
+                condition=Q(active=True),
+                name="unique_active_license_plate_restriction",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["normalized_license_plate", "active"]),
+            models.Index(fields=["active", "-created_at"]),
+        ]
+
+    def is_currently_active(self):
+        now = timezone.now()
+
+        if not self.active:
+            return False
+
+        if self.starts_at and self.starts_at > now:
+            return False
+
+        if self.ends_at and self.ends_at <= now:
+            return False
+
+        return True
+
+    def lift(self, officer=None):
+        self.active = False
+        self.lifted_by_officer = officer
+        self.lifted_at = timezone.now()
+        self.save(
+            update_fields=[
+                "active",
+                "lifted_by_officer",
+                "lifted_at",
+                "updated_at",
+            ]
+        )
+
+    def __str__(self):
+        return f"{self.display_license_plate} - {'active' if self.active else 'lifted'}"

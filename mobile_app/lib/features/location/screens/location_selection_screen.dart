@@ -228,6 +228,27 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
             : 'Locatie-toestemming geweigerd. Schakel locatievoorziening in en probeer opnieuw.',
         svgAsset: 'assets/pop-up-denied.svg',
       );
+    } on QueueJoinException catch (e) {
+      if (!mounted) return;
+
+      if (e.code == 'license_plate_blocked') {
+        await showAppAlert(
+          context: context,
+          title: 'Kenteken geblokkeerd',
+          message:
+              'Dit kenteken is tijdelijk geblokkeerd voor de wachtrij. '
+              'Neem contact op met de medewerker op locatie.',
+          svgAsset: 'assets/pop-up-denied.svg',
+        );
+        return;
+      }
+
+      await showAppAlert(
+        context: context,
+        title: 'Fout',
+        message: e.message,
+        svgAsset: 'assets/pop-up-denied.svg',
+      );
     } catch (e) {
       if (!mounted) return;
 
@@ -321,6 +342,7 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
     return AppShellScaffold(
       // showHelp: true,
       // onHelpTap: () => context.push('/locations/info'),
+      showHelp: false,
       activeTab: NavTab.locations,
       child: RefreshIndicator(
         onRefresh: _loadQueues,

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kentekenblokkades - TaxiBuffer Control</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'control_panel:dashboard' %}">
+                TAXI<span style="color:#E0BD22;font-weight:bold;">BUFFER</span> Control
+            </a>
+
+            <div class="ms-auto d-flex gap-3 align-items-center">
+                <a class="nav-link text-white" href="{% url 'control_panel:dashboard' %}">Dashboard</a>
+                <a class="nav-link text-white" href="{% url 'control_panel:logout' %}">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
+            <div>
+                <h2>Kentekenblokkades</h2>
+                <p class="text-muted mb-0">
+                    Blokkeer kentekens die niet mogen deelnemen aan de wachtrij.
+                </p>
+            </div>
+        </div>
+
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header fw-bold">Nieuw kenteken blokkeren</div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Kenteken</label>
+                            <input type="text" name="license_plate" class="form-control" placeholder="Bijv. TX-123-X"
+                                required>
+                        </div>
+
+                        <div class="col-md-8">
+                            <label class="form-label">Reden</label>
+                            <input type="text" name="reason" class="form-control"
+                                placeholder="Bijv. misbruik wachtrij, agressief gedrag, verkeerde locatie...">
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="remove_waiting_entries"
+                                    id="removeWaitingEntries" checked>
+                                <label class="form-check-label" for="removeWaitingEntries">
+                                    Verwijder actieve wachtende chauffeurs met dit kenteken direct uit de wachtrij.
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <button class="btn btn-danger" type="submit">
+                                Kenteken blokkeren
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header fw-bold">Actieve blokkades</div>
+            <div class="card-body">
+                {% if active_restrictions %}
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Kenteken</th>
+                                <th>Reden</th>
+                                <th>Aangemaakt door</th>
+                                <th>Datum</th>
+                                <th class="text-end">Actie</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for restriction in active_restrictions %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-danger fs-6">
+                                        {{ restriction.display_license_plate }}
+                                    </span>
+                                </td>
+                                <td>{{ restriction.reason|default:"-" }}</td>
+                                <td>
+                                    {{ restriction.created_by_officer.credentials|default:"-" }}
+                                </td>
+                                <td>{{ restriction.created_at|date:"d-m-Y H:i" }}</td>
+                                <td class="text-end">
+                                    <form method="post"
+                                        action="{% url 'control_panel:lift_license_plate_restriction' restriction.id %}"
+                                        onsubmit="return confirm('Blokkade opheffen?');">
+                                        {% csrf_token %}
+                                        <button class="btn btn-outline-success btn-sm" type="submit">
+                                            Opheffen
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">Geen actieve blokkades.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header fw-bold">Recent opgeheven blokkades</div>
+            <div class="card-body">
+                {% if lifted_restrictions %}
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Kenteken</th>
+                                <th>Reden</th>
+                                <th>Opgeheven door</th>
+                                <th>Opgeheven op</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for restriction in lifted_restrictions %}
+                            <tr>
+                                <td>{{ restriction.display_license_plate }}</td>
+                                <td>{{ restriction.reason|default:"-" }}</td>
+                                <td>{{ restriction.lifted_by_officer.credentials|default:"-" }}</td>
+                                <td>{{ restriction.lifted_at|date:"d-m-Y H:i" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">Nog geen opgeheven blokkades.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

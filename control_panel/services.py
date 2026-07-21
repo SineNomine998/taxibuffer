@@ -32,13 +32,13 @@ def send_notification_to_vehicle(vehicle_entry, is_busje=False):
 
                     for s in subs:
                         send_web_push(s.subscription_info, payload)
-                        plate = vehicle_entry.license_plate or "unknown"
+                        plate = vehicle_entry.license_plate_snapshot or "unknown"
                         logger.info(
                             f"Push notification sent to {plate}"
                         )
                     # vehicle_entry.dequeue()
                 else:
-                    plate = vehicle_entry.license_plate or "unknown"
+                    plate = vehicle_entry.license_plate_snapshot or "unknown"
                     logger.warning(
                         f"No push subscriptions found for license plate: {plate}"
                     )

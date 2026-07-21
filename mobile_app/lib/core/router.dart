@@ -85,18 +85,6 @@ final GoRouter router = GoRouter(
       return '/login?next=$next';
     }
 
-    // TODO: Let LoginScreen decide where to go after login
-    // // User is authenticated. Do not let authenticated users sit on login/signup.
-    // if (auth.status == AuthGateStatus.authenticated) {
-    //   final onAuthScreen = path == '/login' || path.startsWith('/signup');
-
-    //   if (onAuthScreen &&
-    //       privacy.status == PrivacyGateStatus.accepted &&
-    //       terms.status == TermsGateStatus.accepted) {
-    //     return '/locations';
-    //   }
-    // }
-
     // Allow privacy/terms screens so user can accept.
     if (isCompliancePath) {
       return null;
@@ -228,10 +216,7 @@ final GoRouter router = GoRouter(
           path: '/settings/activity',
           builder: (_, _) => const ActivityScreen(),
         ),
-        GoRoute(
-          path: '/settings/faq',
-          builder: (_, _) => const FaqScreen(),
-        ),
+        GoRoute(path: '/settings/faq', builder: (_, _) => const FaqScreen()),
         GoRoute(
           path: '/numbers',
           builder: (_, _) => const SequenceHistoryScreen(),
