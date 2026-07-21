@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/config/api_client.dart';
 import 'package:mobile_app/core/theme.dart';
+import 'package:mobile_app/features/auth/auth_gate_state.dart';
+import 'package:mobile_app/features/compliance/privacy/privacy_gate_state.dart';
 import 'package:mobile_app/features/compliance/terms_of_use/terms_gate_state.dart';
 import 'package:mobile_app/widgets/primary_pill_button.dart';
 import 'package:provider/provider.dart';
@@ -91,13 +93,18 @@ class _TermsOfUseScreenState extends State<TermsOfUseScreen> {
 
       if (!mounted) return;
 
+      context.read<AuthGateState>().markAuthenticated();
       context.read<TermsGateState>().markAccepted();
-      final target = widget.next?.isNotEmpty == true
-          ? widget.next!
-          : '/locations';
+      final target = resolvePostAuthTarget(widget.next);
       context.go(target);
     } on ApiAuthException {
-      return;
+      if (!mounted) return;
+
+      context.read<AuthGateState>().markUnauthenticated();
+      context.read<PrivacyGateState>().reset();
+      context.read<TermsGateState>().reset();
+
+      context.go('/login?next=${Uri.encodeComponent('/locations')}');
     } catch (_) {
       if (!mounted) return;
 
@@ -109,6 +116,34 @@ class _TermsOfUseScreenState extends State<TermsOfUseScreen> {
         setState(() => _accepting = false);
       }
     }
+  }
+
+  String resolvePostAuthTarget(String? next) {
+    if (next == null || next.trim().isEmpty) return '/locations';
+
+    final uri = Uri.tryParse(next);
+    if (uri == null) return '/locations';
+
+    final path = uri.path;
+
+    final blockedPaths = {
+      '/',
+      '/info',
+      '/login',
+      '/signup',
+      '/privacy',
+      '/privacy-preview',
+      '/terms',
+      '/terms-preview',
+      '/password-reset',
+      '/password-reset/sent',
+    };
+
+    if (blockedPaths.contains(path)) return '/locations';
+    if (path.startsWith('/signup')) return '/locations';
+    if (!path.startsWith('/')) return '/locations';
+
+    return next;
   }
 
   @override

@@ -96,7 +96,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
 
   Future<void> _accept() async {
     final policy = _policy;
-    if (policy == null) return;
+    if (policy == null || _isAccepting) return;
 
     setState(() => _isAccepting = true);
 
@@ -105,10 +105,19 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
 
       if (!mounted) return;
 
+      context.read<AuthGateState>().markAuthenticated();
       context.read<PrivacyGateState>().markAccepted();
-      context.go(widget.next ?? '/locations');
+
+      final target = resolvePostAuthTarget(widget.next);
+      context.go(target);
     } on ApiAuthException {
-      return;
+      if (!mounted) return;
+
+      context.read<AuthGateState>().markUnauthenticated();
+      context.read<PrivacyGateState>().reset();
+      context.read<TermsGateState>().reset();
+
+      context.go('/login?next=${Uri.encodeComponent('/locations')}');
     } catch (_) {
       if (!mounted) return;
 
@@ -120,6 +129,34 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
         setState(() => _isAccepting = false);
       }
     }
+  }
+
+  String resolvePostAuthTarget(String? next) {
+    if (next == null || next.trim().isEmpty) return '/locations';
+
+    final uri = Uri.tryParse(next);
+    if (uri == null) return '/locations';
+
+    final path = uri.path;
+
+    final blockedPaths = {
+      '/',
+      '/info',
+      '/login',
+      '/signup',
+      '/privacy',
+      '/privacy-preview',
+      '/terms',
+      '/terms-preview',
+      '/password-reset',
+      '/password-reset/sent',
+    };
+
+    if (blockedPaths.contains(path)) return '/locations';
+    if (path.startsWith('/signup')) return '/locations';
+    if (!path.startsWith('/')) return '/locations';
+
+    return next;
   }
 
   @override
