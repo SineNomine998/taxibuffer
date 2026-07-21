@@ -36,7 +36,7 @@ class Chauffeur(models.Model):
     location = models.PointField(null=True, blank=True, srid=4326)
 
     def get_current_vehicle(self):
-        return self.vehicles.filter(is_current=True).first()
+        return self.vehicles.filter(is_active=True, is_current=True).first()
 
     @property
     def current_license_plate(self):

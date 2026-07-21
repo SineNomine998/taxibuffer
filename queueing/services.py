@@ -8,11 +8,10 @@ import logging
 
 from .models import TaxiQueue, QueueEntry, QueueNotification, PushSubscription
 from .push_views import send_web_push
-from accounts.models import Chauffeur
+from accounts.models import Chauffeur, ChauffeurVehicle
 from geofence.models import BufferZone
 from geofence.services import point_in_buffer
 from .constants import ACTIVE_QUEUE_STATUSES
-
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +63,12 @@ class QueueService:
         return True, None
 
     def add_chauffeur_to_queue(
-        self, chauffeur: Chauffeur, queue: TaxiQueue, signup_location: Point
+        self,
+        chauffeur: Chauffeur,
+        queue: TaxiQueue,
+        signup_location: Point,
+        vehicle: ChauffeurVehicle,
+        license_plate_snapshot: str,
     ) -> Tuple[bool, str, Optional[str]]:
         """
         Add a chauffeur to the specified queue.
@@ -90,8 +94,7 @@ class QueueService:
                 ).first()
 
                 notification_missed_entry = QueueEntry.objects.filter(
-                    chauffeur=chauffeur,
-                    status=QueueEntry.Status.NOTIFIED
+                    chauffeur=chauffeur, status=QueueEntry.Status.NOTIFIED
                 ).first()
 
                 if existing_entry:
@@ -100,7 +103,7 @@ class QueueService:
                         f"You are already in queue: {existing_entry.queue.name}",
                         existing_entry.uuid,
                     )
-                
+
                 if notification_missed_entry:
                     return (
                         False,
@@ -123,9 +126,10 @@ class QueueService:
                     queue=queue,
                     chauffeur=chauffeur,
                     vehicle_type=current_vehicle.vehicle_type,
-                    license_plate=current_vehicle.license_plate,
                     signup_location=signup_location,
                     status=QueueEntry.Status.WAITING,
+                    vehicle=vehicle,
+                    license_plate_snapshot=license_plate_snapshot,
                 )
 
                 position = entry.get_queue_position()
@@ -198,9 +202,7 @@ class QueueService:
                         if entry.status == QueueEntry.Status.WAITING:
                             notification = entry.notify()
                             plate = entry.display_license_plate or "unknown"
-                            logger.info(
-                                f"Notified chauffeur {plate}"
-                            )
+                            logger.info(f"Notified chauffeur {plate}")
                             notified_count += 1
                             sequence_number = getattr(
                                 notification, "sequence_number", None
@@ -234,12 +236,17 @@ class QueueService:
                                                 send_web_push(
                                                     s.subscription_info, payload
                                                 )
-                                                plate = entry.display_license_plate or "unknown"
+                                                plate = (
+                                                    entry.display_license_plate
+                                                    or "unknown"
+                                                )
                                                 logger.info(
                                                     f"Push notification sent to {plate}"
                                                 )
                                         else:
-                                            plate = entry.display_license_plate or "unknown"
+                                            plate = (
+                                                entry.display_license_plate or "unknown"
+                                            )
                                             logger.warning(
                                                 f"No push subscriptions found for chauffeur {plate}"
                                             )
@@ -256,9 +263,7 @@ class QueueService:
 
                 except Exception as e:
                     plate = entry.display_license_plate or "unknown"
-                    logger.error(
-                        f"Failed to notify chauffeur {plate}: {e}"
-                    )
+                    logger.error(f"Failed to notify chauffeur {plate}: {e}")
                     continue
 
             return notified_count
@@ -347,9 +352,7 @@ class QueueService:
                                 notification.queue_entry.display_license_plate
                                 or "unknown"
                             )
-                            logger.info(
-                                f"Timed out notification for {plate}"
-                            )
+                            logger.info(f"Timed out notification for {plate}")
                             timeout_count += 1
 
                             # This slot is now available again, so we can notify the next person in line
@@ -358,10 +361,11 @@ class QueueService:
                             queue = notification.queue_entry.queue
                             waiting_entries = queue.get_waiting_entries()
 
-                            plate = notification.queue_entry.display_license_plate or "unknown"
-                            logger.info(
-                                f"Timed out notification for {plate}"
+                            plate = (
+                                notification.queue_entry.display_license_plate
+                                or "unknown"
                             )
+                            logger.info(f"Timed out notification for {plate}")
 
                             # Find the next entry that's not the one that just timed out
                             next_entries = [

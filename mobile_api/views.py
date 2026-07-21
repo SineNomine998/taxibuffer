@@ -875,6 +875,8 @@ class MobileJoinQueueView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        license_plate = current_vehicle.license_plate
+
         existing_entry = (
             QueueEntry.objects.filter(
                 chauffeur=chauffeur,
@@ -908,6 +910,28 @@ class MobileJoinQueueView(APIView):
                     ),
                 },
                 status=status.HTTP_200_OK,
+            )
+
+        duplicate_plate_entry = (
+            QueueEntry.objects.filter(
+                queue=queue,
+                status__in=ACTIVE_QUEUE_STATUSES,
+                license_plate_snapshot__iexact=license_plate,
+            )
+            .exclude(chauffeur=chauffeur)
+            .select_related("chauffeur")
+            .first()
+        )
+
+        if duplicate_plate_entry is not None:
+            raise ValidationError(
+                {
+                    "detail": (
+                        "Dit kenteken staat al in deze wachtrij. "
+                        "Gebruik een ander voertuig of neem contact op met de medewerker op locatie."
+                    ),
+                    "code": "license_plate_already_in_queue",
+                }
             )
 
         has_push_token = MobilePushToken.objects.filter(
@@ -953,6 +977,8 @@ class MobileJoinQueueView(APIView):
             chauffeur=chauffeur,
             queue=queue,
             signup_location=signup_point,
+            vehicle=current_vehicle,
+            license_plate_snapshot=license_plate,
         )
 
         if not success:
@@ -1017,11 +1043,16 @@ class MobileJoinQueueView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+        entry.vehicle = current_vehicle
+        entry.license_plate_snapshot = license_plate
         entry.last_location_at = timezone.now()
         entry.last_location_lat = lat
         entry.last_location_lng = lng
+
         entry.save(
             update_fields=[
+                "vehicle",
+                "license_plate_snapshot",
                 "last_location_at",
                 "last_location_lat",
                 "last_location_lng",

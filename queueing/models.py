@@ -123,10 +123,16 @@ class QueueEntry(models.Model):
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.WAITING
     )
+    vehicle = models.ForeignKey(
+        "accounts.ChauffeurVehicle",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+    )
     vehicle_type = models.CharField(
         max_length=10, choices=VehicleType.choices, null=True, blank=True
     )
-    license_plate = models.CharField(max_length=20, null=True, blank=True)
+    license_plate_snapshot = models.CharField(max_length=20, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     notified_at = models.DateTimeField(null=True, blank=True)
@@ -166,6 +172,7 @@ class QueueEntry(models.Model):
 
     def notify(self):
         from .activity import log_chauffeur_activity
+
         """Mark entry as notified and create notification record."""
         if self.status != self.Status.WAITING:
             raise ValidationError(f"Cannot notify chauffeur with status: {self.status}")
