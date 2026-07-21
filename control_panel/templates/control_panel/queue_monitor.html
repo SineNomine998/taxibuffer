@@ -109,6 +109,18 @@
             white-space: nowrap;
         }
 
+        .entry-primary-line {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .quick-arrived-btn {
+            font-weight: 800;
+            border-radius: 10px;
+        }
+
         .list-toolbar {
             display: flex;
             gap: 0.75rem;
@@ -269,7 +281,17 @@
                 <div class="entry-row open-entry-modal" data-entry-id="{{ entry.id }}" data-queue-id="{{ queue.id }}"
                     data-license-plate="{{ entry.license_plate_snapshot }}" data-status="{{ entry.status }}">
                     <div class="entry-main">
-                        <span class="license-plate">{{ entry.license_plate_snapshot|default:"-" }}</span>
+                        <div class="entry-primary-line">
+                            <span class="license-plate">{{ entry.license_plate_snapshot|default:"-" }}</span>
+
+                            {% if entry.status == "notified" %}
+                            <button type="button" class="btn btn-success btn-sm quick-arrived-btn"
+                                data-entry-id="{{ entry.id }}" data-queue-id="{{ queue.id }}">
+                                Aangekomen
+                            </button>
+                            {% endif %}
+                        </div>
+
                         <div class="entry-meta">
                             Volgnummer #{{ entry.sequence_number|default:"--" }} ·
                             {{ entry.display_time|time:"H:i:s" }} ·
@@ -490,23 +512,39 @@
                     ? 'warning-soft'
                     : '';
 
+            const arrivedButton = entry.status === 'notified'
+                ? `
+            <button type="button"
+                class="btn btn-success btn-sm quick-arrived-btn"
+                data-entry-id="${entry.id}"
+                data-queue-id="${queueId}">
+                Aangekomen
+            </button>
+        `
+                : '';
+
             return `
-                <div class="entry-row open-entry-modal ${agingClass}"
-                    data-entry-id="${entry.id}"
-                    data-queue-id="${queueId}"
-                    data-license-plate="${entry.license_plate_snapshot || ''}"
-                    data-status="${entry.status || ''}">
-                    <div class="entry-main">
-                        <span class="license-plate">${entry.license_plate_snapshot || '-'}</span>
-                        <div class="entry-meta">
-                            Volgnummer #${entry.sequence_number || '--'} ·
-                            ${entry.display_time || '--:--:--'} ·
-                            ${entry.display_status || ''}
-                        </div>
-                    </div>
-                    <div class="entry-actions-hint">Klik voor acties</div>
+        <div class="entry-row open-entry-modal ${agingClass}"
+            data-entry-id="${entry.id}"
+            data-queue-id="${queueId}"
+            data-license-plate="${entry.license_plate_snapshot || ''}"
+            data-status="${entry.status || ''}">
+            <div class="entry-main">
+                <div class="entry-primary-line">
+                    <span class="license-plate">${entry.license_plate_snapshot || '-'}</span>
+                    ${arrivedButton}
                 </div>
-            `;
+
+                <div class="entry-meta">
+                    Volgnummer #${entry.sequence_number || '--'} ·
+                    ${entry.display_time || '--:--:--'} ·
+                    ${entry.display_status || ''}
+                </div>
+            </div>
+
+            <div class="entry-actions-hint">Klik voor meer acties</div>
+        </div>
+    `;
         }
 
         function filterByPlate(entries, query) {
@@ -714,6 +752,21 @@
             });
 
             document.addEventListener('click', function (event) {
+                const quickArrivedBtn = event.target.closest('.quick-arrived-btn');
+
+                if (quickArrivedBtn) {
+                    event.stopPropagation();
+
+                    if (!confirm('Bevestigen: chauffeur is aangekomen?')) return;
+
+                    markEntryDequeued(
+                        quickArrivedBtn.dataset.queueId,
+                        quickArrivedBtn.dataset.entryId,
+                        quickArrivedBtn
+                    );
+                    return;
+                }
+
                 const row = event.target.closest('.open-entry-modal');
 
                 if (row) {
