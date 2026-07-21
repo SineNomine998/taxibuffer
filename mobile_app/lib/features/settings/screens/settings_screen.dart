@@ -50,11 +50,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-  void _showNotImplemented(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature is nog niet beschikbaar.')),
-    );
-  }
+  // void _showNotImplemented(String feature) {
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     SnackBar(content: Text('$feature is nog niet beschikbaar.')),
+  //   );
+  // }
 
   Future<void> _showPrivacyPolicy() async {
     await PrivacyNoticeSheet.show(context);
@@ -204,10 +204,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'Hulp & info',
               description: 'Ondersteuning en informatie.',
               children: [
-                _SettingsNavigationTile(
-                  icon: Icons.help_outline_rounded,
-                  title: 'Veelgestelde vragen',
-                  onTap: () => _showNotImplemented('Veelgestelde vragen'),
+                ListTile(
+                  leading: const _SettingsIcon(Icons.help_outline_rounded),
+                  title: const Text(
+                    'Veelgestelde vragen',
+                    style: TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => context.push('/settings/faq'),
                 ),
                 // _SettingsNavigationTile(
                 //   icon: Icons.report_problem_outlined,

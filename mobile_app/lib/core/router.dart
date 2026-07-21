@@ -15,6 +15,7 @@ import 'package:mobile_app/features/auth/signup/signup_form_state.dart';
 import 'package:mobile_app/features/compliance/terms_of_use/screens/terms_of_use_preview_screen.dart';
 import 'package:mobile_app/features/compliance/terms_of_use/screens/terms_of_use_screen.dart';
 import 'package:mobile_app/features/compliance/terms_of_use/terms_gate_state.dart';
+import 'package:mobile_app/features/faq/screens/faq_screen.dart';
 import 'package:mobile_app/features/info/screens/info_screen.dart';
 import 'package:mobile_app/features/info/screens/startup_screen.dart';
 import 'package:mobile_app/features/location/screens/location_selection_info_screen.dart';
@@ -226,6 +227,10 @@ final GoRouter router = GoRouter(
         GoRoute(
           path: '/settings/activity',
           builder: (_, _) => const ActivityScreen(),
+        ),
+        GoRoute(
+          path: '/settings/faq',
+          builder: (_, _) => const FaqScreen(),
         ),
         GoRoute(
           path: '/numbers',

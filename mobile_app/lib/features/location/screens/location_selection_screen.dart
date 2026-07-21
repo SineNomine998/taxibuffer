@@ -319,8 +319,8 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
     final accountState = context.read<AccountState>();
 
     return AppShellScaffold(
-      showHelp: true,
-      onHelpTap: () => context.push('/locations/info'),
+      // showHelp: true,
+      // onHelpTap: () => context.push('/locations/info'),
       activeTab: NavTab.locations,
       child: RefreshIndicator(
         onRefresh: _loadQueues,
