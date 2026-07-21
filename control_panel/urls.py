@@ -56,4 +56,10 @@ urlpatterns = [
         views.FlagEntryLicensePlateView.as_view(),
         name="flag_entry_license_plate",
     ),
+    # Queue history endpoints (for dequeued chauffeurs)
+    path(
+        "queue/<int:queue_id>/history/",
+        views.QueueHistoryView.as_view(),
+        name="queue_history",
+    ),
 ]

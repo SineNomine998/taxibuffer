@@ -181,6 +181,12 @@ class QueueMonitorView(ControlLoginRequiredMixin, View):
 
         total_waiting_count = waiting_entries.count()
 
+        history_count = QueueEntry.objects.filter(
+            queue=queue,
+            status=QueueEntry.Status.DEQUEUED,
+            dequeued_at__gte=today_start_utc,
+        ).count()
+
         latest_notification_seq = Subquery(
             QueueNotification.objects.filter(queue_entry=OuterRef("pk"))
             .order_by("-notification_time")
@@ -191,24 +197,13 @@ class QueueMonitorView(ControlLoginRequiredMixin, View):
         called_qs = (
             QueueEntry.objects.filter(
                 queue=queue,
-                status__in=CONTROL_DASHBOARD_CALLED_STATUSES,
-            )
-            .filter(
-                Q(notified_at__gte=today_start_utc)
-                | Q(dequeued_at__gte=today_start_utc)
+                status=QueueEntry.Status.NOTIFIED,
+                notified_at__gte=today_start_utc,
             )
             .annotate(
                 sequence_number=latest_notification_seq,
-                display_time=Case(
-                    When(status=QueueEntry.Status.DEQUEUED, then=F("dequeued_at")),
-                    default=F("notified_at"),
-                    output_field=DateTimeField(),
-                ),
-                display_status=Case(
-                    When(status=QueueEntry.Status.DEQUEUED, then=Value("Dequeued")),
-                    default=Value("Notified"),
-                    output_field=CharField(),
-                ),
+                display_time=F("notified_at"),
+                display_status=Value("Opgeroepen", output_field=CharField()),
             )
             .order_by("-display_time")
         )
@@ -233,6 +228,7 @@ class QueueMonitorView(ControlLoginRequiredMixin, View):
             "called_entries": called_entries,
             "waiting_count": total_waiting_count,
             "called_count": called_count,
+            "history_count": history_count,
         }
         return render(request, "control_panel/queue_monitor.html", context)
 
@@ -288,24 +284,13 @@ class QueueStatusAPIView(ControlLoginRequiredMixin, View):
             called_qs = (
                 QueueEntry.objects.filter(
                     queue=queue,
-                    status__in=CONTROL_DASHBOARD_CALLED_STATUSES,
-                )
-                .filter(
-                    Q(notified_at__gte=today_start_utc)
-                    | Q(dequeued_at__gte=today_start_utc)
+                    status=QueueEntry.Status.NOTIFIED,
+                    notified_at__gte=today_start_utc,
                 )
                 .annotate(
                     sequence_number=latest_notification_seq,
-                    display_time=Case(
-                        When(status=QueueEntry.Status.DEQUEUED, then=F("dequeued_at")),
-                        default=F("notified_at"),
-                        output_field=DateTimeField(),
-                    ),
-                    display_status=Case(
-                        When(status=QueueEntry.Status.DEQUEUED, then=Value("Dequeued")),
-                        default=Value("Notified"),
-                        output_field=CharField(),
-                    ),
+                    display_time=F("notified_at"),
+                    display_status=Value("Opgeroepen", output_field=CharField()),
                 )
                 .order_by("-display_time")
             )
@@ -361,6 +346,11 @@ class QueueStatusAPIView(ControlLoginRequiredMixin, View):
                     "called_count": called_qs.count(),
                     "last_updated": last_updated_local.strftime("%H:%M:%S"),
                     "today_date": now_local.strftime("%d-%m-%Y"),
+                    "history_count": QueueEntry.objects.filter(
+                        queue=queue,
+                        status=QueueEntry.Status.DEQUEUED,
+                        dequeued_at__gte=today_start_utc,
+                    ).count(),
                 }
             )
 
@@ -638,3 +628,42 @@ class FlagEntryLicensePlateView(View):
                 },
                 status=400,
             )
+
+
+@method_decorator(user_passes_test(is_officer), name="dispatch")
+class QueueHistoryView(View):
+    def get(self, request, queue_id):
+        queue = get_object_or_404(TaxiQueue, id=queue_id)
+
+        europe = pytz.timezone("Europe/Amsterdam")
+        now_local = timezone.now().astimezone(europe)
+        today_start_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start_utc = today_start_local.astimezone(pytz.UTC)
+
+        latest_notification_seq = Subquery(
+            QueueNotification.objects.filter(queue_entry=OuterRef("pk"))
+            .order_by("-notification_time")
+            .values("sequence_number")[:1],
+            output_field=IntegerField(),
+        )
+
+        history_entries = (
+            QueueEntry.objects.filter(
+                queue=queue,
+                status=QueueEntry.Status.DEQUEUED,
+                dequeued_at__gte=today_start_utc,
+            )
+            .annotate(sequence_number=latest_notification_seq)
+            .order_by("-dequeued_at")
+        )
+
+        return render(
+            request,
+            "control_panel/queue_history.html",
+            {
+                "queue": queue,
+                "history_entries": history_entries,
+                "history_count": history_entries.count(),
+                "today_date": now_local.strftime("%d-%m-%Y"),
+            },
+        )
