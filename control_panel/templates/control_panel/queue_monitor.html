@@ -1,145 +1,147 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Queue Monitor - {{ queue.name }} - TaxiBuffer Control</title>
+    <title>{{ queue.name }} - TaxiBuffer Control</title>
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
     <style>
+        body {
+            background: #f5f6f8;
+        }
+
         .navbar-brand span {
             color: #E0BD22;
             font-weight: bold;
         }
 
-        .status-section {
-            margin-bottom: 1.5rem;
+        .page-title {
+            font-weight: 800;
+            color: #1f2937;
         }
 
-        .status-card {
-            border-radius: 16px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
-            margin-bottom: 24px;
+        .status-pill {
+            font-size: 0.85rem;
+            padding: 0.45rem 0.75rem;
+            border-radius: 999px;
+        }
+
+        .control-card {
             border: none;
+            border-radius: 18px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
         }
 
-        .status-card .card-header {
-            border-radius: 16px 16px 0 0;
-            font-weight: 700;
-            letter-spacing: 0.02em;
+        .big-action-btn {
+            min-height: 64px;
+            font-size: 1.05rem;
+            font-weight: 800;
+            border-radius: 14px;
         }
 
-        .status-card.waiting .card-header {
-            background-color: #e7f1ff;
+        .section-card {
+            border: none;
+            border-radius: 18px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+
+        .section-header {
+            padding: 1rem 1.2rem;
+            font-weight: 800;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-header.called {
+            background: #fff7d6;
+            color: #6b4e00;
+        }
+
+        .section-header.waiting {
+            background: #e7f1ff;
             color: #0f3c78;
         }
 
-        .status-card.notified .card-header {
-            background-color: #fff9db;
-            color: #8f5c00;
-        }
-
-        .status-card.dequeued .card-header {
-            background-color: #dce9e0;
-            color: #0f5132;
-        }
-
-        .license-plate {
-            font-family: monospace;
-            font-weight: 800;
-            padding: 6px 10px;
-            background: #ffffff;
-            border-radius: 8px;
-            display: inline-block;
-        }
-
-        .status-card.notified .license-plate {
-            font-size: 1.8rem;
-            letter-spacing: 0.04em;
-            padding: 10px 14px;
-            background: #fff8e1;
-        }
-
-        .status-card.dequeued .license-plate {
-            font-size: 1.3rem;
-            padding: 8px 12px;
-            background: #f8fff6;
-        }
-
-        .status-card.waiting .license-plate {
-            font-size: 1rem;
-            padding: 7px 11px;
-            background: #f5f7ff;
-        }
-
-        .status-item {
+        .entry-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 1rem;
-            padding: 1rem 1.1rem;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+            padding: 1rem 1.2rem;
+            border-bottom: 1px solid #eef0f3;
         }
 
-        .status-item:last-child {
+        .entry-row:last-child {
             border-bottom: none;
         }
 
-        .sequence-number {
-            font-weight: 700;
-            color: #495057;
+        .entry-main {
+            min-width: 0;
         }
 
-        .timestamp {
-            font-size: 0.85rem;
-            color: #6c757d;
-            white-space: nowrap;
+        .license-plate {
+            font-family: monospace;
+            font-weight: 900;
+            font-size: 1.25rem;
+            background: #ffffff;
+            border: 2px solid #e5e7eb;
+            padding: 0.45rem 0.75rem;
+            border-radius: 10px;
+            display: inline-block;
+            letter-spacing: 0.04em;
         }
 
-        #lastUpdated {
-            font-size: 0.8em;
-            color: #6c757d;
+        .entry-meta {
+            margin-top: 0.4rem;
+            color: #6b7280;
+            font-size: 0.9rem;
         }
 
-        .status-card .card-body {
-            padding: 1rem;
-        }
-
-        .status-card .card-body p {
-            margin-bottom: 0;
-            color: #6c757d;
-        }
-
-        .queue-highlight {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: #343a40;
-        }
-
-        .operator-actions {
-            border: none;
-            border-radius: 16px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
-        }
-
-        .operator-action-buttons {
+        .entry-actions {
             display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-            justify-content: flex-end;
+            flex-direction: column;
+            gap: 0.5rem;
+            min-width: 160px;
         }
 
-        .operator-action-btn {
-            min-width: 110px;
-            padding: 0.4rem 0.75rem;
-            font-size: 0.85rem;
+        .entry-actions .btn {
+            font-weight: 700;
+            border-radius: 10px;
         }
 
-        @media (min-width: 768px) {
-            .operator-action-btn {
-                min-width: 130px;
-                padding: 0.5rem 0.9rem;
-                font-size: 0.9rem;
+        .empty-state {
+            padding: 2rem;
+            color: #6b7280;
+            text-align: center;
+        }
+
+        .danger-soft {
+            border-left: 6px solid #dc3545;
+            background: #fff1f1;
+        }
+
+        .warning-soft {
+            border-left: 6px solid #ffc107;
+            background: #fff9e6;
+        }
+
+        @media (max-width: 576px) {
+            .entry-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .entry-actions {
+                width: 100%;
+            }
+
+            .big-action-btn {
+                width: 100%;
             }
         }
     </style>
@@ -148,513 +150,521 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="{% url 'control_panel:dashboard' %}">TAXI<span>BUFFER</span> Control</a>
+            <a class="navbar-brand" href="{% url 'control_panel:dashboard' %}">
+                TAXI<span>BUFFER</span> Control
+            </a>
+
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-                title="Toggle navigation">
+                aria-label="Menu openen">
                 <span class="navbar-toggler-icon"></span>
             </button>
+
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
+                <ul class="navbar-nav me-auto">
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'control_panel:dashboard' %}">Dashboard</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'control_panel:license_plate_restrictions' %}">
-                            Blokkades
+                            Kentekenblokkades
                         </a>
                     </li>
                 </ul>
-                <ul class="navbar-nav ms-auto">
+
+                <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'control_panel:logout' %}">Logout</a>
+                        <a class="nav-link" href="{% url 'control_panel:logout' %}">Uitloggen</a>
                     </li>
                 </ul>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-4">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2>{{ queue.name }}</h2>
-            <span id="connectionStatus" class="badge bg-success">Connected</span>
+    <main class="container py-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+            <div>
+                <h1 class="page-title h2 mb-1">{{ queue.name }}</h1>
+                <p class="text-muted mb-0">
+                    Ophaallocatie: <strong>{{ queue.pickup_zone.name }}</strong>
+                </p>
+            </div>
+
+            <div class="text-md-end">
+                <span id="connectionStatus" class="badge bg-success status-pill">Verbonden</span><br>
+                <small id="lastUpdated" class="text-muted">Laatst bijgewerkt: {{ now|time:"H:i:s" }}</small>
+            </div>
         </div>
 
-        <div class="mt-3 text-end">
-            <small id="lastUpdated" class="text-muted">Last updated: {{ now|time:"H:i:s" }}</small>
-        </div>
-
-        <p class="text-muted">Monitoring queue activity for {{ queue.pickup_zone.name }} on
-            <span id="todayDate">{{ today_date }}</span>
-        </p>
-
-        <div class="operator-actions card mb-4">
+        <div class="control-card card mb-4">
             <div class="card-body">
-                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-                    <div>
-                        <h5 class="mb-1">Oproep acties</h5>
-                        <p class="text-muted mb-0">Roep handmatig het volgende voertuig op.</p>
+                <h2 class="h5 fw-bold mb-1">Snelle acties</h2>
+                <p class="text-muted mb-3">
+                    Gebruik deze knoppen alleen wanneer er een voertuig naar de ophaallocatie mag.
+                </p>
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <button type="button" id="callVehicleBtn" class="btn btn-primary big-action-btn w-100"
+                            data-queue-id="{{ queue.id }}">
+                            Auto oproepen
+                        </button>
                     </div>
 
-                    <div class="operator-action-buttons">
-                        <button type="button" id="callVehicleBtn" class="btn btn-primary operator-action-btn"
+                    <div class="col-md-4">
+                        <button type="button" id="bypassBusjeBtn" class="btn btn-warning big-action-btn w-100"
                             data-queue-id="{{ queue.id }}">
-                            Voertuig nodig
+                            Busje oproepen
                         </button>
+                    </div>
 
-                        <button type="button" id="bypassBusjeBtn" class="btn btn-warning operator-action-btn"
-                            data-queue-id="{{ queue.id }}">
-                            Busje nodig
+                    <div class="col-md-4">
+                        <button type="button" id="pauseBtn{{ queue.id }}"
+                            class="btn {% if queue.notifications_paused %}btn-success{% else %}btn-outline-secondary{% endif %} big-action-btn w-100"
+                            data-paused="{{ queue.notifications_paused|yesno:'1,0' }}"
+                            onclick="togglePause({{ queue.id }})">
+                            {% if queue.notifications_paused %}
+                            Oproepen hervatten
+                            {% else %}
+                            Oproepen pauzeren
+                            {% endif %}
                         </button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <form id="pauseForm{{ queue.id }}" class="pause-form" method="post" onsubmit="return false;">
-            {% csrf_token %}
-            <button type="button" id="pauseBtn{{ queue.id }}" class="btn btn-warning" style="margin-top: 15px;"
-                data-paused="{{ queue.notifications_paused|yesno:'1,0' }}"
-                aria-pressed="{{ queue.notifications_paused|yesno:'true,false' }}"
-                onclick="togglePause({{ queue.id }})">
-                {{ queue.notifications_paused|yesno:"Resume,Pause" }}
-            </button>
-        </form>
+        <section class="section-card card mb-4">
+            <div class="section-header called">
+                <span>Opgeroepen chauffeurs</span>
+                <span id="calledCount" class="badge bg-warning text-dark">{{ called_count }}</span>
+            </div>
 
-        <script>
-            function getCookie(name) {
-                const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-                return v ? v.pop() : '';
-            }
-
-            async function callQueueAction(queueId, actionUrl, buttonElement, loadingText) {
-                const originalText = buttonElement.textContent;
-                buttonElement.disabled = true;
-                buttonElement.textContent = loadingText;
-
-                try {
-                    const response = await fetch(actionUrl, {
-                        method: "POST",
-                        headers: {
-                            "X-CSRFToken": getCookie("csrftoken"),
-                            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
-                        }
-                    });
-
-                    const data = await response.json();
-
-                    if (data.success) {
-                        alert(data.message || "Actie uitgevoerd.");
-                    } else {
-                        alert("Error: " + (data.error || "Onbekende fout."));
-                    }
-                } catch (err) {
-                    console.error("Queue action error:", err);
-                    alert("Kon de actie niet uitvoeren.");
-                } finally {
-                    buttonElement.disabled = false;
-                    buttonElement.textContent = originalText;
-                }
-            }
-
-            document.addEventListener("DOMContentLoaded", function () {
-                const callVehicleBtn = document.getElementById("callVehicleBtn");
-                const bypassBusjeBtn = document.getElementById("bypassBusjeBtn");
-
-                if (callVehicleBtn) {
-                    callVehicleBtn.addEventListener("click", function () {
-                        const queueId = this.dataset.queueId;
-
-                        callQueueAction(
-                            queueId,
-                            `/control/queue/${queueId}/voertuig/`,
-                            this,
-                            "Oproepen..."
-                        );
-                    });
-                }
-
-                if (bypassBusjeBtn) {
-                    bypassBusjeBtn.addEventListener("click", function () {
-                        const queueId = this.dataset.queueId;
-
-                        callQueueAction(
-                            queueId,
-                            `/control/queue/${queueId}/busje/`,
-                            this,
-                            "Busje oproepen..."
-                        );
-                    });
-                }
-            });
-
-            async function togglePause(queueId) {
-                const btn = document.getElementById('pauseBtn' + queueId);
-                if (!btn) {
-                    console.error('Pause button not found for queue', queueId);
-                    return;
-                }
-
-                const pausedNow = btn.dataset.paused === '1';
-                const action = pausedNow ? 'resume' : 'pause';
-                const url = `/control/queue/${queueId}/toggle-pause/`;
-
-                btn.disabled = true;
-
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRFToken': getCookie('csrftoken'),
-                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-                        },
-                        body: 'action=' + encodeURIComponent(action)
-                    });
-
-                    if (!response.ok) {
-                        const text = await response.text();
-                        throw new Error('HTTP ' + response.status + ': ' + text);
-                    }
-
-                    const data = await response.json();
-                    if (!data || data.success !== true) {
-                        throw new Error(data && data.error ? data.error : 'Unexpected response');
-                    }
-
-                    const isPaused = !!data.notifications_paused;
-                    btn.dataset.paused = isPaused ? '1' : '0';
-                    btn.setAttribute('aria-pressed', isPaused ? 'true' : 'false');
-                    btn.textContent = isPaused ? 'Resume' : 'Pause';
-
-                } catch (err) {
-                    console.error('Toggle pause failed', err);
-                    alert('Kon de actie niet uitvoeren: ' + err.message);
-                } finally {
-                    btn.disabled = false;
-                }
-            }
-        </script>
-
-        <div class="row mt-4 status-section">
-            <div class="col-12">
-                <div class="card status-card called">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>Called</span>
-                        <span id="calledCount" class="badge bg-warning text-dark">{{ called_count }}</span>
-                    </div>
-                    <div class="card-body">
-                        <div id="calledList">
-                            {% for entry in called_entries %}
-                            <div class="status-item">
-                                <span class="license-plate">{{ entry.license_plate_snapshot }}</span>
-                                <span class="sequence-number">#{{ entry.sequence_number|default:'--' }}</span>
-                                <div class="text-end">
-                                    <small class="timestamp">{{ entry.display_time|time:"H:i:s" }}</small><br>
-                                    <small class="text-muted">{{ entry.display_status }}</small>
-
-                                    {% if entry.status == "notified" %}
-                                    <br>
-                                    <button type="button"
-                                        class="btn btn-outline-danger btn-sm mt-2 flag-license-plate-btn"
-                                        data-entry-id="{{ entry.id }}" data-queue-id="{{ queue.id }}"
-                                        data-license-plate="{{ entry.license_plate_snapshot }}">
-                                        Kenteken blokkeren
-                                    </button>
-                                    <br>
-                                    <button type="button" class="btn btn-success btn-sm mt-2 mark-dequeued-btn"
-                                        data-entry-id="{{ entry.id }}" data-queue-id="{{ queue.id }}">
-                                        Aangekomen
-                                    </button>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            {% empty %}
-                            <p class="text-muted">No chauffeurs called</p>
-                            {% endfor %}
+            <div id="calledList">
+                {% for entry in called_entries %}
+                <div class="entry-row">
+                    <div class="entry-main">
+                        <span class="license-plate">{{ entry.license_plate_snapshot }}</span>
+                        <div class="entry-meta">
+                            Volgnummer #{{ entry.sequence_number|default:"--" }} ·
+                            {{ entry.display_time|time:"H:i:s" }} ·
+                            {{ entry.display_status }}
                         </div>
                     </div>
+
+                    <div class="entry-actions">
+                        {% if entry.status == "notified" %}
+                        <button type="button" class="btn btn-success mark-dequeued-btn" data-entry-id="{{ entry.id }}"
+                            data-queue-id="{{ queue.id }}">
+                            Aangekomen
+                        </button>
+                        {% endif %}
+
+                        <button type="button" class="btn btn-outline-danger flag-license-plate-btn"
+                            data-entry-id="{{ entry.id }}" data-queue-id="{{ queue.id }}"
+                            data-license-plate="{{ entry.license_plate_snapshot }}">
+                            Kenteken blokkeren
+                        </button>
+                    </div>
                 </div>
+                {% empty %}
+                <div class="empty-state">Er zijn nog geen chauffeurs opgeroepen.</div>
+                {% endfor %}
             </div>
+        </section>
+
+        <section class="section-card card">
+            <div class="section-header waiting">
+                <span>Wachtende chauffeurs</span>
+                <span id="waitingCount" class="badge bg-primary">{{ waiting_count }}</span>
+            </div>
+
+            <div id="waitingList">
+                {% for entry in waiting_entries %}
+                <div class="entry-row">
+                    <div class="entry-main">
+                        <span class="license-plate">{{ entry.license_plate_snapshot }}</span>
+                        <div class="entry-meta">
+                            Aangemeld om {{ entry.created_at|time:"H:i:s" }}
+                        </div>
+                    </div>
+
+                    <div class="entry-actions">
+                        <button type="button" class="btn btn-outline-danger flag-license-plate-btn"
+                            data-entry-id="{{ entry.id }}" data-queue-id="{{ queue.id }}"
+                            data-license-plate="{{ entry.license_plate_snapshot }}">
+                            Kenteken blokkeren
+                        </button>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="empty-state">Er staan momenteel geen chauffeurs te wachten.</div>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+
+    <div class="modal fade" id="blockPlateModal" tabindex="-1" aria-labelledby="blockPlateModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content" id="blockPlateForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="blockPlateModalLabel">Kenteken blokkeren</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Sluiten"></button>
+                </div>
+
+                <div class="modal-body">
+                    <p class="mb-2">U gaat dit kenteken blokkeren:</p>
+                    <div class="license-plate mb-3" id="modalLicensePlate">--</div>
+
+                    <label class="form-label fw-bold" for="blockReason">Reden</label>
+                    <textarea id="blockReason" class="form-control" rows="3"
+                        placeholder="Bijv. misbruik van wachtrij, agressief gedrag, verkeerde locatie..."></textarea>
+
+                    <div class="form-check mt-3">
+                        <input class="form-check-input" type="checkbox" id="removeWaitingEntries" checked>
+                        <label class="form-check-label" for="removeWaitingEntries">
+                            Direct verwijderen uit actieve wachtrijen
+                        </label>
+                    </div>
+
+                    <div class="alert alert-warning mt-3 mb-0">
+                        Deze chauffeur kan met dit kenteken niet opnieuw aanmelden totdat de blokkade wordt opgeheven.
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        Annuleren
+                    </button>
+                    <button type="submit" class="btn btn-danger">
+                        Blokkeren
+                    </button>
+                </div>
+            </form>
         </div>
-        <div class="row status-section">
-            <div class="col-12">
-                <div class="card status-card waiting">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>Waiting</span>
-                        <span id="waitingCount" class="badge bg-primary">{{ waiting_count }}</span>
-                    </div>
-                    <div class="card-body">
-                        <div id="waitingList">
-                            {% for entry in waiting_entries %}
-                            <div class="status-item">
-                                <span class="license-plate">{{ entry.license_plate_snapshot }}</span>
+    </div>
 
-                                <div class="text-end">
-                                    <small class="timestamp">{{ entry.created_at|time:"H:i:s" }}</small><br>
-
-                                    <button type="button"
-                                        class="btn btn-outline-danger btn-sm mt-2 flag-license-plate-btn"
-                                        data-entry-id="{{ entry.id }}" data-queue-id="{{ queue.id }}"
-                                        data-license-plate="{{ entry.license_plate_snapshot }}">
-                                        Kenteken blokkeren
-                                    </button>
-                                </div>
-                            </div>
-                            {% empty %}
-                            <p class="text-muted">No chauffeurs waiting</p>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="controlToast" class="toast" role="alert">
+            <div class="toast-header">
+                <strong class="me-auto">TaxiBuffer</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Sluiten"></button>
             </div>
+            <div class="toast-body" id="toastBody"></div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Real-time monitoring with auto-refresh
-        document.addEventListener('DOMContentLoaded', function () {
-            const queueId = "{{ queue.id }}";
-            let connectionStatus = document.getElementById('connectionStatus');
-            let lastUpdated = document.getElementById('lastUpdated');
-            let retryCount = 0;
-            let pollInterval;
+        const queueId = "{{ queue.id }}";
+        let pollInterval = null;
+        let selectedBlock = {
+            queueId: null,
+            entryId: null,
+            licensePlate: null,
+        };
 
-            function updateQueueStatus() {
-                fetch(`/control/api/queue/${queueId}/status/`)
-                    .then(response => {
-                        if (!response.ok) throw new Error('Network response failed');
-                        return response.json();
-                    })
-                    .then(data => {
-                        if (!data.success) throw new Error(data.error || 'Unknown error');
+        function getCookie(name) {
+            const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return v ? v.pop() : '';
+        }
 
-                        // Reset connection status
-                        connectionStatus.className = 'badge bg-success';
-                        connectionStatus.textContent = 'Connected';
-                        retryCount = 0;
+        function showToast(message) {
+            document.getElementById('toastBody').textContent = message;
+            const toast = new bootstrap.Toast(document.getElementById('controlToast'));
+            toast.show();
+        }
 
-                        // Update waiting list
-                        document.getElementById('waitingCount').textContent = data.waiting_count;
-                        updateEntryList('waitingList', data.waiting_entries, entry => {
-                            return `
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <span class="license-plate">${entry.license_plate_snapshot}</span>
-                                    <div class="text-end">
-                                        <small class="timestamp">${entry.created_at}</small><br>
-                                        <button
-                                            type="button"
-                                            class="btn btn-outline-danger btn-sm mt-2 flag-license-plate-btn"
-                                            data-entry-id="${entry.id}"
-                                            data-queue-id="${queueId}"
-                                            data-license-plate="${entry.license_plate_snapshot}"
-                                        >
-                                            Kenteken blokkeren
-                                        </button>
-                                    </div>
-                                </div>
-                            `;
-                        });
+        async function callQueueAction(actionUrl, buttonElement, loadingText) {
+            const originalText = buttonElement.textContent.trim();
+            buttonElement.disabled = true;
+            buttonElement.textContent = loadingText;
 
-                        // Update called list
-                        document.getElementById('calledCount').textContent = data.called_count;
-                        updateEntryList('calledList', data.called_entries, entry => {
-                            const age = entry.notified_age_seconds || 0;
-                            const agingClass = entry.status === 'notified' && age > 420
-                                ? 'border border-danger bg-danger-subtle'
-                                : entry.status === 'notified' && age > 180
-                                    ? 'border border-warning bg-warning-subtle'
-                                    : '';
-                            const markButton = entry.status === 'notified'
-                                ? `
-                                    <br>
-                                    <button
-                                        type="button"
-                                        class="btn btn-success btn-sm mt-2 mark-dequeued-btn"
-                                        data-entry-id="${entry.id}"
-                                        data-queue-id="${queueId}"
-                                    >
-                                        Aangekomen
-                                    </button>
-                                `
-                                : '';
-                            const flagButton = entry.status === 'notified'
-                                ? `
-                                    <br>
-                                    <button
-                                        type="button"
-                                        class="btn btn-outline-danger btn-sm mt-2 flag-license-plate-btn"
-                                        data-entry-id="${entry.id}"
-                                        data-queue-id="${queueId}"
-                                        data-license-plate="${entry.license_plate_snapshot}"
-                                    >
-                                        Kenteken blokkeren
-                                    </button>
-                                `
-                                : '';
-
-                            return `
-                               <div class="status-item ${agingClass}">
-                                    <span class="license-plate">${entry.license_plate_snapshot}</span>
-                                    <span class="sequence-number">#${entry.sequence_number || '--'}</span>
-                                    <div class="text-end">
-                                        <small class="timestamp">${entry.display_time}</small><br>
-                                        <small class="text-muted">${entry.display_status}</small>
-                                        ${flagButton}
-                                        ${markButton}
-                                    </div>
-                                </div>
-                            `;
-                        });
-
-                        // Update last updated timestamp
-                        lastUpdated.textContent = `Last updated: ${data.last_updated}`;
-                        document.getElementById('todayDate').textContent = data.today_date;
-                    })
-                    .catch(error => {
-                        console.error('Error fetching queue status:', error);
-                        retryCount++;
-
-                        if (retryCount >= 3) {
-                            connectionStatus.className = 'badge bg-danger';
-                            connectionStatus.textContent = 'Disconnected';
-                        }
-                    });
-            }
-
-            function updateEntryList(elementId, entries, templateFunction) {
-                const element = document.getElementById(elementId);
-                if (!element) return;
-
-                if (entries.length === 0) {
-                    element.innerHTML = '<p class="text-muted">No chauffeurs in this status</p>';
-                    return;
-                }
-
-                let html = '';
-                entries.forEach(entry => {
-                    html += templateFunction(entry);
+            try {
+                const response = await fetch(actionUrl, {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": getCookie("csrftoken"),
+                        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+                    }
                 });
-                element.innerHTML = html;
-            }
 
-            async function markEntryDequeued(queueId, entryId, buttonElement) {
-                const originalText = buttonElement.textContent;
-                buttonElement.disabled = true;
-                buttonElement.textContent = 'Bezig...';
+                const data = await response.json();
 
-                try {
-                    const response = await fetch(
-                        `/control/queue/${queueId}/entry/${entryId}/dequeue/`,
-                        {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRFToken': getCookie('csrftoken'),
-                                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-                            }
-                        }
-                    );
-
-                    const data = await response.json();
-
-                    if (!data.success) {
-                        alert('Error: ' + (data.error || 'Kon niet markeren.'));
-                        return;
-                    }
-
+                if (data.success) {
+                    showToast(data.message || "Actie uitgevoerd.");
                     updateQueueStatus();
-                } catch (err) {
-                    console.error('Mark dequeued failed', err);
-                    alert('Kon chauffeur niet markeren.');
-                } finally {
-                    buttonElement.disabled = false;
-                    buttonElement.textContent = originalText;
+                } else {
+                    showToast(data.error || "Actie mislukt.");
                 }
+            } catch (err) {
+                console.error(err);
+                showToast("Kon de actie niet uitvoeren.");
+            } finally {
+                buttonElement.disabled = false;
+                buttonElement.textContent = originalText;
             }
+        }
 
-            async function flagLicensePlate(queueId, entryId, licensePlate) {
-                const reason = prompt(
-                    `Waarom wilt u kenteken ${licensePlate} blokkeren?`,
-                    ''
-                );
+        async function togglePause(queueId) {
+            const btn = document.getElementById('pauseBtn' + queueId);
+            const pausedNow = btn.dataset.paused === '1';
+            const action = pausedNow ? 'resume' : 'pause';
 
-                if (reason === null) {
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`/control/queue/${queueId}/toggle-pause/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                    },
+                    body: 'action=' + encodeURIComponent(action)
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    showToast(data.error || "Pauzeren mislukt.");
                     return;
                 }
 
-                const removeWaitingEntries = confirm(
-                    'Wilt u actieve wachtende chauffeurs met dit kenteken direct uit de wachtrij verwijderen?'
-                );
+                const isPaused = !!data.notifications_paused;
+                btn.dataset.paused = isPaused ? '1' : '0';
+                btn.textContent = isPaused ? 'Oproepen hervatten' : 'Oproepen pauzeren';
+                btn.className = isPaused
+                    ? 'btn btn-success big-action-btn w-100'
+                    : 'btn btn-outline-secondary big-action-btn w-100';
 
-                try {
-                    const body = new URLSearchParams();
-                    body.set('reason', reason);
-                    body.set('remove_waiting_entries', removeWaitingEntries ? '1' : '0');
+                showToast(isPaused ? 'Oproepen zijn gepauzeerd.' : 'Oproepen zijn hervat.');
+            } catch (err) {
+                console.error(err);
+                showToast("Kon pauzestand niet wijzigen.");
+            } finally {
+                btn.disabled = false;
+            }
+        }
 
-                    const response = await fetch(
-                        `/control/queue/${queueId}/entry/${entryId}/flag-license-plate/`,
-                        {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRFToken': getCookie('csrftoken'),
-                                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                            },
-                            body: body.toString(),
-                        }
+        function renderEmpty(message) {
+            return `<div class="empty-state">${message}</div>`;
+        }
+
+        function renderWaitingEntry(entry) {
+            return `
+                <div class="entry-row">
+                    <div class="entry-main">
+                        <span class="license-plate">${entry.license_plate_snapshot || '-'}</span>
+                        <div class="entry-meta">Aangemeld om ${entry.created_at || '--:--:--'}</div>
+                    </div>
+
+                    <div class="entry-actions">
+                        <button type="button" class="btn btn-outline-danger flag-license-plate-btn"
+                            data-entry-id="${entry.id}"
+                            data-queue-id="${queueId}"
+                            data-license-plate="${entry.license_plate_snapshot || ''}">
+                            Kenteken blokkeren
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCalledEntry(entry) {
+            const age = entry.notified_age_seconds || 0;
+            const agingClass = entry.status === 'notified' && age > 420
+                ? 'danger-soft'
+                : entry.status === 'notified' && age > 180
+                    ? 'warning-soft'
+                    : '';
+
+            const arrivedButton = entry.status === 'notified'
+                ? `
+                    <button type="button" class="btn btn-success mark-dequeued-btn"
+                        data-entry-id="${entry.id}" data-queue-id="${queueId}">
+                        Aangekomen
+                    </button>
+                `
+                : '';
+
+            return `
+                <div class="entry-row ${agingClass}">
+                    <div class="entry-main">
+                        <span class="license-plate">${entry.license_plate_snapshot || '-'}</span>
+                        <div class="entry-meta">
+                            Volgnummer #${entry.sequence_number || '--'} ·
+                            ${entry.display_time || '--:--:--'} ·
+                            ${entry.display_status || ''}
+                        </div>
+                    </div>
+
+                    <div class="entry-actions">
+                        ${arrivedButton}
+                        <button type="button" class="btn btn-outline-danger flag-license-plate-btn"
+                            data-entry-id="${entry.id}"
+                            data-queue-id="${queueId}"
+                            data-license-plate="${entry.license_plate_snapshot || ''}">
+                            Kenteken blokkeren
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateList(elementId, entries, renderer, emptyMessage) {
+            const element = document.getElementById(elementId);
+
+            if (!entries || entries.length === 0) {
+                element.innerHTML = renderEmpty(emptyMessage);
+                return;
+            }
+
+            element.innerHTML = entries.map(renderer).join('');
+        }
+
+        function updateQueueStatus() {
+            fetch(`/control/api/queue/${queueId}/status/`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || 'Status ophalen mislukt');
+
+                    document.getElementById('connectionStatus').className = 'badge bg-success status-pill';
+                    document.getElementById('connectionStatus').textContent = 'Verbonden';
+
+                    document.getElementById('waitingCount').textContent = data.waiting_count;
+                    document.getElementById('calledCount').textContent = data.called_count;
+                    document.getElementById('lastUpdated').textContent = `Laatst bijgewerkt: ${data.last_updated}`;
+
+                    updateList(
+                        'waitingList',
+                        data.waiting_entries,
+                        renderWaitingEntry,
+                        'Er staan momenteel geen chauffeurs te wachten.'
                     );
 
-                    const data = await response.json();
+                    updateList(
+                        'calledList',
+                        data.called_entries,
+                        renderCalledEntry,
+                        'Er zijn nog geen chauffeurs opgeroepen.'
+                    );
+                })
+                .catch(error => {
+                    console.error(error);
+                    document.getElementById('connectionStatus').className = 'badge bg-danger status-pill';
+                    document.getElementById('connectionStatus').textContent = 'Geen verbinding';
+                });
+        }
 
-                    if (!data.success) {
-                        alert('Error: ' + (data.error || 'Kon kenteken niet blokkeren.'));
-                        return;
+        async function markEntryDequeued(queueId, entryId, buttonElement) {
+            const originalText = buttonElement.textContent.trim();
+            buttonElement.disabled = true;
+            buttonElement.textContent = 'Bezig...';
+
+            try {
+                const response = await fetch(`/control/queue/${queueId}/entry/${entryId}/dequeue/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
                     }
+                });
 
-                    alert(data.message || 'Kenteken is geblokkeerd.');
-                    updateQueueStatus();
+                const data = await response.json();
 
-                } catch (err) {
-                    console.error('Flag license plate failed', err);
-                    alert('Kon kenteken niet blokkeren.');
+                if (!data.success) {
+                    showToast(data.error || 'Kon chauffeur niet markeren.');
+                    return;
                 }
+
+                showToast(data.message || 'Chauffeur gemarkeerd als aangekomen.');
+                updateQueueStatus();
+            } catch (err) {
+                console.error(err);
+                showToast('Kon chauffeur niet markeren.');
+            } finally {
+                buttonElement.disabled = false;
+                buttonElement.textContent = originalText;
             }
+        }
+
+        function openBlockModal(queueId, entryId, licensePlate) {
+            selectedBlock = { queueId, entryId, licensePlate };
+
+            document.getElementById('modalLicensePlate').textContent = licensePlate || '-';
+            document.getElementById('blockReason').value = '';
+            document.getElementById('removeWaitingEntries').checked = true;
+
+            const modal = new bootstrap.Modal(document.getElementById('blockPlateModal'));
+            modal.show();
+        }
+
+        async function submitBlockPlate() {
+            const body = new URLSearchParams();
+            body.set('reason', document.getElementById('blockReason').value.trim());
+            body.set('remove_waiting_entries', document.getElementById('removeWaitingEntries').checked ? '1' : '0');
+
+            const response = await fetch(
+                `/control/queue/${selectedBlock.queueId}/entry/${selectedBlock.entryId}/flag-license-plate/`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                    },
+                    body: body.toString()
+                }
+            );
+
+            const data = await response.json();
+
+            if (!data.success) {
+                showToast(data.error || 'Kon kenteken niet blokkeren.');
+                return;
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('blockPlateModal')).hide();
+            showToast(data.message || 'Kenteken is geblokkeerd.');
+            updateQueueStatus();
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('callVehicleBtn')?.addEventListener('click', function () {
+                callQueueAction(`/control/queue/${queueId}/voertuig/`, this, 'Auto oproepen...');
+            });
+
+            document.getElementById('bypassBusjeBtn')?.addEventListener('click', function () {
+                callQueueAction(`/control/queue/${queueId}/busje/`, this, 'Busje oproepen...');
+            });
+
+            document.getElementById('blockPlateForm')?.addEventListener('submit', function (event) {
+                event.preventDefault();
+                submitBlockPlate();
+            });
 
             document.addEventListener('click', function (event) {
-                const markButton = event.target.closest('.mark-dequeued-btn');
+                const arrivedBtn = event.target.closest('.mark-dequeued-btn');
 
-                if (markButton) {
-                    const queueId = markButton.dataset.queueId;
-                    const entryId = markButton.dataset.entryId;
-
-                    if (!confirm('Chauffeur markeren als aangekomen/afgehandeld?')) {
-                        return;
-                    }
-
-                    markEntryDequeued(queueId, entryId, markButton);
+                if (arrivedBtn) {
+                    if (!confirm('Bevestigen: chauffeur is aangekomen?')) return;
+                    markEntryDequeued(arrivedBtn.dataset.queueId, arrivedBtn.dataset.entryId, arrivedBtn);
                     return;
                 }
 
-                const flagButton = event.target.closest('.flag-license-plate-btn');
+                const blockBtn = event.target.closest('.flag-license-plate-btn');
 
-                if (flagButton) {
-                    const queueId = flagButton.dataset.queueId;
-                    const entryId = flagButton.dataset.entryId;
-                    const licensePlate = flagButton.dataset.licensePlate;
-
-                    if (!confirm(`Kenteken ${licensePlate} blokkeren?`)) {
-                        return;
-                    }
-
-                    flagLicensePlate(queueId, entryId, licensePlate);
+                if (blockBtn) {
+                    openBlockModal(
+                        blockBtn.dataset.queueId,
+                        blockBtn.dataset.entryId,
+                        blockBtn.dataset.licensePlate
+                    );
                 }
             });
 
-            // Initial update
             updateQueueStatus();
-
-            // Set interval for auto-refresh (every 10 seconds)
             pollInterval = setInterval(updateQueueStatus, 10000);
 
-            // Cleanup on page unload
             window.addEventListener('beforeunload', () => {
                 if (pollInterval) clearInterval(pollInterval);
             });
