@@ -30,6 +30,14 @@ class NotificationService {
         importance: Importance.high,
       );
 
+  static const AndroidNotificationChannel _generalChannel =
+      AndroidNotificationChannel(
+        'taxibuffer_general',
+        'TaxiBuffer meldingen',
+        description: 'Algemene TaxiBuffer meldingen',
+        importance: Importance.max,
+      );
+
   Future<void> init() async {
     if (_initialized) return;
     _initialized = true;
@@ -61,13 +69,28 @@ class NotificationService {
       },
     );
 
-    await _localNotifications
+    final android = _localNotifications
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(_queueChannel);
+        >();
+
+    await android?.createNotificationChannel(_queueChannel);
+    await android?.createNotificationChannel(_generalChannel);
 
     FirebaseMessaging.onMessage.listen((message) async {
+      final type = message.data['type']?.toString();
+
+      if (type == 'test_push') {
+        await _showLocalNotification(
+          title: message.notification?.title ?? 'Pushmeldingen werken goed',
+          body:
+              message.notification?.body ??
+              'U ontvangt meldingen van TaxiBuffer correct.',
+          payload: 'test_push',
+        );
+        return;
+      }
+
       final notificationId =
           message.data['notification_id']?.toString() ??
           '${message.data['type']}_${message.data['entry_uuid']}';
@@ -104,6 +127,31 @@ class NotificationService {
     _messaging.onTokenRefresh.listen((newToken) {
       _registerToken(newToken);
     });
+  }
+
+  Future<void> _showLocalNotification({
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    final androidDetails = AndroidNotificationDetails(
+      _generalChannel.id,
+      _generalChannel.name,
+      channelDescription: _generalChannel.description,
+      importance: Importance.max,
+      priority: Priority.high,
+      icon: '@drawable/ic_notification',
+    );
+
+    final details = NotificationDetails(android: androidDetails);
+
+    await _localNotifications.show(
+      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title: title,
+      body: body,
+      notificationDetails: details,
+      payload: payload,
+    );
   }
 
   Future<bool> requestAndRegisterToken() async {
@@ -170,6 +218,8 @@ class NotificationService {
 
   Future<void> _handleNotificationData(Map<String, dynamic> data) async {
     final type = data['type'];
+
+    if (type == 'test_push') return;
 
     if (type == 'location_lost') {
       final entryUuid = data['entry_uuid']?.toString();

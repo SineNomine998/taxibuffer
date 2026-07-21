@@ -45,7 +45,7 @@ from compliance.services import (
 )
 from compliance.permissions import HasAcceptedPrivacyPolicy, HasAcceptedTermsOfUse
 from mobile_api.models import MobilePushToken
-from mobile_api.push import send_location_lost_push
+from mobile_api.push import send_location_lost_push, send_test_push_to_chauffeur
 
 logger = logging.getLogger(__name__)
 
@@ -1697,5 +1697,37 @@ class MobileActivityLogView(APIView):
         return Response(
             {
                 "results": results,
+            }
+        )
+
+
+class MobileTestPushView(APIView):
+    permission_classes = [
+        IsAuthenticated,
+        HasAcceptedPrivacyPolicy,
+        HasAcceptedTermsOfUse,
+    ]
+
+    def post(self, request):
+        chauffeur = get_current_chauffeur(request.user)
+
+        result = send_test_push_to_chauffeur(chauffeur)
+
+        if not result["success"]:
+            return Response(
+                {
+                    "success": False,
+                    "detail": result.get(
+                        "message",
+                        "Testmelding kon niet worden verzonden.",
+                    ),
+                },
+                status=400,
+            )
+
+        return Response(
+            {
+                "success": True,
+                "message": "Testmelding verzonden.",
             }
         )

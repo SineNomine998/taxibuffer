@@ -110,3 +110,50 @@ def send_location_lost_push(entry_id):
         response.success_count,
         response.failure_count,
     )
+
+
+def send_test_push_to_chauffeur(chauffeur):
+    ensure_firebase_initialized()
+
+    tokens = list(
+        MobilePushToken.objects.filter(
+            chauffeur=chauffeur,
+            active=True,
+        ).values_list("token", flat=True)
+    )
+
+    if not tokens:
+        logger.warning(
+            "No active FCM tokens for test push chauffeur_id=%s",
+            chauffeur.id,
+        )
+        return {
+            "success": False,
+            "message": "Geen actief push-token gevonden.",
+        }
+
+    message = messaging.MulticastMessage(
+        tokens=tokens,
+        notification=messaging.Notification(
+            title="Pushmeldingen werken goed",
+            body="U ontvangt meldingen van TaxiBuffer correct.",
+        ),
+        data={
+            "type": "test_push",
+        },
+    )
+
+    response = messaging.send_each_for_multicast(message)
+
+    logger.info(
+        "FCM test_push sent chauffeur_id=%s success=%s failure=%s",
+        chauffeur.id,
+        response.success_count,
+        response.failure_count,
+    )
+
+    return {
+        "success": response.success_count > 0,
+        "success_count": response.success_count,
+        "failure_count": response.failure_count,
+    }

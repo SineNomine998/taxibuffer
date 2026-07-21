@@ -5,6 +5,7 @@ import 'package:mobile_app/core/theme.dart';
 import 'package:mobile_app/features/compliance/widgets/privacy_sheet.dart';
 import 'package:mobile_app/features/compliance/widgets/terms_sheet.dart';
 import 'package:mobile_app/features/queue/queue_location_tracker.dart';
+import 'package:mobile_app/features/settings/services/settings_service.dart';
 import 'package:mobile_app/widgets/screen_header.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -19,6 +20,8 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   String _versionText = '';
   bool locationAvailable = false;
+  final _settingsService = SettingsService();
+  bool _testingPush = false;
 
   @override
   void initState() {
@@ -61,6 +64,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await TermsOfUseSheet.show(context);
   }
 
+  Future<void> _testPushNotifications() async {
+    if (_testingPush) return;
+
+    setState(() => _testingPush = true);
+
+    try {
+      await _settingsService.testPushNotification();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Testmelding verzonden. Controleer uw meldingen.'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Testmelding mislukt. Controleer of meldingen zijn toegestaan.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _testingPush = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final locationTracker = context.watch<QueueLocationTracker>();
@@ -85,10 +120,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'Meldingen en locatie',
               description: 'Beheer meldingen en live tracking.',
               children: [
-                _SettingsNavigationTile(
-                  icon: Icons.notifications_active_outlined,
-                  title: 'Pushmeldingen testen',
-                  onTap: () => _showNotImplemented('Pushmeldingen testen'),
+                ListTile(
+                  leading: _SettingsIcon(Icons.notifications_active_outlined),
+                  title: const Text(
+                    'Pushmeldingen testen',
+                    style: TextStyle(
+                      fontFamily: 'DM Sans',
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _testingPush
+                        ? 'Testmelding wordt verzonden...'
+                        : 'Controleer of meldingen goed binnenkomen',
+                    style: const TextStyle(fontFamily: 'DM Sans'),
+                  ),
+                  trailing: _testingPush
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chevron_right_rounded),
+                  onTap: _testingPush ? null : _testPushNotifications,
                 ),
                 _SettingsStatusTile(
                   icon: Icons.location_on_outlined,

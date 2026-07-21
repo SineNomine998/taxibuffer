@@ -126,4 +126,10 @@ urlpatterns = [
         views.MobileActivityLogView.as_view(),
         name="mobile_activity",
     ),
+    # Push notification testing endpoints
+    path(
+        "push/test/",
+        views.MobileTestPushView.as_view(),
+        name="mobile_test_push",
+    ),
 ]
