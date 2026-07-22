@@ -26,7 +26,9 @@ class QueueService {
     await _channel?.sink.close();
     _channel = null;
 
-    final token = await _apiClient.refreshAndGetAccessToken();
+    final token = forceRefreshToken
+        ? await _apiClient.refreshAndGetAccessToken()
+        : await _apiClient.getAccessTokenOrRefresh();
 
     final wsBase = ApiConfig.baseUrl
         .replaceFirst('https://', 'wss://')

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_background_geolocation/flutter_background_geolocation.dart'
     as bg;
+import 'package:mobile_app/core/config/api_client.dart';
 
 import 'services/queue_service.dart';
 
@@ -197,6 +198,9 @@ class QueueLocationTracker extends ChangeNotifier {
       );
 
       _handleResult(result);
+    } on ApiAuthException catch (e) {
+      debugPrint('Queue location auth failed: $e');
+      await stop();
     } catch (error, stackTrace) {
       debugPrint('Queue location report failed: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -216,6 +220,9 @@ class QueueLocationTracker extends ChangeNotifier {
       );
 
       _handleResult(result);
+    } on ApiAuthException catch (e) {
+      debugPrint('Queue location unavailable auth failed: $e');
+      await stop();
     } catch (error, stackTrace) {
       debugPrint('Queue location report failed: $error');
       debugPrintStack(stackTrace: stackTrace);

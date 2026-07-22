@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
@@ -175,13 +177,13 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
         queueState.setActiveEntry(state.activeEntryUuid!);
 
         if (state.activelyWaiting) {
-          await tracker.start(state.activeEntryUuid!);
+          unawaited(tracker.start(state.activeEntryUuid!));
         } else {
-          await tracker.stop();
+          unawaited(tracker.stop());
         }
       } else {
         queueState.clearActiveEntry();
-        await tracker.stop();
+        unawaited(tracker.stop());
       }
 
       if (!mounted) return;
@@ -251,11 +253,14 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
 
       if (!mounted) return;
 
-      context.read<QueueState>().setActiveEntry(entryUuid);
-      await context.read<QueueLocationTracker>().start(entryUuid);
+      final queueState = context.read<QueueState>();
+      final tracker = context.read<QueueLocationTracker>();
 
-      if (!mounted) return;
+      queueState.setActiveEntry(entryUuid);
+
       context.go('/queue/$entryUuid');
+
+      unawaited(tracker.start(entryUuid));
     } on LocationPermissionDeniedException catch (e) {
       if (!mounted) return;
 

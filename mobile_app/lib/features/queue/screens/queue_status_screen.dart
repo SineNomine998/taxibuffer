@@ -133,9 +133,11 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
     }
 
     if (status.status == 'waiting') {
-      await tracker.start(widget.entryUuid);
+      if (!tracker.isRunning) {
+        unawaited(tracker.start(widget.entryUuid));
+      }
     } else {
-      await tracker.stop();
+      unawaited(tracker.stop());
     }
 
     if (!mounted) return;
@@ -402,7 +404,12 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
               child: CircularProgressIndicator(color: AppColors.gradientStart),
             )
           : _connectionError != null && _status == null
-          ? _ErrorState(message: _connectionError!, onRetry: _connect)
+          ? _ErrorState(
+              message: _connectionError!,
+              onRetry: () {
+                unawaited(_connect(forceRefreshToken: true));
+              },
+            )
           : _buildContent(),
     );
   }

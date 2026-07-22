@@ -38,10 +38,6 @@ class QueuePermissionGate {
         notificationSettings.authorizationStatus ==
             AuthorizationStatus.provisional;
 
-    if (notificationGranted) {
-      await NotificationService.instance.requestAndRegisterToken();
-    }
-
     final notificationPermanentlyDenied =
         notificationSettings.authorizationStatus == AuthorizationStatus.denied;
 

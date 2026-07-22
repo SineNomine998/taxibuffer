@@ -170,29 +170,37 @@ class NotificationService {
       provisional: false,
     );
 
-    final allowed =
-        settings.authorizationStatus == AuthorizationStatus.authorized ||
-        settings.authorizationStatus == AuthorizationStatus.provisional;
+    final isAuthorized = switch (settings.authorizationStatus) {
+      AuthorizationStatus.authorized || AuthorizationStatus.provisional => true,
+      _ => false,
+    };
 
-    if (!allowed) return false;
+    if (!isAuthorized) return false;
 
     final token = await _messaging.getToken();
+    if (token?.isEmpty ?? true) return false;
 
-    if (token == null || token.isEmpty) return false;
-
-    await _registerToken(token);
-
-    return true;
+    return _registerToken(token!);
   }
 
-  Future<void> _registerToken(String token) async {
-    await _api.post(
-      '/api/mobile/push-token/',
-      body: {
-        'token': token,
-        'platform': Platform.isAndroid ? 'android' : 'ios',
-      },
-    );
+  Future<bool> _registerToken(String token) async {
+    try {
+      await _api.post(
+        '/api/mobile/push-token/',
+        body: {
+          'token': token,
+          'platform': Platform.isAndroid ? 'android' : 'ios',
+        },
+      );
+
+      return true;
+    } on ApiAuthException {
+      // Don't log the user out.
+      // Registration can be retried later.
+      return false;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> _handleForegroundMessage(RemoteMessage message) async {

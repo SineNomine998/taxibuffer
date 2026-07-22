@@ -16,8 +16,8 @@ class QueueStatusConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         user = self.scope.get("user")
 
-        print("WS connect user:", self.scope.get("user"))
-        print("WS authenticated:", self.scope.get("user").is_authenticated)
+        print("WS connect user:", user)
+        print("WS authenticated:", getattr(user, "is_authenticated", False))
 
         if not user or not user.is_authenticated:
             await self.close(code=4001)
@@ -25,11 +25,17 @@ class QueueStatusConsumer(AsyncWebsocketConsumer):
 
         self.entry_uuid = self.scope["url_route"]["kwargs"]["entry_uuid"]
         self.running = True
+
         await self.accept()
-        asyncio.ensure_future(self._push_loop())
+
+        self.push_task = asyncio.create_task(self._push_loop())
 
     async def disconnect(self, close_code):
         self.running = False
+
+        push_task = getattr(self, "push_task", None)
+        if push_task:
+            push_task.cancel()
 
     async def receive(self, text_data=None, bytes_data=None):
         # Client can send {"action": "leave"} to dequeue
@@ -51,9 +57,31 @@ class QueueStatusConsumer(AsyncWebsocketConsumer):
         while self.running:
             try:
                 payload = await self._build_status_payload()
+
+                if not self.running:
+                    break
+
                 await self.send(json.dumps(payload, default=str))
+
+            except asyncio.CancelledError:
+                break
+
             except Exception as e:
-                await self.send(json.dumps({"type": "error", "detail": str(e)}))
+                if not self.running:
+                    break
+
+                try:
+                    await self.send(
+                        json.dumps(
+                            {
+                                "type": "error",
+                                "detail": str(e),
+                            }
+                        )
+                    )
+                except Exception:
+                    break
+
             await asyncio.sleep(self.POLL_INTERVAL)
 
     @database_sync_to_async
@@ -82,7 +110,10 @@ class QueueStatusConsumer(AsyncWebsocketConsumer):
 
         # Check for unacknowledged notification (in the old flow, the user clicking on "Begrepen" button would mean they acknowledge)
         notification = (
-            QueueNotification.objects.filter(queue_entry=entry, response=QueueNotification.ResponseType.PENDING,)
+            QueueNotification.objects.filter(
+                queue_entry=entry,
+                response=QueueNotification.ResponseType.PENDING,
+            )
             .order_by("-notification_time")
             .first()
         )

@@ -9,7 +9,7 @@ class ApiClient {
   final TokenStorage _tokenStorage;
   final http.Client _http;
 
-  Future<bool>? _refreshFuture;
+  static Future<String?>? _refreshFuture;
 
   ApiClient({TokenStorage? tokenStorage, http.Client? httpClient})
     : _tokenStorage = tokenStorage ?? TokenStorage(),
@@ -48,9 +48,9 @@ class ApiClient {
       return firstResponse;
     }
 
-    final refreshed = await _refreshAccessTokenSingleFlight();
+    final refreshedAccess = await _refreshAccessTokenSingleFlight();
 
-    if (!refreshed) {
+    if (refreshedAccess == null || refreshedAccess.isEmpty) {
       await _tokenStorage.clearTokens();
       throw const ApiAuthException('Sessie verlopen.');
     }
@@ -86,36 +86,29 @@ class ApiClient {
   }
 
   Future<String> refreshAndGetAccessToken() async {
-    final refreshed = await _refreshAccessTokenSingleFlight();
+    final access = await _refreshAccessTokenSingleFlight();
 
-    if (!refreshed) {
+    if (access == null || access.isEmpty) {
       await _tokenStorage.clearTokens();
       throw const ApiAuthException('Sessie verlopen.');
     }
 
-    final newAccessToken = await _tokenStorage.getAccessToken();
-
-    if (newAccessToken == null || newAccessToken.isEmpty) {
-      await _tokenStorage.clearTokens();
-      throw const ApiAuthException('Geen access token ontvangen.');
-    }
-
-    return newAccessToken;
+    return access;
   }
 
-  Future<bool> _refreshAccessTokenSingleFlight() {
-    _refreshFuture ??= _refreshAccessToken();
+  Future<String?> _refreshAccessTokenSingleFlight() {
+    ApiClient._refreshFuture ??= _refreshAccessToken();
 
-    return _refreshFuture!.whenComplete(() {
-      _refreshFuture = null;
+    return ApiClient._refreshFuture!.whenComplete(() {
+      ApiClient._refreshFuture = null;
     });
   }
 
-  Future<bool> _refreshAccessToken() async {
+  Future<String?> _refreshAccessToken() async {
     final refreshToken = await _tokenStorage.getRefreshToken();
 
     if (refreshToken == null || refreshToken.isEmpty) {
-      return false;
+      return null;
     }
 
     try {
@@ -129,20 +122,31 @@ class ApiClient {
       );
 
       if (response.statusCode != 200) {
-        return false;
+        return null;
       }
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final data = jsonDecode(response.body);
+
+      if (data is! Map<String, dynamic>) {
+        return null;
+      }
+
       final access = data['access']?.toString();
+      final refresh = data['refresh']?.toString();
 
       if (access == null || access.isEmpty) {
-        return false;
+        return null;
       }
 
       await _tokenStorage.saveAccessToken(access);
-      return true;
+
+      if (refresh != null && refresh.isNotEmpty) {
+        await _tokenStorage.saveRefreshToken(refresh);
+      }
+
+      return access;
     } catch (_) {
-      return false;
+      return null;
     }
   }
 
