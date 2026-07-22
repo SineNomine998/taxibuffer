@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_app/core/config/api_client.dart';
 import 'package:mobile_app/core/models/vehicle.dart';
 import 'package:mobile_app/features/account/widgets/add_vehicle_card.dart';
 import 'package:mobile_app/features/account/widgets/edit_vehicle_sheet.dart';
@@ -44,9 +45,26 @@ class _AccountScreenState extends State<AccountScreen> {
     _emailController = TextEditingController();
     _rtxController = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      context.read<AccountState>().load().then((_) => _syncControllers());
-      if (!mounted) return;
-      await syncQueueTracking(context);
+      try {
+        await context.read<AccountState>().load();
+
+        if (!mounted) return;
+
+        _syncControllers();
+
+        await syncQueueTracking(context);
+      } on ApiAuthException {
+        if (!mounted) return;
+
+        context.read<AuthGateState>().markUnauthenticated();
+        context.read<PrivacyGateState>().reset();
+        context.read<TermsGateState>().reset();
+        await context.read<QueueLocationTracker>().stop();
+
+        if (!mounted) return;
+
+        context.go('/login?next=${Uri.encodeComponent('/account')}');
+      }
     });
   }
 
@@ -148,12 +166,14 @@ class _AccountScreenState extends State<AccountScreen> {
 
     if (!mounted) return;
 
-    context.read<AuthGateState>().markUnauthenticated();
-    context.read<PrivacyGateState>().reset();
-    context.read<TermsGateState>().reset();
     await context.read<QueueLocationTracker>().stop();
 
     if (!mounted) return;
+
+    context.read<AuthGateState>().markUnauthenticated();
+    context.read<PrivacyGateState>().reset();
+    context.read<TermsGateState>().reset();
+
     context.go('/login');
   }
 

@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mobile_app/core/notifications/notification_service.dart';
-import '../config/api_client.dart';
 
 class QueuePermissionStatus {
   final bool locationGranted;
@@ -21,10 +19,6 @@ class QueuePermissionStatus {
 }
 
 class QueuePermissionGate {
-  final ApiClient _api;
-
-  QueuePermissionGate({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
-
   Future<QueuePermissionStatus> check() async {
     final locationPermission = await Geolocator.checkPermission();
 
@@ -94,26 +88,11 @@ class QueuePermissionGate {
     final notificationPermanentlyDenied =
         notificationSettings.authorizationStatus == AuthorizationStatus.denied;
 
-    if (notificationGranted) {
-      await _registerPushToken();
-    }
-
     return QueuePermissionStatus(
       locationGranted: locationGranted,
       locationPermanentlyDenied: locationPermanentlyDenied,
       notificationGranted: notificationGranted,
       notificationPermanentlyDenied: notificationPermanentlyDenied,
-    );
-  }
-
-  Future<void> _registerPushToken() async {
-    final token = await FirebaseMessaging.instance.getToken();
-    await _api.post(
-      '/api/mobile/push-token/',
-      body: {
-        'token': token,
-        'platform': Platform.isAndroid ? 'android' : 'ios',
-      },
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:mobile_app/core/config/api_client.dart';
 import '../../../core/models/vehicle.dart';
 import 'models/account_profile.dart';
 import 'services/account_service.dart';
@@ -24,14 +25,18 @@ class AccountState extends ChangeNotifier {
     isLoading = true;
     loadError = null;
     notifyListeners();
+
     try {
       final data = await _accountService.fetchAccount();
+
       profile = AccountProfile.fromJson(data['profile']);
       vehicles = (data['vehicles'] as List)
           .map((v) => Vehicle.fromJson(v as Map<String, dynamic>))
           .toList();
+    } on ApiAuthException {
+      rethrow;
     } catch (e) {
-      loadError = e.toString();
+      loadError = e.toString().replaceFirst('Exception: ', '');
     } finally {
       isLoading = false;
       notifyListeners();
@@ -81,15 +86,19 @@ class AccountState extends ChangeNotifier {
 
   Future<void> removeVehicle(Vehicle target) async {
     await _accountService.removeVehicle(target.id!);
-    await load();
-    vehicles.removeWhere((v) => v.id == target.id);
+
+    vehicles = vehicles.where((v) => v.id != target.id).toList();
+
+    if (vehicles.isNotEmpty && vehicles.every((v) => !v.isCurrent)) {
+      await load();
+      return;
+    }
+
     notifyListeners();
   }
 
   Future<void> adjustVehicle(Vehicle target) async {
     final saved = await _accountService.adjustVehicle(target);
-
-    await load();
 
     vehicles = vehicles.map((v) {
       if (v.id != saved.id) return v;

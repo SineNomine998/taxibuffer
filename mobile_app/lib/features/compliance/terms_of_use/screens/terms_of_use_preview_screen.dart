@@ -15,8 +15,7 @@ class TermsOfUsePreviewScreen extends StatefulWidget {
       _TermsOfUsePreviewScreenState();
 }
 
-class _TermsOfUsePreviewScreenState
-    extends State<TermsOfUsePreviewScreen> {
+class _TermsOfUsePreviewScreenState extends State<TermsOfUsePreviewScreen> {
   final _service = TermsService();
   final _scrollController = ScrollController();
 
@@ -52,6 +51,13 @@ class _TermsOfUsePreviewScreenState
       final policy = await _service.fetchPublicTermsOfUse();
       if (!mounted) return;
       setState(() => _policy = policy);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+
+        if (_scrollController.position.maxScrollExtent <= 0) {
+          setState(() => _hasScrolledToBottom = true);
+        }
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() => _error = 'Kon gebruiksvoorwaarden niet laden.');

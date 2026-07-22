@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/config/api_client.dart';
 import 'package:mobile_app/core/permissions/queue_permission_gate.dart';
 import 'package:mobile_app/features/account/account_state.dart';
+import 'package:mobile_app/features/auth/auth_gate_state.dart';
+import 'package:mobile_app/features/compliance/privacy/privacy_gate_state.dart';
+import 'package:mobile_app/features/compliance/terms_of_use/terms_gate_state.dart';
 import 'package:mobile_app/features/queue/queue_location_tracker.dart';
 import 'package:mobile_app/features/queue/queue_state.dart';
-import 'package:mobile_app/features/queue/queue_tracking_sync.dart';
 import 'package:provider/provider.dart';
 import '../../../core/dialogs.dart';
 import '../../../core/theme.dart';
@@ -39,10 +41,30 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
 
     WidgetsBinding.instance.addObserver(this);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadQueues();
-      _checkQueuePermissions();
-      context.read<AccountState>().load();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadQueues();
+
+      if (!mounted) return;
+
+      await _checkQueuePermissions();
+
+      if (!mounted) return;
+
+      try {
+        await context.read<AccountState>().load();
+      } on ApiAuthException {
+        if (!mounted) return;
+
+        context.read<AuthGateState>().markUnauthenticated();
+        context.read<PrivacyGateState>().reset();
+        context.read<TermsGateState>().reset();
+
+        await context.read<QueueLocationTracker>().stop();
+
+        if (!mounted) return;
+
+        context.go('/login?next=${Uri.encodeComponent('/locations')}');
+      }
     });
   }
 
@@ -147,19 +169,36 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
 
       final queueState = context.read<QueueState>();
 
+      final tracker = context.read<QueueLocationTracker>();
+
       if (state.hasActiveQueue) {
         queueState.setActiveEntry(state.activeEntryUuid!);
+
+        if (state.activelyWaiting) {
+          await tracker.start(state.activeEntryUuid!);
+        } else {
+          await tracker.stop();
+        }
       } else {
         queueState.clearActiveEntry();
+        await tracker.stop();
       }
 
-      setState(() => _queues = state.queues);
+      if (!mounted) return;
 
-      await syncQueueTracking(context);
+      setState(() => _queues = state.queues);
     } on ApiAuthException {
-      // ApiClient already triggered SessionManager.handleAuthExpired().
-      // So don't show an error message here.
-      return;
+      if (!mounted) return;
+
+      context.read<AuthGateState>().markUnauthenticated();
+      context.read<PrivacyGateState>().reset();
+      context.read<TermsGateState>().reset();
+
+      await context.read<QueueLocationTracker>().stop();
+
+      if (!mounted) return;
+
+      context.go('/login?next=${Uri.encodeComponent('/locations')}');
     } catch (_) {
       if (!mounted) return;
 

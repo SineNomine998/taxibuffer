@@ -33,6 +33,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
   int _reconnectAttempts = 0;
   bool _isDisposed = false;
   bool _isReconnecting = false;
+  bool _hasExited = false;
 
   @override
   void initState() {
@@ -127,7 +128,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
 
     // Entry no longer active: officer/system marked chauffeur as handled/dequeued.
     if (!status.active) {
-      _exitQueue();
+      await _exitQueue();
       return;
     }
 
@@ -182,11 +183,24 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
   /// Clears global queue state and navigates away.
   /// Call this whenever the user is no longer in the queue,
   /// whether by leaving voluntarily or being dequeued externally.
-  void _exitQueue() async {
-    if (!mounted) return;
-    await context.read<QueueLocationTracker>().stop();
+  Future<void> _exitQueue() async {
+    if (_hasExited) return;
+    _hasExited = true;
+
+    if (!mounted || _isDisposed) return;
+
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+
+    await _subscription?.cancel();
+    _subscription = null;
 
     if (!mounted) return;
+
+    await context.read<QueueLocationTracker>().stop();
+
+    if (!mounted || _isDisposed) return;
+
     context.read<QueueState>().clearActiveEntry();
     context.go('/locations');
   }
@@ -302,7 +316,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
       final success = await _queueService.leaveQueue();
       if (!mounted) return;
       if (success) {
-        _exitQueue();
+        await _exitQueue();
       } else {
         await showAppAlert(
           context: context,
@@ -311,6 +325,15 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
           svgAsset: 'assets/pop-up-denied.svg',
         );
       }
+    } catch (e) {
+      if (!mounted) return;
+
+      await showAppAlert(
+        context: context,
+        title: 'Fout',
+        message: e.toString().replaceFirst('Exception: ', ''),
+        svgAsset: 'assets/pop-up-denied.svg',
+      );
     } finally {
       if (mounted) setState(() => _isLeaving = false);
     }
@@ -341,7 +364,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _reconnect(showLoading: false);
+      unawaited(_reconnect(showLoading: false));
 
       final tracker = context.read<QueueLocationTracker>();
       unawaited(tracker.reportNow());
@@ -349,7 +372,10 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
   }
 
   Future<void> _reconnect({bool showLoading = true}) async {
+    if (_isDisposed || !mounted) return;
+
     _reconnectTimer?.cancel();
+    _reconnectTimer = null;
 
     await _subscription?.cancel();
     _subscription = null;
@@ -362,7 +388,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
 
     await _connect(showLoading: showLoading, forceRefreshToken: true);
 
-    if (!mounted) return;
+    if (!mounted || _isDisposed) return;
 
     await context.read<QueueLocationTracker>().reportNow();
   }

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_app/core/config/api_client.dart';
+import 'package:mobile_app/features/auth/auth_gate_state.dart';
+import 'package:mobile_app/features/compliance/privacy/privacy_gate_state.dart';
+import 'package:mobile_app/features/compliance/terms_of_use/terms_gate_state.dart';
 import 'package:mobile_app/widgets/screen_header.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/theme.dart';
 import '../models/activity_log_item.dart';
@@ -40,10 +45,21 @@ class _ActivityScreenState extends State<ActivityScreen> {
 
     try {
       final items = await _service.fetchActivityLogs();
+
       if (!mounted) return;
+
       setState(() => _items = items);
+    } on ApiAuthException {
+      if (!mounted) return;
+
+      context.read<AuthGateState>().markUnauthenticated();
+      context.read<PrivacyGateState>().reset();
+      context.read<TermsGateState>().reset();
+
+      context.go('/login?next=${Uri.encodeComponent('/settings/activity')}');
     } catch (_) {
       if (!mounted) return;
+
       setState(() {
         _error = 'Kon activiteiten niet laden. Probeer het opnieuw.';
       });
@@ -138,7 +154,7 @@ class _ActivityList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dates = grouped.keys.toList();
+    final dates = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
 
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),

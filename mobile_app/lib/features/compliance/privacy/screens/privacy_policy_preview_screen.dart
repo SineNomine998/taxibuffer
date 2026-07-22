@@ -51,6 +51,13 @@ class _PrivacyPolicyPreviewScreenState
       final policy = await _service.fetchPublicPrivacyPolicy();
       if (!mounted) return;
       setState(() => _policy = policy);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+
+        if (_scrollController.position.maxScrollExtent <= 0) {
+          setState(() => _hasScrolledToBottom = true);
+        }
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() => _error = 'Kon privacyverklaring niet laden.');

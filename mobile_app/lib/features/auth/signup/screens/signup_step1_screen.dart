@@ -54,7 +54,7 @@ class _SignupStep1ScreenState extends State<SignupStep1Screen> {
           title: 'Emailadres al in gebruik.',
           message:
               'Dit emailadres is al geregistreerd. Log in of gebruik een ander adres.',
-          svgAsset: 'asssets/warning-badge.svg',
+          svgAsset: 'assets/warning-badge.svg',
         );
         return;
       }
@@ -64,7 +64,7 @@ class _SignupStep1ScreenState extends State<SignupStep1Screen> {
       context.read<SignupFormState>().setPersonalDetails(
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
-        email: _emailController.text.trim(),
+        email: _emailController.text.trim().toLowerCase(),
         taxiLicenseNumber: _rtxController.text.trim(),
       );
       context.push('/signup/password');

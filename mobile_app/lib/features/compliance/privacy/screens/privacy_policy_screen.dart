@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_app/core/navigation/post_auth_target.dart';
 import 'package:mobile_app/features/auth/auth_gate_state.dart';
 import 'package:mobile_app/features/compliance/terms_of_use/terms_gate_state.dart';
 import 'package:provider/provider.dart';
@@ -131,34 +132,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
     }
   }
 
-  String resolvePostAuthTarget(String? next) {
-    if (next == null || next.trim().isEmpty) return '/locations';
-
-    final uri = Uri.tryParse(next);
-    if (uri == null) return '/locations';
-
-    final path = uri.path;
-
-    final blockedPaths = {
-      '/',
-      '/info',
-      '/login',
-      '/signup',
-      '/privacy',
-      '/privacy-preview',
-      '/terms',
-      '/terms-preview',
-      '/password-reset',
-      '/password-reset/sent',
-    };
-
-    if (blockedPaths.contains(path)) return '/locations';
-    if (path.startsWith('/signup')) return '/locations';
-    if (!path.startsWith('/')) return '/locations';
-
-    return next;
-  }
-
   @override
   void dispose() {
     _scrollController.dispose();
@@ -168,21 +141,6 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
   @override
   Widget build(BuildContext context) {
     final policy = _policy;
-
-    if (policy == null || policy.bodyNl.trim().isEmpty) {
-      return PopScope(
-        canPop: false,
-        child: Scaffold(
-          backgroundColor: const Color(0xFFF7F7F7),
-          body: SafeArea(
-            child: _ErrorState(
-              message: 'Privacyverklaring kon niet worden geladen.',
-              onRetry: _load,
-            ),
-          ),
-        ),
-      );
-    }
 
     return PopScope(
       canPop: false,
@@ -197,6 +155,11 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                 )
               : _error != null
               ? _ErrorState(message: _error!, onRetry: _load)
+              : policy == null || policy.bodyNl.trim().isEmpty
+              ? _ErrorState(
+                  message: 'Privacyverklaring kon niet worden geladen.',
+                  onRetry: _load,
+                )
               : Column(
                   children: [
                     Padding(

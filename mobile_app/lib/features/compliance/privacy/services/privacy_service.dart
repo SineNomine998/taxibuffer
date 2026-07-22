@@ -1,9 +1,8 @@
 import 'dart:convert';
 
-import 'package:mobile_app/core/config/api_config.dart';
-
-import '../../../../core/config/api_client.dart';
 import 'package:http/http.dart' as http;
+import 'package:mobile_app/core/config/api_config.dart';
+import '../../../../core/config/api_client.dart';
 
 class BootstrapStatus {
   final bool privacyPolicyRequired;
@@ -62,14 +61,43 @@ class PrivacyService {
 
   PrivacyService({ApiClient? api}) : _api = api ?? ApiClient();
 
+  Map<String, dynamic> _decodeMap(String body, String fallback) {
+    try {
+      final data = jsonDecode(body);
+      if (data is Map<String, dynamic>) return data;
+    } catch (_) {}
+
+    throw Exception(fallback);
+  }
+
+  String _errorMessage(http.Response response, String fallback) {
+    try {
+      final data = jsonDecode(response.body);
+
+      if (data is Map<String, dynamic>) {
+        final detail = data['detail'];
+        final error = data['error'];
+
+        if (detail != null) return detail.toString();
+        if (error != null) return error.toString();
+      }
+    } catch (_) {}
+
+    return fallback;
+  }
+
   Future<BootstrapStatus> fetchBootstrapStatus() async {
     final response = await _api.get('/api/mobile/bootstrap/');
 
     if (response.statusCode != 200) {
-      throw Exception('Kon app-status niet laden.');
+      throw Exception(_errorMessage(response, 'Kon app-status niet laden.'));
     }
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = _decodeMap(
+      response.body,
+      'Ongeldig app-status formaat ontvangen.',
+    );
+
     return BootstrapStatus.fromJson(data);
   }
 
@@ -77,10 +105,16 @@ class PrivacyService {
     final response = await _api.get('/api/mobile/privacy-policy/');
 
     if (response.statusCode != 200) {
-      throw Exception('Kon privacyverklaring niet laden.');
+      throw Exception(
+        _errorMessage(response, 'Kon privacyverklaring niet laden.'),
+      );
     }
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = _decodeMap(
+      response.body,
+      'Ongeldig privacyverklaring formaat ontvangen.',
+    );
+
     return PrivacyPolicyData.fromJson(data);
   }
 
@@ -89,13 +123,21 @@ class PrivacyService {
       '${ApiConfig.baseUrl}/api/mobile/privacy-policy/public/',
     );
 
-    final response = await http.get(uri);
+    final response = await http.get(
+      uri,
+      headers: {'Accept': 'application/json'},
+    );
 
     if (response.statusCode != 200) {
-      throw Exception('Kon privacyverklaring niet laden.');
+      throw Exception(
+        _errorMessage(response, 'Kon privacyverklaring niet laden.'),
+      );
     }
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = _decodeMap(
+      response.body,
+      'Ongeldig privacyverklaring formaat ontvangen.',
+    );
 
     return PrivacyPolicyData.fromJson({...data, 'id': 0, 'accepted': false});
   }
@@ -107,7 +149,9 @@ class PrivacyService {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Kon privacyverklaring niet accepteren.');
+      throw Exception(
+        _errorMessage(response, 'Kon privacyverklaring niet accepteren.'),
+      );
     }
   }
 }

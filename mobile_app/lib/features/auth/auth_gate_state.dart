@@ -20,10 +20,8 @@ class AuthGateState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await _apiClient.getAccessTokenOrRefresh();
-      _status = token.isNotEmpty
-          ? AuthGateStatus.authenticated
-          : AuthGateStatus.unauthenticated;
+      await _apiClient.refreshAndGetAccessToken();
+      _status = AuthGateStatus.authenticated;
     } catch (_) {
       _status = AuthGateStatus.unauthenticated;
     }

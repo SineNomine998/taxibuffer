@@ -1,25 +1,22 @@
 import 'package:flutter/foundation.dart';
-import '../../../core/models/vehicle.dart';
 import 'package:collection/collection.dart';
 
-/// Accumulates data across all signup steps. Created once above the
-/// signup route subtree and read/written by each step screen.
-/// Submitted as a single payload to mobile_api only on final confirmation.
+import '../../../core/models/vehicle.dart';
+
 class SignupFormState extends ChangeNotifier {
-  // Step 1 - personal details
   String firstName = '';
   String lastName = '';
   String email = '';
   String taxiLicenseNumber = '';
 
-  // Step 2 - credentials
   String password = '';
   String passwordConfirm = '';
 
-  // Step 3 - vehicles
   final List<Vehicle> vehicles = [];
+
   bool privacyPolicyAccepted = false;
   bool termsOfUseAccepted = false;
+
   String? acceptedPrivacyPolicyVersion;
   String? acceptedTermsOfUseVersion;
 
@@ -29,10 +26,10 @@ class SignupFormState extends ChangeNotifier {
     required String email,
     required String taxiLicenseNumber,
   }) {
-    this.firstName = firstName;
-    this.lastName = lastName;
-    this.email = email;
-    this.taxiLicenseNumber = taxiLicenseNumber;
+    this.firstName = firstName.trim();
+    this.lastName = lastName.trim();
+    this.email = email.trim().toLowerCase();
+    this.taxiLicenseNumber = taxiLicenseNumber.trim().toUpperCase();
     notifyListeners();
   }
 
@@ -43,26 +40,54 @@ class SignupFormState extends ChangeNotifier {
   }
 
   void addVehicle(Vehicle vehicle) {
-    if (vehicle.isCurrent) {
+    final normalized = Vehicle(
+      nickname: vehicle.nickname.trim(),
+      licensePlate: vehicle.licensePlate.trim().toUpperCase(),
+      vehicleType: vehicle.vehicleType,
+      isCurrent: vehicle.isCurrent || vehicles.isEmpty,
+    );
+
+    final alreadyExists = vehicles.any(
+      (v) => v.licensePlate.toUpperCase() == normalized.licensePlate,
+    );
+
+    if (alreadyExists) {
+      throw Exception('Dit kenteken is al toegevoegd.');
+    }
+
+    if (normalized.isCurrent) {
       for (var i = 0; i < vehicles.length; i++) {
         final v = vehicles[i];
-        // make it no more current
-        if (v.isCurrent) {
-          vehicles[i] = Vehicle(
-            nickname: v.nickname,
-            licensePlate: v.licensePlate,
-            vehicleType: v.vehicleType,
-            isCurrent: false,
-          );
-        }
+        vehicles[i] = Vehicle(
+          nickname: v.nickname,
+          licensePlate: v.licensePlate,
+          vehicleType: v.vehicleType,
+          isCurrent: false,
+        );
       }
     }
-    vehicles.add(vehicle);
+
+    vehicles.add(normalized);
     notifyListeners();
   }
 
   void removeVehicle(Vehicle vehicle) {
-    vehicles.remove(vehicle);
+    final wasCurrent = vehicle.isCurrent;
+
+    vehicles.removeWhere(
+      (v) => v.licensePlate.toUpperCase() == vehicle.licensePlate.toUpperCase(),
+    );
+
+    if (wasCurrent && vehicles.isNotEmpty) {
+      final first = vehicles.first;
+      vehicles[0] = Vehicle(
+        nickname: first.nickname,
+        licensePlate: first.licensePlate,
+        vehicleType: first.vehicleType,
+        isCurrent: true,
+      );
+    }
+
     notifyListeners();
   }
 
@@ -73,9 +98,11 @@ class SignupFormState extends ChangeNotifier {
         nickname: v.nickname,
         licensePlate: v.licensePlate,
         vehicleType: v.vehicleType,
-        isCurrent: v == target,
+        isCurrent:
+            v.licensePlate.toUpperCase() == target.licensePlate.toUpperCase(),
       );
     }
+
     notifyListeners();
   }
 
@@ -91,26 +118,28 @@ class SignupFormState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Vehicle? get currentVehicle =>
-      vehicles.where((v) => v.isCurrent).cast<Vehicle?>().firstOrNull;
+  Vehicle? get currentVehicle => vehicles.firstWhereOrNull((v) => v.isCurrent);
 
   List<Vehicle> get otherVehicles =>
       vehicles.where((v) => !v.isCurrent).toList();
 
-  /// Resets everything - call after a successful signup submission
-  /// or if the user abandons the flow.
   void reset() {
     firstName = '';
     lastName = '';
     email = '';
     taxiLicenseNumber = '';
+
     password = '';
     passwordConfirm = '';
+
     vehicles.clear();
+
     privacyPolicyAccepted = false;
     acceptedPrivacyPolicyVersion = null;
+
     termsOfUseAccepted = false;
     acceptedTermsOfUseVersion = null;
+
     notifyListeners();
   }
 }

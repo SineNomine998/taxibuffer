@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/dialogs.dart';
+import 'package:mobile_app/features/auth/auth_gate_state.dart';
 import 'package:mobile_app/features/auth/services/auth_service.dart';
 import 'package:mobile_app/features/auth/signup/signup_form_state.dart';
 import 'package:mobile_app/features/compliance/privacy/privacy_gate_state.dart';
@@ -104,6 +105,8 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
 
       if (!mounted) return;
 
+      context.read<AuthGateState>().markAuthenticated();
+
       signupFormState.reset();
 
       final bootstrap = await PrivacyService().fetchBootstrapStatus();
@@ -135,7 +138,7 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
       await showAppAlert(
         context: context,
         title: "Account kon niet worden aangemaakt",
-        message: "Er is iets misgegaan. Probeer opnieuw.",
+        message: e.toString().replaceFirst('Exception: ', ''),
         svgAsset: 'assets/pop-up-denied.svg',
       );
     } finally {

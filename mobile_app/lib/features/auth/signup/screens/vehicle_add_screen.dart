@@ -26,6 +26,21 @@ class _VehicleAddScreenState extends State<VehicleAddScreen> {
   String? _serverError;
 
   @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final hasNoVehicles = context.read<SignupFormState>().vehicles.isEmpty;
+
+      if (hasNoVehicles) {
+        setState(() => _setAsCurrent = true);
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _nicknameController.dispose();
     _plateController.dispose();
@@ -34,14 +49,20 @@ class _VehicleAddScreenState extends State<VehicleAddScreen> {
 
   void _save() {
     if (!_formKey.currentState!.validate()) return;
-    context.read<SignupFormState>().addVehicle(
+
+    final form = context.read<SignupFormState>();
+
+    final shouldBeCurrent = _setAsCurrent || form.vehicles.isEmpty;
+
+    form.addVehicle(
       Vehicle(
         nickname: _nicknameController.text.trim(),
-        licensePlate: _plateController.text.trim(),
+        licensePlate: _plateController.text.trim().toUpperCase(),
         vehicleType: _vehicleType,
-        isCurrent: true,
+        isCurrent: shouldBeCurrent,
       ),
     );
+
     context.pop();
   }
 

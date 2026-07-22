@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mobile_app/core/app_state.dart';
 import 'package:mobile_app/core/dialogs.dart';
 import 'package:mobile_app/core/router.dart';
+import 'package:mobile_app/features/auth/auth_gate_state.dart';
 import 'package:mobile_app/features/queue/queue_location_tracker.dart';
 import 'package:mobile_app/features/queue/queue_state.dart';
 import 'package:mobile_app/features/queue/queue_tracking_sync.dart';
@@ -30,12 +33,16 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   Future<void> _syncQueueTracking() async {
     if (_syncingQueueTracking || !mounted) return;
 
+    if (authGateState.status != AuthGateStatus.authenticated) {
+      return;
+    }
+
     _syncingQueueTracking = true;
 
     try {
       await syncQueueTracking(context);
     } catch (_) {
-      // Ignore here. ApiClient/session handling can deal with auth issues.
+      // Ignore here. Protected screens/router handle auth problems.
     } finally {
       _syncingQueueTracking = false;
     }
@@ -103,6 +110,8 @@ class _GlobalQueueListenerState extends State<_GlobalQueueListener> {
     if (!mounted) return;
 
     final tracker = context.read<QueueLocationTracker>();
+
+    if (tracker.dequeued) return;
 
     if (tracker.outsideWarningActive &&
         tracker.outsideWarningEventId != _lastHandledOutsideWarningEventId &&
@@ -200,10 +209,10 @@ class _OutsideBufferWarningDialog extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Image.asset(
+                SvgPicture.asset(
                   'assets/warning-badge.svg',
                   height: 76,
-                  errorBuilder: (_, _, _) {
+                  placeholderBuilder: (_) {
                     return const Icon(
                       Icons.warning_rounded,
                       size: 72,

@@ -26,7 +26,7 @@ class TokenStorage {
   }
 
   Future<void> saveAccessToken(String access) async {
-    await _storage.write(key: 'accesss_token', value: access);
+    await _storage.write(key: 'access_token', value: access);
   }
 
   Future<void> saveRefreshToken(String refresh) async {

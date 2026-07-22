@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_app/core/notifications/notification_service.dart';
 import 'package:mobile_app/core/theme.dart';
 import 'package:mobile_app/features/compliance/widgets/privacy_sheet.dart';
 import 'package:mobile_app/features/compliance/widgets/terms_sheet.dart';
@@ -70,6 +71,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _testingPush = true);
 
     try {
+      final allowed = await NotificationService.instance
+          .requestAndRegisterToken();
+
+      if (!allowed) {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Meldingen zijn niet toegestaan op dit toestel.'),
+          ),
+        );
+        return;
+      }
+
       await _settingsService.testPushNotification();
 
       if (!mounted) return;

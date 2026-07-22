@@ -24,23 +24,51 @@ class AuthService {
 
     final response = await http.post(
       uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email, 'password': password}),
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'email': email.trim().toLowerCase(),
+        'password': password,
+      }),
     );
 
-    final data = jsonDecode(response.body);
+    Map<String, dynamic>? data;
+
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        data = decoded;
+      }
+    } catch (_) {}
 
     if (response.statusCode != 200) {
-      throw Exception(data['detail'] ?? 'Login failed');
+      throw Exception(
+        data?['detail']?.toString() ?? 'Ongeldige inloggegevens.',
+      );
     }
 
-    await _tokenStorage.saveTokens(
-      access: data['access'],
-      refresh: data['refresh'],
-    );
+    final access = data?['access']?.toString();
+    final refresh = data?['refresh']?.toString();
+    final user = data?['user'];
+
+    if (access == null ||
+        access.isEmpty ||
+        refresh == null ||
+        refresh.isEmpty) {
+      throw Exception('Login-response bevat geen geldige tokens.');
+    }
+
+    await _tokenStorage.saveTokens(access: access, refresh: refresh);
+
     await _tokenStorage.clearLogoutPending();
 
-    return data['user'];
+    if (user is Map<String, dynamic>) {
+      return user;
+    }
+
+    return {};
   }
 
   Future<void> logout() async {
@@ -96,7 +124,7 @@ class AuthService {
     required String privacyPolicyVersion,
     required bool privacyPolicyAccepted,
     required String termsOfUseVersion,
-    required bool termsOfUseAccepted
+    required bool termsOfUseAccepted,
   }) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/mobile/auth/signup/');
 

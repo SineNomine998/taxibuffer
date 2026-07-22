@@ -182,12 +182,22 @@ class LocationService {
     );
 
     if (response.statusCode != 200 && response.statusCode != 201) {
-      final data = jsonDecode(response.body);
+      String? code;
+      String message = 'Aanmelden bij wachtrij mislukt.';
 
-      throw QueueJoinException(
-        code: data['code'],
-        message: data['detail'] ?? 'Aanmelden bij wachtrij mislukt.',
-      );
+      try {
+        final data = jsonDecode(response.body);
+
+        if (data is Map<String, dynamic>) {
+          code = data['code']?.toString();
+          message =
+              data['detail']?.toString() ??
+              data['error']?.toString() ??
+              message;
+        }
+      } catch (_) {}
+
+      throw QueueJoinException(code: code, message: message);
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;

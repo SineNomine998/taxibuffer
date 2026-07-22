@@ -23,9 +23,10 @@ class QueueService {
     String entryUuid, {
     bool forceRefreshToken = false,
   }) async {
-    final token = forceRefreshToken
-        ? await _apiClient.refreshAndGetAccessToken()
-        : await _apiClient.getAccessTokenOrRefresh();
+    await _channel?.sink.close();
+    _channel = null;
+
+    final token = await _apiClient.refreshAndGetAccessToken();
 
     final wsBase = ApiConfig.baseUrl
         .replaceFirst('https://', 'wss://')
@@ -59,30 +60,56 @@ class QueueService {
   }
 
   void _onRawMessage(dynamic raw) {
-    debugPrint('WS RAW: $raw');
-    final data = jsonDecode(raw as String) as Map<String, dynamic>;
+    try {
+      debugPrint('WS RAW: $raw');
 
-    switch (data['type']) {
-      case 'status':
-        _controller.add(QueueStatus.fromJson(data));
-        break;
-      case 'leave_result':
-        final success = data['success'] as bool? ?? false;
-        _leaveCompleter?.complete(success);
-        _leaveCompleter = null;
-        break;
-      case 'error':
-        _controller.addError(
-          Exception(data['detail']?.toString() ?? 'WebSocket error'),
-        );
-        break;
+      final data = jsonDecode(raw as String) as Map<String, dynamic>;
+
+      switch (data['type']) {
+        case 'status':
+          if (!_controller.isClosed) {
+            _controller.add(QueueStatus.fromJson(data));
+          }
+          break;
+
+        case 'leave_result':
+          final success = data['success'] as bool? ?? false;
+          _leaveCompleter?.complete(success);
+          _leaveCompleter = null;
+          break;
+
+        case 'error':
+          if (!_controller.isClosed) {
+            _controller.addError(
+              Exception(data['detail']?.toString() ?? 'WebSocket error'),
+            );
+          }
+          break;
+      }
+    } catch (e) {
+      if (!_controller.isClosed) {
+        _controller.addError(Exception('Ongeldig WebSocket bericht.'));
+      }
     }
   }
 
   Future<bool> leaveQueue() async {
     final response = await _apiClient.post('/api/mobile/queue/leave/');
 
-    return response.statusCode == 200;
+    if (response.statusCode == 200) {
+      return true;
+    }
+
+    String message = 'Kon wachtrij niet verlaten.';
+
+    try {
+      final data = jsonDecode(response.body);
+      if (data is Map<String, dynamic> && data['detail'] != null) {
+        message = data['detail'].toString();
+      }
+    } catch (_) {}
+
+    throw Exception(message);
   }
 
   Future<void> respondToNotification(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/dialogs.dart';
+import 'package:mobile_app/core/navigation/post_auth_target.dart';
 import 'package:mobile_app/core/theme.dart';
 import 'package:mobile_app/features/auth/auth_gate_state.dart';
 import 'package:mobile_app/features/compliance/terms_of_use/terms_gate_state.dart';
@@ -14,7 +15,9 @@ import '../../services/auth_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String? next;
+
+  const LoginScreen({super.key, this.next});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -115,8 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      final next = GoRouterState.of(context).uri.queryParameters['next'];
-      final target = next?.isNotEmpty == true ? next! : '/locations';
+      final target = resolvePostAuthTarget(widget.next);
 
       if (bootstrap.privacyPolicyRequired) {
         privacyGate.reset();

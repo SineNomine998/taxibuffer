@@ -51,17 +51,25 @@ class NotificationService {
       settings: initSettings,
       onDidReceiveNotificationResponse: (response) async {
         final payload = response.payload;
-        if (payload == null) return;
+        if (payload == null || payload.isEmpty) return;
 
-        final data = jsonDecode(payload) as Map<String, dynamic>;
+        Map<String, dynamic> data;
+
+        try {
+          data = jsonDecode(payload) as Map<String, dynamic>;
+        } catch (_) {
+          return;
+        }
+
         final notificationId = data['notification_id']?.toString();
 
         if (notificationId != null && notificationId.isNotEmpty) {
-          await _localNotifications.cancel(id: int.parse(notificationId));
-        }
+          final id = int.tryParse(notificationId);
+          if (id != null) {
+            await _localNotifications.cancel(id: id);
+          }
 
-        if (notificationId != null && notificationId.isNotEmpty) {
-          final shouldHandle = await _markNotificationSeen(notificationId);
+          final shouldHandle = await _markNotificationHandled(notificationId);
           if (!shouldHandle) return;
         }
 
@@ -86,7 +94,7 @@ class NotificationService {
           body:
               message.notification?.body ??
               'U ontvangt meldingen van TaxiBuffer correct.',
-          payload: 'test_push',
+          payload: jsonEncode({'type': 'test_push'}),
         );
         return;
       }

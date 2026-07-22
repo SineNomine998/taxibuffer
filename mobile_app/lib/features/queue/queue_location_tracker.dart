@@ -170,7 +170,17 @@ class QueueLocationTracker extends ChangeNotifier {
 
       await _handleNativeLocation(location);
     } catch (_) {
-      await _reportLocationUnavailable();
+      try {
+        final location = await bg.BackgroundGeolocation.getCurrentPosition(
+          samples: 1,
+          persist: false,
+          timeout: 15,
+        );
+
+        await _handleNativeLocation(location);
+      } catch (_) {
+        await _reportLocationUnavailable();
+      }
     }
   }
 
