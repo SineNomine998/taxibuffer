@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .vehicle import MobileVehicleSerializer
+from accounts.choices import TTO_CHOICES
 
 User = get_user_model()
 
@@ -10,6 +11,16 @@ class MobileAccountProfileSerializer(serializers.Serializer):
     last_name = serializers.CharField(max_length=150)
     email = serializers.EmailField()
     taxi_license_number = serializers.CharField(max_length=100)
+    tto = serializers.ChoiceField(
+        choices=TTO_CHOICES,
+        required=False,
+        allow_blank=True,
+    )
+    phone_number = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=30,
+    )
 
     def validate_first_name(self, value):
         value = value.strip()

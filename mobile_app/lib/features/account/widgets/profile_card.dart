@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_app/core/models/tto_option.dart';
+import 'package:mobile_app/widgets/shell_dropdown_field.dart';
 import '../../../widgets/shell_text_field.dart';
 import '../../../widgets/primary_pill_button.dart';
 import '../../../widgets/secondary_pill_button.dart';
@@ -13,6 +15,10 @@ class ProfileCard extends StatelessWidget {
   final TextEditingController lastNameController;
   final TextEditingController emailController;
   final TextEditingController rtxController;
+  final TextEditingController phoneController;
+  final String? selectedTto;
+  final List<TtoOption> ttoOptions;
+  final ValueChanged<String?> onTtoChanged;
   final bool isSaving;
   final VoidCallback onEdit;
   final VoidCallback onCancel;
@@ -28,6 +34,10 @@ class ProfileCard extends StatelessWidget {
     required this.lastNameController,
     required this.emailController,
     required this.rtxController,
+    required this.phoneController,
+    required this.selectedTto,
+    required this.ttoOptions,
+    required this.onTtoChanged,
     required this.isSaving,
     required this.onEdit,
     required this.onCancel,
@@ -38,6 +48,11 @@ class ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ttoLabel = ttoOptions
+        .where((t) => t.value == profile.tto)
+        .map((t) => t.label)
+        .firstOrNull;
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFF6F6F8),
@@ -73,6 +88,13 @@ class ProfileCard extends StatelessWidget {
           _Row(
             label: 'E-mail',
             value: profile.email.isEmpty ? 'Niet ingesteld' : profile.email,
+          ),
+          _Row(label: 'TTO', value: ttoLabel ?? 'Niet ingesteld'),
+          _Row(
+            label: 'Telefoon',
+            value: profile.phoneNumber.isEmpty
+                ? 'Niet ingesteld'
+                : profile.phoneNumber,
           ),
           _Row(
             label: 'Huidig voertuig',
@@ -150,6 +172,43 @@ class ProfileCard extends StatelessWidget {
                     validator: (v) => (v == null || v.trim().isEmpty)
                         ? 'Verplicht veld'
                         : null,
+                  ),
+                  const SizedBox(height: 14),
+                  ShellTextField(
+                    label: 'Telefoonnummer*',
+                    hint: '06 12345678',
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Verplicht veld'
+                        : null,
+                  ),
+                  const SizedBox(height: 14),
+                  ShellDropdownField<String>(
+                    label: 'TTO*',
+                    hint: 'Selecteer een TTO',
+                    value: selectedTto != null && selectedTto!.isNotEmpty
+                        ? selectedTto
+                        : null,
+                    items: ttoOptions
+                        .where((t) => t.value.isNotEmpty)
+                        .map(
+                          (t) => DropdownMenuItem<String>(
+                            value: t.value,
+                            child: Text(
+                              t.label,
+                              style: const TextStyle(
+                                fontFamily: 'DM Sans',
+                                fontSize: 17,
+                                color: Color(0xFF222222),
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: onTtoChanged,
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Selecteer een TTO' : null,
                   ),
                   const SizedBox(height: 14),
                   Row(

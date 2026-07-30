@@ -32,15 +32,19 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
     final lastName = signupFormState.lastName;
     final email = signupFormState.email;
     final taxiLicenseNumber = signupFormState.taxiLicenseNumber;
+    final tto = signupFormState.tto;
+    final phoneNumber = signupFormState.phoneNumber;
     final password = signupFormState.password;
     final passwordConfirm = signupFormState.passwordConfirm;
     final vehicles = signupFormState.vehicles.map((v) => v.toJson()).toList();
 
-    if (signupFormState.firstName.isEmpty ||
-        signupFormState.lastName.isEmpty ||
-        signupFormState.email.isEmpty ||
-        signupFormState.taxiLicenseNumber.isEmpty ||
-        signupFormState.password.isEmpty) {
+    if (firstName.isEmpty ||
+        lastName.isEmpty ||
+        email.isEmpty ||
+        taxiLicenseNumber.isEmpty ||
+        tto.isEmpty ||
+        phoneNumber.isEmpty ||
+        password.isEmpty) {
       await showAppAlert(
         context: context,
         title: "Onvolledige gegevens",
@@ -94,6 +98,8 @@ class _SignupStep3ScreenState extends State<SignupStep3Screen> {
         lastName: lastName,
         email: email,
         taxiLicenseNumber: taxiLicenseNumber,
+        tto: tto,
+        phoneNumber: phoneNumber,
         password: password,
         passwordConfirm: passwordConfirm,
         vehicles: vehicles,

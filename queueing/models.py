@@ -6,6 +6,7 @@ from django.db.models import Q
 import uuid
 from accounts.models import Chauffeur, VehicleType
 from geofence.models import BufferZone, PickupZone
+from mobile_api.serializers.vehicle import normalize_license_plate
 
 
 class TaxiQueue(models.Model):
@@ -160,6 +161,25 @@ class QueueEntry(models.Model):
             models.Index(fields=["status", "notified_at"]),
         ]
 
+    @classmethod
+    def get_last_chauffeur_for_license_plate(cls, license_plate):
+        if not license_plate:
+            return None
+
+        normalized = normalize_license_plate(license_plate)
+
+        if not normalized:
+            return None
+
+        entry = (
+            cls.objects.filter(normalized_license_plate_snapshot=normalized)
+            .select_related("chauffeur__user")
+            .order_by("-created_at")
+            .first()
+        )
+
+        return entry.chauffeur if entry else None
+
     def clean(self):
         """Validate that chauffeur is not in another active queue."""
         if self.pk is None:
@@ -233,28 +253,6 @@ class QueueEntry(models.Model):
         self.status = self.Status.DEQUEUED
         self.dequeued_at = timezone.now()
         self.save()
-
-    # TODO! Remove timeout functionality
-    # def timeout_notification(self):
-    #     """Mark that notification timed out but keep them in the queue."""
-    #     if self.status != self.Status.NOTIFIED:
-    #         raise ValidationError(
-    #             f"Cannot timeout notification with status: {self.status}"
-    #         )
-
-    #     # Change status back to WAITING instead of TIMEOUT to keep the chauffeur in queue
-    #     self.status = self.Status.WAITING
-    #     self.save()
-
-    def is_notification_expired(self):
-        """Check if notification has expired based on timeout setting."""
-        # if self.status != self.Status.NOTIFIED or not self.notified_at:
-        # return False
-
-        # timeout_minutes = self.queue.notification_timeout_minutes
-        # expiry_time = self.notified_at + timezone.timedelta(minutes=timeout_minutes)
-        # return timezone.now() > expiry_time
-        return False
 
     def get_queue_position(self):
         """Get current position in queue (1-indexed)."""

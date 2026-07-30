@@ -23,6 +23,8 @@ void main() async {
         ChangeNotifierProvider.value(value: authGateState),
         ChangeNotifierProvider.value(value: privacyGateState),
         ChangeNotifierProvider.value(value: termsGateState),
+        ChangeNotifierProvider.value(value: profileGateState),
+        ChangeNotifierProvider.value(value: accountState),
         ChangeNotifierProvider(create: (_) => QueueLocationTracker()),
       ],
       child: const App(),

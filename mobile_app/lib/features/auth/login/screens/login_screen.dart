@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/dialogs.dart';
 import 'package:mobile_app/core/navigation/post_auth_target.dart';
+import 'package:mobile_app/core/notifications/notification_service.dart';
 import 'package:mobile_app/core/theme.dart';
+import 'package:mobile_app/features/account/profile_gate_state.dart';
 import 'package:mobile_app/features/auth/auth_gate_state.dart';
 import 'package:mobile_app/features/compliance/terms_of_use/terms_gate_state.dart';
 import 'package:mobile_app/features/compliance/privacy/privacy_gate_state.dart';
@@ -83,6 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final authGate = context.read<AuthGateState>();
     final privacyGate = context.read<PrivacyGateState>();
     final termsGate = context.read<TermsGateState>();
+    final profileGate = context.read<ProfileGateState>();
 
     try {
       await _authService.login(email: email, password: password);
@@ -118,31 +123,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      final target = resolvePostAuthTarget(widget.next);
-
-      if (bootstrap.privacyPolicyRequired) {
-        privacyGate.reset();
-        termsGate.reset();
-        authGate.markAuthenticated();
-
-        context.go('/privacy?next=${Uri.encodeComponent(target)}');
-        return;
-      }
-
-      privacyGate.markAccepted();
-
-      if (bootstrap.termsOfUseRequired) {
-        termsGate.reset();
-        authGate.markAuthenticated();
-
-        context.go('/terms?next=${Uri.encodeComponent(target)}');
-        return;
-      }
-
-      termsGate.markAccepted();
-
+      privacyGate.setFromBootstrap(bootstrap);
+      termsGate.setFromBootstrap(bootstrap);
+      profileGate.setFromBootstrap(bootstrap.profileCompletionRequired);
       authGate.markAuthenticated();
 
+      unawaited(NotificationService.instance.requestAndRegisterToken());
+
+      final target = resolvePostAuthTarget(widget.next);
       context.go(target);
     } catch (e, stackTrace) {
       debugPrint('Post-login flow failed: $e');
@@ -153,8 +141,9 @@ class _LoginScreenState extends State<LoginScreen> {
       authGate.markAuthenticated();
       privacyGate.reset();
       termsGate.reset();
+      profileGate.reset();
 
-      context.go('/locations');
+      context.go('/privacy?next=${Uri.encodeComponent('/locations')}');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

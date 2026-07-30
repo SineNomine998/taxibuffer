@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:mobile_app/core/config/api_client.dart';
+import 'package:mobile_app/core/models/tto_option.dart';
 import '../../../core/models/vehicle.dart';
 import '../models/account_profile.dart';
 
@@ -114,5 +115,29 @@ class AccountService {
     return Vehicle.fromJson(
       _jsonMap(response, 'Ongeldig voertuig-formaat ontvangen.'),
     );
+  }
+
+  Future<List<TtoOption>> fetchTtoOptions() async {
+    final response = await _api.get('/api/mobile/ttos/');
+
+    if (response.statusCode != 200) {
+      throw Exception(_errorMessage(response, 'Kon TTO-lijst niet laden.'));
+    }
+
+    final data = _jsonMap(response, 'Ongeldig TTO-formaat ontvangen.');
+    final items = data['ttos'];
+
+    if (items is! List) {
+      throw Exception('Ongeldig TTO-formaat ontvangen.');
+    }
+
+    try {
+      return items
+          .map((e) => TtoOption.fromJson(e as Map<String, dynamic>))
+          .where((e) => e.value.isNotEmpty && e.label.isNotEmpty)
+          .toList();
+    } catch (_) {
+      throw Exception('Ongeldig TTO-formaat ontvangen.');
+    }
   }
 }

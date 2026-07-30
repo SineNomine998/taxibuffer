@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 
 from .vehicle import MobileVehicleSerializer
 from compliance.services import get_active_privacy_policy, get_active_terms_of_use
+from accounts.choices import TTO_CHOICES
 
 User = get_user_model()
 
@@ -20,6 +21,14 @@ class MobileSignUpSerializer(serializers.Serializer):
     privacy_policy_accepted = serializers.BooleanField()
     terms_of_use_version = serializers.CharField()
     terms_of_use_accepted = serializers.BooleanField()
+    tto = serializers.ChoiceField(
+        choices=TTO_CHOICES,
+        required=True,
+    )
+    phone_number = serializers.CharField(
+        required=True,
+        max_length=30,
+    )
 
     def validate_email(self, value):
         value = value.lower().strip()

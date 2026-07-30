@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.forms import PasswordResetForm
 from rest_framework import status
-from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
+from rest_framework.exceptions import ValidationError, NotFound
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -27,6 +27,7 @@ from mobile_api.serializers import (
     serialize_waiting_entry,
 )
 from accounts.models import Chauffeur, ChauffeurVehicle, VehicleType
+from accounts.choices import TTO_CHOICES
 from queueing.models import TaxiQueue, QueueEntry, QueueNotification
 from queueing.services import QueueService
 from queueing.constants import ACTIVE_QUEUE_STATUSES
@@ -47,17 +48,12 @@ from compliance.services import (
 from compliance.permissions import HasAcceptedPrivacyPolicy, HasAcceptedTermsOfUse
 from mobile_api.models import MobilePushToken
 from mobile_api.push import send_location_lost_push, send_test_push_to_chauffeur
+from mobile_api.utils import get_current_chauffeur, chauffeur_profile_complete
+from .permissions import HasCompletedRequiredProfile
 
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
-
-
-def get_current_chauffeur(user):
-    chauffeur = getattr(user, "chauffeur", None)
-    if chauffeur is None:
-        raise PermissionDenied("Geen chauffeurprofiel gevonden.")
-    return chauffeur
 
 
 def parse_lat_lng(data):
@@ -97,6 +93,9 @@ class MobileBootstrapView(APIView):
                 "current_privacy_policy_version": policy.version if policy else None,
                 "terms_of_use_required": terms_required,
                 "current_terms_of_use_version": current_terms_version,
+                "profile_completion_required": not chauffeur_profile_complete(
+                    chauffeur=chauffeur
+                ),
             }
         )
 
@@ -393,6 +392,8 @@ class MobileSignUpView(APIView):
                     user=user,
                     taxi_license_number=data["taxi_license_number"],
                     location=None,
+                    tto=data["tto"],
+                    phone_number=data["phone_number"],
                 )
 
                 for idx, vehicle in enumerate(vehicles):
@@ -461,6 +462,15 @@ class MobilePasswordResetView(APIView):
         )
 
 
+class MobileTTOChoicesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(
+            {"ttos": [{"value": value, "label": label} for value, label in TTO_CHOICES]}
+        )
+
+
 class MobileAccountView(APIView):
     permission_classes = [
         IsAuthenticated,
@@ -484,6 +494,9 @@ class MobileAccountView(APIView):
             "last_name": user.last_name,
             "email": user.email,
             "taxi_license_number": chauffeur.taxi_license_number,
+            "tto": chauffeur.tto,
+            "tto_display": chauffeur.get_tto_display() if chauffeur.tto else "",
+            "phone_number": chauffeur.phone_number,
         }
 
         return Response(
@@ -523,7 +536,9 @@ class MobileAccountProfileView(APIView):
         user.save(update_fields=["first_name", "last_name", "email"])
 
         chauffeur.taxi_license_number = data["taxi_license_number"]
-        chauffeur.save(update_fields=["taxi_license_number"])
+        chauffeur.tto = data.get("tto", chauffeur.tto)
+        chauffeur.phone_number = data.get("phone_number", chauffeur.phone_number)
+        chauffeur.save(update_fields=["taxi_license_number", "tto", "phone_number"])
 
         return Response(serializer.data)
 
@@ -745,6 +760,7 @@ class MobileQueueListView(APIView):
         IsAuthenticated,
         HasAcceptedPrivacyPolicy,
         HasAcceptedTermsOfUse,
+        HasCompletedRequiredProfile,
     ]
 
     def get(self, request):
@@ -799,6 +815,7 @@ class MobileValidateLocationView(APIView):
         IsAuthenticated,
         HasAcceptedPrivacyPolicy,
         HasAcceptedTermsOfUse,
+        HasCompletedRequiredProfile,
     ]
 
     def post(self, request, queue_id):
@@ -852,6 +869,7 @@ class MobileJoinQueueView(APIView):
         IsAuthenticated,
         HasAcceptedPrivacyPolicy,
         HasAcceptedTermsOfUse,
+        HasCompletedRequiredProfile,
     ]
 
     def post(self, request, queue_id):
@@ -1104,6 +1122,7 @@ class MobilePushTokenView(APIView):
         IsAuthenticated,
         HasAcceptedPrivacyPolicy,
         HasAcceptedTermsOfUse,
+        HasCompletedRequiredProfile,
     ]
 
     def post(self, request):
@@ -1135,6 +1154,7 @@ class MobileQueueStatusView(APIView):
         IsAuthenticated,
         HasAcceptedPrivacyPolicy,
         HasAcceptedTermsOfUse,
+        HasCompletedRequiredProfile,
     ]
 
     def get(self, request):
@@ -1238,6 +1258,7 @@ class MobileLeaveQueueView(APIView):
         IsAuthenticated,
         HasAcceptedPrivacyPolicy,
         HasAcceptedTermsOfUse,
+        HasCompletedRequiredProfile,
     ]
 
     def post(self, request):
@@ -1400,6 +1421,7 @@ class MobileQueueLocationReportView(APIView):
         IsAuthenticated,
         HasAcceptedPrivacyPolicy,
         HasAcceptedTermsOfUse,
+        HasCompletedRequiredProfile,
     ]
 
     # TODO: timeout = 4 mins?
@@ -1705,6 +1727,7 @@ class MobileActivityLogView(APIView):
         IsAuthenticated,
         HasAcceptedPrivacyPolicy,
         HasAcceptedTermsOfUse,
+        HasCompletedRequiredProfile,
     ]
 
     def get(self, request):

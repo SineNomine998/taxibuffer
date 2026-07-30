@@ -1,7 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mobile_app/features/account/account_state.dart';
+import 'package:mobile_app/features/account/profile_gate_state.dart';
 import 'package:mobile_app/features/account/screens/account_screen.dart';
+import 'package:mobile_app/features/account/screens/complete_profile_screen.dart';
 import 'package:mobile_app/features/activity/screens/activity_screen.dart';
 import 'package:mobile_app/features/auth/auth_gate_state.dart';
 import 'package:mobile_app/features/auth/login/screens/login_screen.dart';
@@ -40,6 +41,7 @@ final GoRouter router = GoRouter(
     authGateState,
     privacyGateState,
     termsGateState,
+    profileGateState,
   ]),
   redirect: (context, state) {
     final auth = authGateState;
@@ -125,6 +127,25 @@ final GoRouter router = GoRouter(
       return '/terms?next=$next';
     }
 
+    final isCompleteProfilePath = state.uri.path == '/complete-profile';
+
+    if (profileGateState.status == ProfileGateStatus.unknown) {
+      profileGateState.check();
+      return null;
+    }
+
+    if (profileGateState.status == ProfileGateStatus.checking) {
+      return null;
+    }
+
+    if (profileGateState.isRequired && !isCompleteProfilePath) {
+      return '/complete-profile?next=${Uri.encodeComponent(state.uri.toString())}';
+    }
+
+    if (profileGateState.isCompleted && isCompleteProfilePath) {
+      return '/locations';
+    }
+
     return null;
   },
   routes: [
@@ -192,13 +213,12 @@ final GoRouter router = GoRouter(
     ),
 
     ShellRoute(
-      builder: (context, state, child) {
-        return ChangeNotifierProvider(
-          create: (_) => AccountState(),
-          child: child,
-        );
-      },
+      builder: (context, state, child) => child,
       routes: [
+        GoRoute(
+          path: '/complete-profile',
+          builder: (context, state) => const CompleteProfileScreen(),
+        ),
         GoRoute(
           path: '/locations',
           builder: (_, _) => const LocationSelectionScreen(),

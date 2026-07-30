@@ -34,6 +34,8 @@ class _AccountScreenState extends State<AccountScreen> {
   late TextEditingController _lastNameController;
   late TextEditingController _emailController;
   late TextEditingController _rtxController;
+  late TextEditingController _phoneController;
+  String? _selectedTto;
   final _profileFormKey = GlobalKey<FormState>();
   bool _isSavingProfile = false;
 
@@ -44,6 +46,7 @@ class _AccountScreenState extends State<AccountScreen> {
     _lastNameController = TextEditingController();
     _emailController = TextEditingController();
     _rtxController = TextEditingController();
+    _phoneController = TextEditingController();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         await context.read<AccountState>().load();
@@ -75,6 +78,8 @@ class _AccountScreenState extends State<AccountScreen> {
     _lastNameController.text = profile.lastName;
     _emailController.text = profile.email;
     _rtxController.text = profile.taxiLicenseNumber;
+    _phoneController.text = profile.phoneNumber;
+    _selectedTto = profile.tto;
   }
 
   @override
@@ -83,6 +88,7 @@ class _AccountScreenState extends State<AccountScreen> {
     _lastNameController.dispose();
     _emailController.dispose();
     _rtxController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -90,12 +96,15 @@ class _AccountScreenState extends State<AccountScreen> {
     if (!_profileFormKey.currentState!.validate()) return;
     setState(() => _isSavingProfile = true);
     try {
-      await context.read<AccountState>().updateProfile(
+      final accountState = context.read<AccountState>();
+      await accountState.updateProfile(
         AccountProfile(
           firstName: _firstNameController.text.trim(),
           lastName: _lastNameController.text.trim(),
           email: _emailController.text.trim(),
           taxiLicenseNumber: _rtxController.text.trim(),
+          phoneNumber: _phoneController.text.trim(),
+          tto: _selectedTto ?? '',
         ),
       );
       if (!mounted) return;
@@ -252,6 +261,14 @@ class _AccountScreenState extends State<AccountScreen> {
                       lastNameController: _lastNameController,
                       emailController: _emailController,
                       rtxController: _rtxController,
+                      phoneController: _phoneController,
+                      selectedTto: _selectedTto,
+                      ttoOptions: state.ttoOptions,
+                      onTtoChanged: (value) {
+                        setState(() {
+                          _selectedTto = value;
+                        });
+                      },
                       isSaving: _isSavingProfile,
                       onEdit: () => setState(() => _editingProfile = true),
                       onCancel: () {

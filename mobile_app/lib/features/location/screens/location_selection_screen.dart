@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_app/core/config/api_client.dart';
+import 'package:mobile_app/core/notifications/notification_service.dart';
 import 'package:mobile_app/core/permissions/queue_permission_gate.dart';
 import 'package:mobile_app/features/account/account_state.dart';
+import 'package:mobile_app/features/account/profile_gate_state.dart';
 import 'package:mobile_app/features/auth/auth_gate_state.dart';
 import 'package:mobile_app/features/compliance/privacy/privacy_gate_state.dart';
 import 'package:mobile_app/features/compliance/terms_of_use/terms_gate_state.dart';
@@ -52,6 +54,8 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
 
       if (!mounted) return;
 
+      unawaited(NotificationService.instance.requestAndRegisterToken());
+
       try {
         await context.read<AccountState>().load();
       } on ApiAuthException {
@@ -73,6 +77,11 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
   Future<void> _checkQueuePermissions() async {
     try {
       final status = await _permissionGate.check();
+      debugPrint(
+        'PERMISSIONS location=${status.locationGranted} '
+        'notification=${status.notificationGranted} '
+        'canJoin=${status.canJoinQueue}',
+      );
 
       if (!mounted) return;
 
@@ -215,6 +224,54 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
 
     if (permissionStatus == null || !permissionStatus.canJoinQueue) {
       await _showPermissionRequiredDialog();
+      return;
+    }
+
+    final profileGate = context.read<ProfileGateState>();
+    final accountState = context.read<AccountState>();
+
+    if (accountState.profile == null) {
+      await accountState.load();
+    }
+
+    if (!mounted) return;
+
+    final profile = accountState.profile;
+
+    final profileIncomplete =
+        profileGate.isRequired ||
+        profile == null ||
+        profile.tto.isEmpty ||
+        profile.phoneNumber.isEmpty;
+
+    if (profileIncomplete) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Profiel niet compleet'),
+            content: const Text(
+              'Vul eerst uw TTO en telefoonnummer in voordat u zich kunt aanmelden voor de wachtrij.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Annuleren'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  context.go(
+                    '/complete-profile?next=${Uri.encodeComponent('/locations')}',
+                  );
+                },
+                child: const Text('Profiel aanvullen'),
+              ),
+            ],
+          );
+        },
+      );
+
       return;
     }
 

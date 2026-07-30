@@ -8,6 +8,8 @@ class SignupFormState extends ChangeNotifier {
   String lastName = '';
   String email = '';
   String taxiLicenseNumber = '';
+  String tto = '';
+  String phoneNumber = '';
 
   String password = '';
   String passwordConfirm = '';
@@ -25,11 +27,15 @@ class SignupFormState extends ChangeNotifier {
     required String lastName,
     required String email,
     required String taxiLicenseNumber,
+    required String tto,
+    required String phoneNumber,
   }) {
     this.firstName = firstName.trim();
     this.lastName = lastName.trim();
     this.email = email.trim().toLowerCase();
     this.taxiLicenseNumber = taxiLicenseNumber.trim().toUpperCase();
+    this.tto = tto;
+    this.phoneNumber = phoneNumber;
     notifyListeners();
   }
 
@@ -128,6 +134,8 @@ class SignupFormState extends ChangeNotifier {
     lastName = '';
     email = '';
     taxiLicenseNumber = '';
+    tto = '';
+    phoneNumber = '';
 
     password = '';
     passwordConfirm = '';

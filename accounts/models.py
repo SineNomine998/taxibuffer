@@ -4,6 +4,8 @@ from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
 
+from .choices import TTO_CHOICES
+
 # Create your models here.
 
 
@@ -34,6 +36,15 @@ class Chauffeur(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     location = models.PointField(null=True, blank=True, srid=4326)
+    tto = models.CharField(
+        max_length=40,
+        choices=TTO_CHOICES,
+        blank=True,
+    )
+    phone_number = models.CharField(
+        max_length=30,
+        blank=True,
+    )
 
     def get_current_vehicle(self):
         return self.vehicles.filter(is_active=True, is_current=True).first()

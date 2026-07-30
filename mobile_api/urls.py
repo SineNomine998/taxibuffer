@@ -59,6 +59,7 @@ urlpatterns = [
         name="mobile_password_reset",
     ),
     # Account endpoints
+    path("ttos/", views.MobileTTOChoicesView.as_view(), name="mobile_tto_choices"),
     path("account/", views.MobileAccountView.as_view(), name="mobile_account"),
     path(
         "account/profile/",

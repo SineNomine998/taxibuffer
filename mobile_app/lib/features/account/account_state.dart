@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:mobile_app/core/config/api_client.dart';
+import 'package:mobile_app/core/models/tto_option.dart';
 import '../../../core/models/vehicle.dart';
 import 'models/account_profile.dart';
 import 'services/account_service.dart';
@@ -10,10 +11,13 @@ class AccountState extends ChangeNotifier {
   AccountState({AccountService? accountService})
     : _accountService = accountService ?? AccountService();
 
+  bool _disposed = false;
+
   AccountProfile? profile;
   List<Vehicle> vehicles = [];
   bool isLoading = false;
   String? loadError;
+  List<TtoOption> ttoOptions = [];
 
   Vehicle? get currentVehicle =>
       vehicles.where((v) => v.isCurrent).cast<Vehicle?>().firstOrNull;
@@ -21,36 +25,62 @@ class AccountState extends ChangeNotifier {
   List<Vehicle> get otherVehicles =>
       vehicles.where((v) => !v.isCurrent).toList();
 
+  void _safeNotify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   Future<void> load() async {
+    if (_disposed) return;
+
     isLoading = true;
     loadError = null;
-    notifyListeners();
+    _safeNotify();
 
     try {
-      final data = await _accountService.fetchAccount();
+      final accountFuture = _accountService.fetchAccount();
+      final ttoFuture = _accountService.fetchTtoOptions();
+
+      final data = await accountFuture;
+      final ttos = await ttoFuture;
+
+      if (_disposed) return;
 
       profile = AccountProfile.fromJson(data['profile']);
       vehicles = (data['vehicles'] as List)
           .map((v) => Vehicle.fromJson(v as Map<String, dynamic>))
           .toList();
+      ttoOptions = ttos;
     } on ApiAuthException {
       rethrow;
     } catch (e) {
+      if (_disposed) return;
       loadError = e.toString().replaceFirst('Exception: ', '');
     } finally {
-      isLoading = false;
-      notifyListeners();
+      if (!_disposed) {
+        isLoading = false;
+        _safeNotify();
+      }
     }
   }
 
   Future<void> updateProfile(AccountProfile updated) async {
     final saved = await _accountService.updateProfile(updated);
+    if (_disposed) return;
+
     profile = saved;
-    notifyListeners();
+    _safeNotify();
   }
 
   Future<void> addVehicle(Vehicle vehicle) async {
     final saved = await _accountService.addVehicle(vehicle);
+    if (_disposed) return;
+
     if (vehicle.isCurrent) {
       vehicles = vehicles
           .map(
@@ -64,12 +94,15 @@ class AccountState extends ChangeNotifier {
           )
           .toList();
     }
+
     vehicles.add(saved);
-    notifyListeners();
+    _safeNotify();
   }
 
   Future<void> setCurrentVehicle(Vehicle target) async {
     await _accountService.setCurrentVehicle(target.id!);
+    if (_disposed) return;
+
     vehicles = vehicles
         .map(
           (v) => Vehicle(
@@ -81,11 +114,13 @@ class AccountState extends ChangeNotifier {
           ),
         )
         .toList();
-    notifyListeners();
+
+    _safeNotify();
   }
 
   Future<void> removeVehicle(Vehicle target) async {
     await _accountService.removeVehicle(target.id!);
+    if (_disposed) return;
 
     vehicles = vehicles.where((v) => v.id != target.id).toList();
 
@@ -94,17 +129,18 @@ class AccountState extends ChangeNotifier {
       return;
     }
 
-    notifyListeners();
+    _safeNotify();
   }
 
   Future<void> adjustVehicle(Vehicle target) async {
     final saved = await _accountService.adjustVehicle(target);
+    if (_disposed) return;
 
     vehicles = vehicles.map((v) {
       if (v.id != saved.id) return v;
       return saved;
     }).toList();
 
-    notifyListeners();
+    _safeNotify();
   }
 }

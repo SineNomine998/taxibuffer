@@ -11,11 +11,14 @@ class BootstrapStatus {
   final bool termsOfUseRequired;
   final String? currentTermsOfUseVersion;
 
+  final bool profileCompletionRequired;
+
   const BootstrapStatus({
     required this.privacyPolicyRequired,
     required this.currentPrivacyPolicyVersion,
     required this.termsOfUseRequired,
     required this.currentTermsOfUseVersion,
+    required this.profileCompletionRequired,
   });
 
   factory BootstrapStatus.fromJson(Map<String, dynamic> json) {
@@ -26,6 +29,7 @@ class BootstrapStatus {
       termsOfUseRequired: json['terms_of_use_required'] == true,
       currentTermsOfUseVersion: json['current_terms_of_use_version']
           ?.toString(),
+      profileCompletionRequired: json['profile_completion_required'] == true,
     );
   }
 }
