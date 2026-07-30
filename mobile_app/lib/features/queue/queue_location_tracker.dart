@@ -14,36 +14,36 @@ class QueueLocationTracker extends ChangeNotifier {
     : _queueService = queueService ?? QueueService();
 
   String? _entryUuid;
-
   bool _isRunning = false;
   bool _isReporting = false;
   bool _configured = false;
   bool _expiredReportTriggered = false;
-
   Timer? _countdownTimer;
-
   int? _graceRemainingSeconds;
   String? _warningMessage;
-
   bool _outsideWarningActive = false;
   int _outsideWarningEventId = 0;
-
   bool _dequeued = false;
   String? _dequeueMessage;
   int _dequeueEventId = 0;
+  int _reportRequestId = 0;
+  int _acknowledgedOutsideWarningEventId = 0;
+  DateTime? _lastSuccessfulLocationReportAt;
+  int _consecutiveUnavailableReports = 0;
+  static const Duration _unavailableDebounceWindow = Duration(seconds: 7);
 
   bool get isRunning => _isRunning;
-
   int? get graceRemainingSeconds => _graceRemainingSeconds;
   String? get warningMessage => _warningMessage;
   bool get hasWarning => _graceRemainingSeconds != null;
-
   bool get outsideWarningActive => _outsideWarningActive;
   int get outsideWarningEventId => _outsideWarningEventId;
-
   bool get dequeued => _dequeued;
   String? get dequeueMessage => _dequeueMessage;
   int get dequeueEventId => _dequeueEventId;
+  bool get shouldShowOutsideWarningPopup =>
+      _outsideWarningActive &&
+      _outsideWarningEventId != _acknowledgedOutsideWarningEventId;
 
   Future<void> start(String entryUuid) async {
     if (_isRunning && _entryUuid == entryUuid) return;
@@ -56,6 +56,7 @@ class QueueLocationTracker extends ChangeNotifier {
     _dequeued = false;
     _dequeueMessage = null;
     _expiredReportTriggered = false;
+    _reportRequestId = 0;
 
     notifyListeners();
 
@@ -72,6 +73,10 @@ class QueueLocationTracker extends ChangeNotifier {
   }
 
   Future<void> stop() async {
+    _reportRequestId++;
+    _lastSuccessfulLocationReportAt = null;
+    _consecutiveUnavailableReports = 0;
+
     _countdownTimer?.cancel();
     _countdownTimer = null;
 
@@ -110,8 +115,12 @@ class QueueLocationTracker extends ChangeNotifier {
       debugPrint('DEBUG: BG provider changed enabled=${event.enabled}');
 
       if (!event.enabled) {
-        unawaited(_reportLocationUnavailable());
+        unawaited(_reportLocationUnavailable(force: true));
+        return;
       }
+
+      _consecutiveUnavailableReports = 0;
+      unawaited(_reportCurrentPositionOnce());
     });
 
     bg.BackgroundGeolocation.onHeartbeat((bg.HeartbeatEvent event) {
@@ -160,7 +169,10 @@ class QueueLocationTracker extends ChangeNotifier {
   }
 
   Future<void> _reportCurrentPositionOnce() async {
-    if (!_isRunning || _entryUuid == null) return;
+    if (!_isRunning || _entryUuid == null || _isReporting) return;
+
+    final requestId = ++_reportRequestId;
+    _isReporting = true;
 
     try {
       final location = await bg.BackgroundGeolocation.getCurrentPosition(
@@ -169,18 +181,30 @@ class QueueLocationTracker extends ChangeNotifier {
         timeout: 30,
       );
 
-      await _handleNativeLocation(location);
-    } catch (_) {
-      try {
-        final location = await bg.BackgroundGeolocation.getCurrentPosition(
-          samples: 1,
-          persist: false,
-          timeout: 15,
-        );
+      if (requestId != _reportRequestId) return;
 
-        await _handleNativeLocation(location);
-      } catch (_) {
-        await _reportLocationUnavailable();
+      final data = await _queueService.reportQueueLocation(
+        entryUuid: _entryUuid!,
+        lat: location.coords.latitude,
+        lng: location.coords.longitude,
+      );
+
+      if (requestId != _reportRequestId) return;
+
+      _handleLocationReportResponse(data);
+    } catch (_) {
+      if (requestId != _reportRequestId) return;
+
+      final data = await _queueService.reportQueueLocationUnavailable(
+        entryUuid: _entryUuid!,
+      );
+
+      if (requestId != _reportRequestId) return;
+
+      _handleLocationReportResponse(data);
+    } finally {
+      if (requestId == _reportRequestId) {
+        _isReporting = false;
       }
     }
   }
@@ -188,16 +212,20 @@ class QueueLocationTracker extends ChangeNotifier {
   Future<void> _handleNativeLocation(bg.Location location) async {
     if (!_isRunning || _entryUuid == null || _isReporting) return;
 
+    final requestId = ++_reportRequestId;
+    final entryUuid = _entryUuid!;
     _isReporting = true;
 
     try {
       final result = await _queueService.reportQueueLocation(
-        entryUuid: _entryUuid!,
+        entryUuid: entryUuid,
         lat: location.coords.latitude,
         lng: location.coords.longitude,
       );
 
-      _handleResult(result);
+      if (requestId != _reportRequestId) return;
+
+      _handleLocationReportResponse(result);
     } on ApiAuthException catch (e) {
       debugPrint('Queue location auth failed: $e');
       await stop();
@@ -205,21 +233,48 @@ class QueueLocationTracker extends ChangeNotifier {
       debugPrint('Queue location report failed: $error');
       debugPrintStack(stackTrace: stackTrace);
     } finally {
-      _isReporting = false;
+      if (requestId == _reportRequestId) {
+        _isReporting = false;
+      }
     }
   }
 
-  Future<void> _reportLocationUnavailable() async {
+  Future<void> _reportLocationUnavailable({bool force = false}) async {
     if (!_isRunning || _entryUuid == null || _isReporting) return;
 
+    final now = DateTime.now();
+
+    final recentlyHadGoodLocation =
+        _lastSuccessfulLocationReportAt != null &&
+        now.difference(_lastSuccessfulLocationReportAt!) <
+            _unavailableDebounceWindow;
+
+    if (!force && recentlyHadGoodLocation) {
+      debugPrint(
+        'Skipping unavailable report: recent successful location report.',
+      );
+      return;
+    }
+
+    _consecutiveUnavailableReports++;
+
+    if (!force && _consecutiveUnavailableReports < 2) {
+      debugPrint('Skipping unavailable report: waiting for repeated failure.');
+      return;
+    }
+
+    final requestId = ++_reportRequestId;
+    final entryUuid = _entryUuid!;
     _isReporting = true;
 
     try {
       final result = await _queueService.reportQueueLocationUnavailable(
-        entryUuid: _entryUuid!,
+        entryUuid: entryUuid,
       );
 
-      _handleResult(result);
+      if (requestId != _reportRequestId) return;
+
+      _handleLocationReportResponse(result);
     } on ApiAuthException catch (e) {
       debugPrint('Queue location unavailable auth failed: $e');
       await stop();
@@ -227,16 +282,39 @@ class QueueLocationTracker extends ChangeNotifier {
       debugPrint('Queue location report failed: $error');
       debugPrintStack(stackTrace: stackTrace);
     } finally {
-      _isReporting = false;
+      if (requestId == _reportRequestId) {
+        _isReporting = false;
+      }
     }
   }
 
-  void _handleResult(Map<String, dynamic> result) {
-    debugPrint('Queue location result: $result');
-    final action = result['action']?.toString();
+  void _handleLocationReportResponse(Map<String, dynamic> data) {
+    debugPrint('Queue location result: $data');
 
-    if (action == 'inside_buffer') {
-      _clearWarning();
+    final action = data['action']?.toString();
+
+    if (action == 'inside_buffer' || action == 'no_buffer') {
+      _lastSuccessfulLocationReportAt = DateTime.now();
+      _consecutiveUnavailableReports = 0;
+      _clearLocationWarning();
+      return;
+    }
+
+    if (data['dequeued'] == true) {
+      _clearLocationWarning();
+
+      _dequeued = true;
+      _dequeueMessage =
+          data['message']?.toString() ?? 'U bent uit de wachtrij verwijderd.';
+      _dequeueEventId++;
+
+      _isRunning = false;
+      _isReporting = false;
+
+      try {
+        bg.BackgroundGeolocation.stop();
+      } catch (_) {}
+
       notifyListeners();
       return;
     }
@@ -245,13 +323,25 @@ class QueueLocationTracker extends ChangeNotifier {
         action == 'outside_grace' ||
         action == 'location_unavailable_warning' ||
         action == 'location_unavailable_grace') {
+      if (action == 'location_unavailable_warning' ||
+          action == 'location_unavailable_grace') {
+        final recentlyHadGoodLocation =
+            _lastSuccessfulLocationReportAt != null &&
+            DateTime.now().difference(_lastSuccessfulLocationReportAt!) <
+                _unavailableDebounceWindow;
+
+        if (recentlyHadGoodLocation) {
+          debugPrint('Ignoring unavailable warning: recent good location.');
+          return;
+        }
+      }
       final seconds =
-          (result['remaining_seconds'] as num?)?.toInt() ??
-          (result['grace_seconds'] as num?)?.toInt() ??
+          (data['remaining_seconds'] as num?)?.toInt() ??
+          (data['grace_seconds'] as num?)?.toInt() ??
           240;
 
       _warningMessage =
-          result['message']?.toString() ??
+          data['message']?.toString() ??
           'Keer terug naar de bufferzone om in de wachtrij te blijven.';
 
       final wasAlreadyWarning = _outsideWarningActive;
@@ -263,27 +353,20 @@ class QueueLocationTracker extends ChangeNotifier {
 
       _startCountdown(seconds);
       notifyListeners();
-      return;
     }
+  }
 
-    if (result['dequeued'] == true) {
-      _dequeued = true;
-      _dequeueMessage =
-          result['message']?.toString() ??
-          'U bent uit de wachtrij verwijderd omdat u buiten de bufferzone bent gebleven.';
-      _dequeueEventId++;
+  void _clearLocationWarning() {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
 
-      _clearWarning();
+    _graceRemainingSeconds = null;
+    _warningMessage = null;
+    _outsideWarningActive = false;
+    _expiredReportTriggered = false;
+    _acknowledgedOutsideWarningEventId = 0;
 
-      _isRunning = false;
-      _isReporting = false;
-
-      try {
-        bg.BackgroundGeolocation.stop();
-      } catch (_) {}
-
-      notifyListeners();
-    }
+    notifyListeners();
   }
 
   void _startCountdown(int seconds) {
@@ -322,17 +405,8 @@ class QueueLocationTracker extends ChangeNotifier {
     await _reportCurrentPositionOnce();
   }
 
-  void _clearWarning() {
-    _countdownTimer?.cancel();
-    _countdownTimer = null;
-
-    _graceRemainingSeconds = null;
-    _warningMessage = null;
-    _outsideWarningActive = false;
-    _expiredReportTriggered = false;
-  }
-
   void acknowledgeOutsideWarning() {
+    _acknowledgedOutsideWarningEventId = _outsideWarningEventId;
     notifyListeners();
   }
 

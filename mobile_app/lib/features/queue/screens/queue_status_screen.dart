@@ -1,6 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_app/core/config/api_client.dart';
+import 'package:mobile_app/features/auth/auth_gate_state.dart';
+import 'package:mobile_app/features/compliance/privacy/privacy_gate_state.dart';
+import 'package:mobile_app/features/compliance/terms_of_use/terms_gate_state.dart';
 import 'package:mobile_app/features/queue/queue_location_tracker.dart';
 import 'package:mobile_app/features/queue/queue_state.dart';
 import 'package:provider/provider.dart';
@@ -34,6 +38,8 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
   bool _isDisposed = false;
   bool _isReconnecting = false;
   bool _hasExited = false;
+  QueueLocationTracker? _tracker;
+  bool _locationWarningDialogOpen = false;
 
   @override
   void initState() {
@@ -42,16 +48,20 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
     _queueService = QueueService();
     // Mark this entry as active globally so BottomNav and other screens know.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<QueueState>().setActiveEntry(widget.entryUuid);
-      }
+      if (!mounted) return;
+
+      context.read<QueueState>().setActiveEntry(widget.entryUuid);
+
+      _tracker = context.read<QueueLocationTracker>();
+      _tracker!.addListener(_onLocationTrackerChanged);
+      _onLocationTrackerChanged();
     });
     _connect();
   }
 
   Future<void> _connect({
     bool showLoading = true,
-    bool forceRefreshToken = false,
+    // bool forceRefreshToken = false,
   }) async {
     if (_isDisposed || !mounted) return;
 
@@ -68,7 +78,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
 
       await _queueService.connect(
         widget.entryUuid,
-        forceRefreshToken: forceRefreshToken,
+        // forceRefreshToken: forceRefreshToken,
       );
 
       _subscription = _queueService.statusStream.listen(
@@ -101,6 +111,8 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
       });
 
       _reconnectAttempts = 0;
+    } on ApiAuthException {
+      await _handleAuthExpired();
     } catch (e) {
       if (_isDisposed || !mounted) return;
 
@@ -114,6 +126,30 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
         setState(() => _isConnecting = false);
       }
     }
+  }
+
+  Future<void> _handleAuthExpired() async {
+    if (!mounted || _isDisposed) return;
+
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+
+    await _subscription?.cancel();
+    _subscription = null;
+
+    if (!mounted) return;
+
+    await context.read<QueueLocationTracker>().stop();
+
+    if (!mounted || _isDisposed) return;
+
+    context.read<AuthGateState>().markUnauthenticated();
+    context.read<PrivacyGateState>().reset();
+    context.read<TermsGateState>().reset();
+
+    context.go(
+      '/login?next=${Uri.encodeComponent('/queue/${widget.entryUuid}')}',
+    );
   }
 
   Future<void> _onStatus(QueueStatus status) async {
@@ -135,6 +171,8 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
     if (status.status == 'waiting') {
       if (!tracker.isRunning) {
         unawaited(tracker.start(widget.entryUuid));
+      } else {
+        unawaited(tracker.reportNow());
       }
     } else {
       unawaited(tracker.stop());
@@ -153,6 +191,28 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
         _showTurnNotification(notification);
       }
     }
+  }
+
+  void _onLocationTrackerChanged() {
+    if (!mounted || _isDisposed) return;
+
+    final tracker = _tracker;
+    if (tracker == null) return;
+
+    if (!tracker.hasWarning && _locationWarningDialogOpen) {
+      _locationWarningDialogOpen = false;
+
+      if (Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop(false);
+      }
+
+      return;
+    }
+
+    if (!tracker.shouldShowOutsideWarningPopup) return;
+    if (_locationWarningDialogOpen) return;
+
+    _locationWarningDialogOpen = true;
   }
 
   void _scheduleReconnect() {
@@ -360,6 +420,8 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
     _subscription?.cancel();
     _queueService.dispose();
 
+    _tracker?.removeListener(_onLocationTrackerChanged);
+
     super.dispose();
   }
 
@@ -388,11 +450,15 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
 
     _queueService = QueueService();
 
-    await _connect(showLoading: showLoading, forceRefreshToken: true);
+    await _connect(showLoading: showLoading);
 
     if (!mounted || _isDisposed) return;
 
-    await context.read<QueueLocationTracker>().reportNow();
+    try {
+      await context.read<QueueLocationTracker>().reportNow();
+    } on ApiAuthException {
+      await _handleAuthExpired();
+    }
   }
 
   @override
@@ -407,7 +473,7 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
           ? _ErrorState(
               message: _connectionError!,
               onRetry: () {
-                unawaited(_connect(forceRefreshToken: true));
+                unawaited(_connect());
               },
             )
           : _buildContent(),
@@ -427,7 +493,6 @@ class _QueueStatusScreenState extends State<QueueStatusScreen>
 
     return RefreshIndicator(
       onRefresh: () async {
-        await context.read<QueueLocationTracker>().reportNow();
         await _reconnect(showLoading: false);
       },
       color: AppColors.gradientStart,

@@ -89,7 +89,7 @@ class ApiClient {
     final access = await _refreshAccessTokenSingleFlight();
 
     if (access == null || access.isEmpty) {
-      await _tokenStorage.clearTokens();
+      // await _tokenStorage.clearTokens();
       throw const ApiAuthException('Sessie verlopen.');
     }
 
