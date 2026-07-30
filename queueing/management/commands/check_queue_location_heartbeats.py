@@ -5,6 +5,8 @@ from django.db import transaction
 from django.utils import timezone
 
 from queueing.models import QueueEntry
+from queueing.activity import log_chauffeur_activity
+from queueing.models import ChauffeurActivityLog
 from mobile_api.push import send_location_lost_push
 
 
@@ -73,6 +75,19 @@ class Command(BaseCommand):
                             "status",
                             "dequeued_at",
                         ]
+                    )
+
+                    log_chauffeur_activity(
+                        chauffeur=entry.chauffeur,
+                        queue=entry.queue,
+                        queue_entry=entry,
+                        event_type=ChauffeurActivityLog.EventType.LOCATION_TIMEOUT_DEQUEUED,
+                        title="Verwijderd uit wachtrij",
+                        message="U bent verwijderd omdat locatie te lang buiten/niet beschikbaar was.",
+                        queue_position=entry.get_queue_position(),
+                        metadata={
+                            "reason": "location_timeout",
+                        },
                     )
 
                     removed += 1
