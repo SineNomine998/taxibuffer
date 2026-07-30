@@ -9,6 +9,20 @@ from accounts.choices import TTO_CHOICES
 User = get_user_model()
 
 
+def validate_dutch_mobile_phone(value):
+    value = (value or "").strip()
+
+    if not value:
+        raise serializers.ValidationError("Telefoonnummer is verplicht.")
+
+    normalized = re.sub(r"[\s\-\(\)]", "", value)
+
+    if not re.match(r"^(06|\+316|00316)[0-9]{8}$", normalized):
+        raise serializers.ValidationError("Vul een geldig Nederlands mobiel nummer in.")
+
+    return normalized
+
+
 class MobileSignUpSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=150)
     last_name = serializers.CharField(max_length=150)
@@ -47,6 +61,9 @@ class MobileSignUpSerializer(serializers.Serializer):
         #     raise serializers.ValidationError({"taxi_license_number": "Dit RTX-nummer is al geregistreerd."})
 
         return value.strip().upper()
+
+    def validate_phone_number(self, value):
+        return validate_dutch_mobile_phone(value)
 
     def validate(self, attrs):
         if attrs["password"] != attrs["password_confirm"]:

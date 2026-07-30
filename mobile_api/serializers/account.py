@@ -1,9 +1,24 @@
+import re
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .vehicle import MobileVehicleSerializer
 from accounts.choices import TTO_CHOICES
 
 User = get_user_model()
+
+
+def validate_dutch_mobile_phone(value):
+    value = (value or "").strip()
+
+    if not value:
+        raise serializers.ValidationError("Telefoonnummer is verplicht.")
+
+    normalized = re.sub(r"[\s\-\(\)]", "", value)
+
+    if not re.match(r"^(06|\+316|00316)[0-9]{8}$", normalized):
+        raise serializers.ValidationError("Vul een geldig Nederlands mobiel nummer in.")
+
+    return normalized
 
 
 class MobileAccountProfileSerializer(serializers.Serializer):
@@ -54,6 +69,9 @@ class MobileAccountProfileSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError("RTX-nummer is verplicht.")
         return value
+
+    def validate_phone_number(self, value):
+        return validate_dutch_mobile_phone(value)
 
 
 class MobileAccountSerializer(serializers.Serializer):
