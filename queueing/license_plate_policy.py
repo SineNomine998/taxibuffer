@@ -48,12 +48,23 @@ def block_license_plate(
     if existing:
         return existing, False, 0
 
+    chauffeur = None
+
+    if source_queue_entry is not None:
+        chauffeur = source_queue_entry.chauffeur
+    else:
+        chauffeur = QueueEntry.get_last_chauffeur_for_license_plate(license_plate)
+
     restriction = LicensePlateRestriction.objects.create(
         normalized_license_plate=normalized,
         display_license_plate=license_plate,
         reason=reason,
         created_by_officer=officer,
         source_queue_entry=source_queue_entry,
+        chauffeur_tto_snapshot=chauffeur.tto if chauffeur else "",
+        chauffeur_tto_display_snapshot=(
+            chauffeur.get_tto_display() if chauffeur and chauffeur.tto else ""
+        ),
     )
 
     removed_count = 0

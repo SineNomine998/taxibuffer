@@ -469,6 +469,9 @@ class LicensePlateRestriction(models.Model):
         related_name="license_plate_restrictions",
     )
 
+    chauffeur_tto_snapshot = models.CharField(max_length=40, blank=True)
+    chauffeur_tto_display_snapshot = models.CharField(max_length=100, blank=True)
+
     starts_at = models.DateTimeField(default=timezone.now)
     ends_at = models.DateTimeField(null=True, blank=True)
 

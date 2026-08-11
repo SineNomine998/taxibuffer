@@ -88,6 +88,7 @@
                         <thead>
                             <tr>
                                 <th>Kenteken</th>
+                                <th>TTO</th>
                                 <th>Reden</th>
                                 <th>Aangemaakt door</th>
                                 <th>Datum</th>
@@ -101,6 +102,9 @@
                                     <span class="badge bg-danger fs-6">
                                         {{ restriction.display_license_plate }}
                                     </span>
+                                </td>
+                                <td>
+                                    {{ restriction.chauffeur_tto_display_snapshot|default:"-" }}
                                 </td>
                                 <td>{{ restriction.reason|default:"-" }}</td>
                                 <td>
@@ -137,6 +141,7 @@
                         <thead>
                             <tr>
                                 <th>Kenteken</th>
+                                <th>TTO</th>
                                 <th>Reden</th>
                                 <th>Opgeheven door</th>
                                 <th>Opgeheven op</th>
@@ -146,6 +151,7 @@
                             {% for restriction in lifted_restrictions %}
                             <tr>
                                 <td>{{ restriction.display_license_plate }}</td>
+                                <td>{{ restriction.chauffeur_tto_display_snapshot|default:"-" }}</td>
                                 <td>{{ restriction.reason|default:"-" }}</td>
                                 <td>{{ restriction.lifted_by_officer.credentials|default:"-" }}</td>
                                 <td>{{ restriction.lifted_at|date:"d-m-Y H:i" }}</td>
