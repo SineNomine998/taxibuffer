@@ -21,6 +21,7 @@ from django.shortcuts import redirect
 from queueing.views import service_worker, InfoPagesView
 from django.conf import settings
 from django.conf.urls.static import static
+from compliance import views as compliance_views
 
 
 def redirect_to_signup(request):
@@ -37,6 +38,8 @@ urlpatterns = [
     path("sw.js", service_worker, name="service_worker"),
     path("", include("sensors.urls")),
     path("api/mobile/", include("mobile_api.urls")),
+    path("privacy/", compliance_views.public_privacy_policy, name="public_privacy_policy"),
+    path("terms/", compliance_views.public_terms_of_use, name="public_terms_of_use"),
 ]
 
 if settings.DEBUG:
