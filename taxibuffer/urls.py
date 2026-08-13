@@ -18,7 +18,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect
-from queueing.views import service_worker, InfoPagesView
+from queueing.views import service_worker, landing_page, InfoPagesView
 from django.conf import settings
 from django.conf.urls.static import static
 from compliance import views as compliance_views
@@ -34,7 +34,8 @@ urlpatterns = [
     path("control/", include("control_panel.urls")),
     path("dashboard/", include("dashboard.urls")),
     path("geofence/", include("geofence.urls")),
-    path("", InfoPagesView.as_view(), name="info_pages"),
+    # path("", InfoPagesView.as_view(), name="info_pages"),
+    path("", landing_page, name="landing_page"),
     path("sw.js", service_worker, name="service_worker"),
     path("", include("sensors.urls")),
     path("api/mobile/", include("mobile_api.urls")),

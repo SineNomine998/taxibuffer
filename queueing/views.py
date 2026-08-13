@@ -58,7 +58,9 @@ def _is_admin_request(request, data):
     if "@admin.com" in email:
         return True
 
-    user_email = (getattr(getattr(request, "user", None), "email", "") or "").strip().lower()
+    user_email = (
+        (getattr(getattr(request, "user", None), "email", "") or "").strip().lower()
+    )
     return "@admin.com" in user_email
 
 
@@ -76,7 +78,7 @@ def _get_active_queue_entry(chauffeur):
     """Get the active queue entry for a chauffeur if they're in queue."""
     if not chauffeur:
         return None
-    
+
     return (
         QueueEntry.objects.filter(
             chauffeur=chauffeur,
@@ -93,17 +95,21 @@ def _get_global_queue_context(chauffeur):
     and GPS tracking across all pages.
     """
     context = {
-        'taxibuffer_in_queue': False,
-        'taxibuffer_entry_uuid': None,
-        'taxibuffer_vapid_key': settings.WEBPUSH_SETTINGS.get("VAPID_PUBLIC_KEY", ""),
+        "taxibuffer_in_queue": False,
+        "taxibuffer_entry_uuid": None,
+        "taxibuffer_vapid_key": settings.WEBPUSH_SETTINGS.get("VAPID_PUBLIC_KEY", ""),
     }
-    
+
     active_entry = _get_active_queue_entry(chauffeur)
     if active_entry:
-        context['taxibuffer_in_queue'] = True
-        context['taxibuffer_entry_uuid'] = str(active_entry.uuid)
-    
+        context["taxibuffer_in_queue"] = True
+        context["taxibuffer_entry_uuid"] = str(active_entry.uuid)
+
     return context
+
+
+def landing_page(request):
+    return render(request, "queueing/landing.html")
 
 
 class InfoPagesView(View):
@@ -254,7 +260,7 @@ class PasswordResetView(DjangoPasswordResetView):
     #     context["domain"] = settings.MAIN_DOMAIN
     #     context["protocol"] = "http" if settings.DEBUG else "https"
     #     return context
-    
+
     def form_valid(self, form):
         form.save(
             request=self.request,
@@ -538,7 +544,7 @@ class SignUpVehicleView(View):
 
             # Log in the user FIRST
             login(request, user, backend="accounts.backends.EmailBackend")
-            
+
             # Then set session variables and save explicitly
             request.session["form_data"] = {
                 "license_plate": chauffeur.current_license_plate,
@@ -546,7 +552,7 @@ class SignUpVehicleView(View):
             }
             request.session.pop("signup_flow", None)
             request.session.modified = True
-            
+
             messages.success(request, "Account aangemaakt. Welkom bij TAXIBUFFER.")
             return redirect("queueing:account")
         except Exception as e:
@@ -653,7 +659,9 @@ class AccountView(View):
             first_name = request.POST.get("first_name", "").strip()
             last_name = request.POST.get("last_name", "").strip()
             email = request.POST.get("email", "").strip().lower()
-            taxi_license_number = request.POST.get("taxi_license_number", "").strip().upper()
+            taxi_license_number = (
+                request.POST.get("taxi_license_number", "").strip().upper()
+            )
 
             if not all([first_name, last_name, email, taxi_license_number]):
                 messages.error(request, "Vul naam, e-mail en RTX-nummer volledig in.")
@@ -671,7 +679,9 @@ class AccountView(View):
                 return redirect("queueing:account")
 
             # Allowed formats: DDDD, DDDDD, DDDD-XD
-            if not re.fullmatch(r"^(?:\d{4}|\d{5}|\d{4}-[A-Za-z]\d)$", taxi_license_number):
+            if not re.fullmatch(
+                r"^(?:\d{4}|\d{5}|\d{4}-[A-Za-z]\d)$", taxi_license_number
+            ):
                 messages.error(
                     request,
                     "RTX-nummer heeft een ongeldig formaat. Gebruik 4 of 5 cijfers, of DDDD-XD.",
@@ -714,7 +724,7 @@ class AccountView(View):
             if not vehicle:
                 messages.error(request, "Voertuig niet gevonden.")
                 return redirect("queueing:account")
-            
+
             has_active_queue_entry = QueueEntry.objects.filter(
                 chauffeur=chauffeur,
                 status__in=ACTIVE_QUEUE_STATUSES,
@@ -927,30 +937,37 @@ class QueueStatusAPIView(View):
             queue = entry.queue
             # TODO! THIS PART IS RELATED TO AUTOMATIC DEQUEUING; MIGHT NOT BE WORKING OPTIMALLY
             # Check for automatic dequeuing based on location
-            lat = request.GET.get('lat')
-            lng = request.GET.get('lng')
+            lat = request.GET.get("lat")
+            lng = request.GET.get("lng")
             if lat and lng:
                 try:
                     lat = float(lat)
                     lng = float(lng)
-                    buffer_zone = getattr(queue, 'buffer_zone', None)
-                    if buffer_zone and not point_in_buffer(buffer_zone, lat, lng) and not _is_admin_request(request, data={}):
+                    buffer_zone = getattr(queue, "buffer_zone", None)
+                    if (
+                        buffer_zone
+                        and not point_in_buffer(buffer_zone, lat, lng)
+                        and not _is_admin_request(request, data={})
+                    ):
                         # Chauffeur has left the buffer zone, dequeue automatically
                         if entry.status in ACTIVE_QUEUE_STATUSES:
                             entry.status = QueueEntry.Status.LEFT_ZONE
                             entry.dequeued_at = timezone.now()
                             entry.save()
-                            logger.info(f"Auto-dequeued chauffeur {entry.chauffeur} for leaving buffer zone.")
+                            logger.info(
+                                f"Auto-dequeued chauffeur {entry.chauffeur} for leaving buffer zone."
+                            )
                 except (ValueError, TypeError):
                     pass  # Invalid lat/lng, ignore
 
             # Get queue position and waiting count
             position = entry.get_queue_position()
-            waiting_entries = queue.get_waiting_entries().select_related(
-                "chauffeur__user"
-            ).order_by("created_at")
+            waiting_entries = (
+                queue.get_waiting_entries()
+                .select_related("chauffeur__user")
+                .order_by("created_at")
+            )
             total_waiting = waiting_entries.count()
-
 
             # Get pending notifications
             pending_notifications = QueueNotification.objects.filter(
@@ -972,7 +989,8 @@ class QueueStatusAPIView(View):
                 {
                     "first_name": waiting_entry.chauffeur.user.first_name,
                     "license_plate": waiting_entry.display_license_plate,
-                    "is_current_chauffeur": waiting_entry.chauffeur_id == entry.chauffeur_id,
+                    "is_current_chauffeur": waiting_entry.chauffeur_id
+                    == entry.chauffeur_id,
                     "position": waiting_entry.get_queue_position(),
                 }
                 for waiting_entry in waiting_entries
@@ -1058,9 +1076,11 @@ class LocationSelectionView(View):
             # If they're already in a queue, redirect them to that queue's status page
             return redirect("queueing:queue_status", entry_uuid=active_entry.uuid)
 
-        active_queues = TaxiQueue.objects.all().select_related(
-            "buffer_zone", "pickup_zone"
-        ).order_by("pickup_zone__created_at")
+        active_queues = (
+            TaxiQueue.objects.all()
+            .select_related("buffer_zone", "pickup_zone")
+            .order_by("pickup_zone__created_at")
+        )
 
         for queue in active_queues:
             queue.waiting_count = queue.get_waiting_entries().count()
@@ -1115,11 +1135,15 @@ class LocationSelectionView(View):
                 signup_point = make_point_from_lat_lng(latitude, longitude, srid=4326)
             except ValueError:
                 logger.warning("Invalid latitude/longitude values.")
-                messages.error(request, "Invalid location coordinates.", extra_tags="location")
+                messages.error(
+                    request, "Invalid location coordinates.", extra_tags="location"
+                )
                 return redirect("queueing:location_selection")
         else:
             logger.warning("Missing latitude/longitude values.")
-            messages.error(request, "Location coordinates are required.", extra_tags="location")
+            messages.error(
+                request, "Location coordinates are required.", extra_tags="location"
+            )
             return redirect("queueing:location_selection")
 
         if signup_point is None and getattr(chauffeur, "location", None):
@@ -1187,7 +1211,9 @@ class LocationSelectionView(View):
                 )
                 return redirect("queueing:location_selection")
             elif message == "Notification missed.":
-                notification_missed_entry = QueueEntry.objects.filter(uuid=entry_uuid).first()
+                notification_missed_entry = QueueEntry.objects.filter(
+                    uuid=entry_uuid
+                ).first()
                 notification_missed_entry.dequeue()
                 messages.warning(
                     request,
@@ -1290,7 +1316,7 @@ class SequenceHistoryView(View):
         return render(request, self.template_name, context)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
+@method_decorator(csrf_exempt, name="dispatch")
 class ReportLocationView(View):
     """Receive a GPS location report from a chauffeur and auto-dequeue if outside buffer."""
 
@@ -1299,38 +1325,42 @@ class ReportLocationView(View):
             entry = get_object_or_404(QueueEntry, uuid=entry_uuid)
 
             if entry.status not in ACTIVE_QUEUE_STATUSES:
-                return JsonResponse({'success': True, 'action': 'none'})
+                return JsonResponse({"success": True, "action": "none"})
 
-            lat = request.GET.get('lat')
-            lng = request.GET.get('lng')
+            lat = request.GET.get("lat")
+            lng = request.GET.get("lng")
 
             if not lat or not lng:
                 # No location provided, do not dequeue, just acknowledge
-                return JsonResponse({'success': True, 'action': 'no_location'})
+                return JsonResponse({"success": True, "action": "no_location"})
 
             try:
                 lat, lng = float(lat), float(lng)
             except ValueError:
-                return JsonResponse({'success': False, 'error': 'Invalid coordinates'}, status=400)
+                return JsonResponse(
+                    {"success": False, "error": "Invalid coordinates"}, status=400
+                )
 
-            buffer_zone = getattr(entry.queue, 'buffer_zone', None)
+            buffer_zone = getattr(entry.queue, "buffer_zone", None)
             if not buffer_zone:
-                return JsonResponse({'success': True, 'action': 'no_buffer'})
+                return JsonResponse({"success": True, "action": "no_buffer"})
 
             inside = point_in_buffer(buffer_zone, lat, lng)
             if not inside and not _is_admin_request(request, data={}):
                 entry.status = QueueEntry.Status.LEFT_ZONE
                 entry.dequeued_at = timezone.now()
-                entry.save(update_fields=['status', 'dequeued_at'])
+                entry.save(update_fields=["status", "dequeued_at"])
 
-                logger.info(f"Auto-dequeued {entry.chauffeur} via location ping (outside buffer).")
-                return JsonResponse({'success': True, 'action': 'dequeued'})
+                logger.info(
+                    f"Auto-dequeued {entry.chauffeur} via location ping (outside buffer)."
+                )
+                return JsonResponse({"success": True, "action": "dequeued"})
 
-            return JsonResponse({'success': True, 'action': 'inside_buffer'})
+            return JsonResponse({"success": True, "action": "inside_buffer"})
 
         except Exception as e:
             logger.exception("Location report failed")
-            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+            return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 # Manual trigger view for testing/admin purposes

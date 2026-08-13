@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="nl">
+
+<head>
+    <meta charset="utf-8">
+    <title>TaxiBuffer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    {% load static %}y
+    <style>
+        html,
+        body {
+            margin: 0;
+            min-height: 100%;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #111;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(rgba(220, 220, 0, 0.78), rgba(200, 200, 0, 0.78)),
+            url("{% static 'queueing/assets/taxibuffer-hero.png' %}") center center / cover no-repeat;
+        }
+
+        .page {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 20px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .logo {
+            width: 360px;
+            max-width: 85vw;
+            margin-bottom: 56px;
+        }
+
+        h1 {
+            margin: 0 0 24px;
+            font-size: 28px;
+            font-weight: 800;
+        }
+
+        .subtitle {
+            max-width: 690px;
+            margin: 0 auto 64px;
+            font-size: 20px;
+            line-height: 1.35;
+            font-weight: 400;
+        }
+
+        .badges {
+            display: flex;
+            gap: 86px;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 110px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            height: 46px;
+            width: auto;
+            display: block;
+        }
+
+        .footer {
+            font-size: 14px;
+        }
+
+        .footer a {
+            color: #222;
+            text-decoration: underline;
+        }
+
+        @media (max-width: 700px) {
+            .logo {
+                margin-bottom: 44px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .subtitle {
+                font-size: 17px;
+                margin-bottom: 44px;
+            }
+
+            .badges {
+                gap: 18px;
+                margin-bottom: 70px;
+            }
+
+            .badge {
+                height: 42px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="page">
+        <img class="logo" src="{% static 'queueing/assets/taxibuffer-logo.png' %}" alt="TaxiBuffer">
+
+        <h1>De digitale wachtrij voor taxichauffeurs</h1>
+
+        <p class="subtitle">
+            Meld je aan voor de taxibuffer via de applicatie, volg je positie en ontvang
+            automatisch een oproep zodra je naar de ophaallocatie kunt rijden
+        </p>
+
+        <div class="badges">
+            <a href="#" aria-label="Download in de App Store">
+                <img class="badge" src="{% static 'queueing/assets/app-store-badge.svg' %}" alt="Download on the App Store">
+            </a>
+
+            <a href="#" aria-label="Download op Google Play">
+                <img class="badge" src="{% static 'queueing/assets/google-play-badge.png' %}" alt="Ontdek het op Google Play">
+            </a>
+        </div>
+
+        <footer class="footer">
+            <a href="{% url 'public_privacy_policy' %}">Privacyverklaring</a>
+            -
+            <a href="{% url 'public_terms_of_use' %}">Gebruikersvoorwaarden</a>
+            -
+            <a href="{% url 'public_account_deletion' %}">Account verwijderen</a>
+            -
+            <a href="mailto:info@codingthecurbs.com">Contact</a>
+        </footer>
+    </main>
+</body>
+
+</html>
