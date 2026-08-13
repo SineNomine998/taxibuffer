@@ -38,8 +38,15 @@ urlpatterns = [
     path("sw.js", service_worker, name="service_worker"),
     path("", include("sensors.urls")),
     path("api/mobile/", include("mobile_api.urls")),
-    path("privacy/", compliance_views.public_privacy_policy, name="public_privacy_policy"),
+    path(
+        "privacy/", compliance_views.public_privacy_policy, name="public_privacy_policy"
+    ),
     path("terms/", compliance_views.public_terms_of_use, name="public_terms_of_use"),
+    path(
+        "account-verwijderen/",
+        compliance_views.public_account_deletion,
+        name="public_account_deletion",
+    ),
 ]
 
 if settings.DEBUG:

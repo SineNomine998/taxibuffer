@@ -10,6 +10,7 @@ import 'package:mobile_app/features/settings/services/settings_service.dart';
 import 'package:mobile_app/widgets/screen_header.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -51,11 +52,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-  // void _showNotImplemented(String feature) {
-  //   ScaffoldMessenger.of(context).showSnackBar(
-  //     SnackBar(content: Text('$feature is nog niet beschikbaar.')),
-  //   );
-  // }
+  void _showNotImplemented(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$feature is nog niet beschikbaar.')),
+    );
+  }
 
   Future<void> _showPrivacyPolicy() async {
     await PrivacyNoticeSheet.show(context);
@@ -108,6 +109,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         setState(() => _testingPush = false);
       }
+    }
+  }
+
+  Future<void> _openAccountDeletionPage() async {
+    final uri = Uri.parse('https://taxibuffer.nl/account-verwijderen/');
+
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    if (!opened && mounted) {
+      _showNotImplemented('Kan de pagina niet openen.');
     }
   }
 
@@ -206,12 +217,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'Mijn activiteiten',
                   onTap: () => context.push('/settings/activity'),
                 ),
-                // _SettingsNavigationTile(
-                //   icon: Icons.delete_outline_rounded,
-                //   title: "Verwijder mijn gegevens",
-                //   destructive: true,
-                //   onTap: () => _showNotImplemented("Gegevens verwijderen"),
-                // ),
+                _SettingsNavigationTile(
+                  icon: Icons.delete_outline_rounded,
+                  title: "Verwijder mijn gegevens",
+                  destructive: true,
+                  onTap: () => _openAccountDeletionPage(),
+                ),
               ],
             ),
             const SizedBox(height: 18),
@@ -252,11 +263,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
 class _SettingsIcon extends StatelessWidget {
   final IconData icon;
-  final bool destructive = false;
-  // final bool destructive;
+  // final bool destructive = false;
+  final bool destructive;
 
-  // const _SettingsIcon(this.icon, {this.destructive = false});
-  const _SettingsIcon(this.icon);
+  const _SettingsIcon(this.icon, {this.destructive = false});
+  // const _SettingsIcon(this.icon);
 
   @override
   Widget build(BuildContext context) {
@@ -493,7 +504,7 @@ class _SettingsNavigationTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? trailingText = null;
-  // final bool destructive;
+  final bool destructive;
   final VoidCallback onTap;
 
   const _SettingsNavigationTile({
@@ -501,7 +512,7 @@ class _SettingsNavigationTile extends StatelessWidget {
     required this.title,
     required this.onTap,
     // this.trailingText,
-    // this.destructive = false,
+    this.destructive = false,
   });
 
   @override
@@ -509,8 +520,8 @@ class _SettingsNavigationTile extends StatelessWidget {
     return ListTile(
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
-      // leading: _SettingsIcon(icon, destructive: destructive),
-      leading: _SettingsIcon(icon),
+      leading: _SettingsIcon(icon, destructive: destructive),
+      // leading: _SettingsIcon(icon),
       title: Text(
         title,
         style: const TextStyle(

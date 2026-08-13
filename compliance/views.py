@@ -36,3 +36,7 @@ def public_terms_of_use(request):
         "compliance/terms_of_use_public.html",
         {"terms": terms},
     )
+
+
+def public_account_deletion(request):
+    return render(request, "compliance/account_deletion_public.html")
