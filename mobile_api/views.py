@@ -5,8 +5,10 @@ from collections import defaultdict
 from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.forms import PasswordResetForm
+from django.views.decorators.cache import cache_page
 from rest_framework import status
 from rest_framework.exceptions import ValidationError, NotFound
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -462,8 +464,9 @@ class MobilePasswordResetView(APIView):
         )
 
 
+@method_decorator(cache_page(60 * 60), name="dispatch")
 class MobileTTOChoicesView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         return Response(
