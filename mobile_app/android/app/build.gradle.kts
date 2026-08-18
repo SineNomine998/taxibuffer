@@ -29,7 +29,7 @@ android {
         applicationId = "com.codingthecurbs.taxibuffer"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -63,6 +63,7 @@ kotlin {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation(platform("com.google.firebase:firebase-bom:34.15.0"))
+    implementation("com.google.android.gms:play-services-location:21.3.0")
 }
 
 flutter {
