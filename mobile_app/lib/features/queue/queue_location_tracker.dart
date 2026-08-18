@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_background_geolocation/flutter_background_geolocation.dart'
-    as bg;
+import 'package:tracelet/tracelet.dart' as tl;
+import 'package:geolocator/geolocator.dart';
 import 'package:mobile_app/core/config/api_client.dart';
 
 import 'services/queue_service.dart';
@@ -19,6 +19,7 @@ class QueueLocationTracker extends ChangeNotifier {
   bool _configured = false;
   bool _expiredReportTriggered = false;
   Timer? _countdownTimer;
+  Timer? _providerWatchdogTimer;
   int? _graceRemainingSeconds;
   String? _warningMessage;
   bool _outsideWarningActive = false;
@@ -30,7 +31,7 @@ class QueueLocationTracker extends ChangeNotifier {
   int _acknowledgedOutsideWarningEventId = 0;
   DateTime? _lastSuccessfulLocationReportAt;
   int _consecutiveUnavailableReports = 0;
-  static const Duration _unavailableDebounceWindow = Duration(seconds: 7);
+  static const Duration _unavailableDebounceWindow = Duration(seconds: 20);
 
   bool get isRunning => _isRunning;
   int? get graceRemainingSeconds => _graceRemainingSeconds;
@@ -63,9 +64,10 @@ class QueueLocationTracker extends ChangeNotifier {
     await _configureIfNeeded();
 
     try {
-      await bg.BackgroundGeolocation.start();
+      await tl.Tracelet.start();
+      _startProviderWatchdog();
     } catch (_) {
-      await _reportLocationUnavailable();
+      await _reportLocationUnavailable(force: true);
       return;
     }
 
@@ -76,6 +78,9 @@ class QueueLocationTracker extends ChangeNotifier {
     _reportRequestId++;
     _lastSuccessfulLocationReportAt = null;
     _consecutiveUnavailableReports = 0;
+
+    _providerWatchdogTimer?.cancel();
+    _providerWatchdogTimer = null;
 
     _countdownTimer?.cancel();
     _countdownTimer = null;
@@ -91,28 +96,46 @@ class QueueLocationTracker extends ChangeNotifier {
     _expiredReportTriggered = false;
 
     try {
-      await bg.BackgroundGeolocation.stop();
+      await tl.Tracelet.stop();
     } catch (_) {}
 
     notifyListeners();
   }
 
+  void _startProviderWatchdog() {
+    _providerWatchdogTimer?.cancel();
+
+    _providerWatchdogTimer = Timer.periodic(const Duration(seconds: 20), (
+      _,
+    ) async {
+      if (!_isRunning || _entryUuid == null) return;
+
+      try {
+        final locationEnabled = await Geolocator.isLocationServiceEnabled();
+
+        if (!locationEnabled) {
+          await _reportLocationUnavailable(force: true);
+          return;
+        }
+
+        await _reportCurrentPositionOnce();
+      } catch (e) {
+        debugPrint('Provider watchdog failed: $e');
+        await _reportLocationUnavailable(force: true);
+      }
+    });
+  }
+
   Future<void> _configureIfNeeded() async {
     if (_configured) return;
 
-    bg.BackgroundGeolocation.onLocation(
-      (bg.Location location) {
-        debugPrint('DEBUG: BG location event received');
-        unawaited(_handleNativeLocation(location));
-      },
-      (bg.LocationError error) {
-        debugPrint('DEBUG: BG location error: ${error.code} ${error.message}');
-        unawaited(_reportLocationUnavailable());
-      },
-    );
+    tl.Tracelet.onLocation((tl.Location location) {
+      debugPrint('DEBUG: Tracelet location event received');
+      unawaited(_handleNativeLocation(location));
+    });
 
-    bg.BackgroundGeolocation.onProviderChange((bg.ProviderChangeEvent event) {
-      debugPrint('DEBUG: BG provider changed enabled=${event.enabled}');
+    tl.Tracelet.onProviderChange((tl.ProviderChangeEvent event) {
+      debugPrint('DEBUG: Tracelet provider changed enabled=${event.enabled}');
 
       if (!event.enabled) {
         unawaited(_reportLocationUnavailable(force: true));
@@ -123,39 +146,38 @@ class QueueLocationTracker extends ChangeNotifier {
       unawaited(_reportCurrentPositionOnce());
     });
 
-    bg.BackgroundGeolocation.onHeartbeat((bg.HeartbeatEvent event) {
-      debugPrint('DEBUG: BG heartbeat event received');
+    tl.Tracelet.onHeartbeat((tl.HeartbeatEvent event) {
+      debugPrint('DEBUG: Tracelet heartbeat event received');
       unawaited(_reportCurrentPositionOnce());
     });
 
-    await bg.BackgroundGeolocation.ready(
-      bg.Config(
-        desiredAccuracy: bg.Config.DESIRED_ACCURACY_HIGH,
-
-        // Test/strict mode: tries to update about every 30 seconds.
-        locationUpdateInterval: 30000,
-        fastestLocationUpdateInterval: 15000,
-        distanceFilter: 0,
-
-        heartbeatInterval: 30,
-
-        foregroundService: true,
-        stopOnTerminate: false,
-        startOnBoot: false,
-        enableHeadless: false,
-
-        pausesLocationUpdatesAutomatically: false,
-        disableStopDetection: true,
-
-        notification: bg.Notification(
-          title: 'TaxiBuffer actief',
-          text: 'Uw wachtrijlocatie wordt gecontroleerd.',
-          channelName: 'TaxiBuffer locatiecontrole',
-          smallIcon: 'drawable/ic_notification',
+    await tl.Tracelet.ready(
+      tl.Config(
+        geo: tl.GeoConfig(
+          desiredAccuracy: tl.DesiredAccuracy.high,
+          distanceFilter: 0,
         ),
-
-        debug: false,
-        logLevel: bg.Config.LOG_LEVEL_OFF,
+        app: tl.AppConfig(
+          stopOnTerminate: false,
+          startOnBoot: false,
+          heartbeatInterval: 30,
+        ),
+        android: tl.AndroidConfig(
+          foregroundService: tl.ForegroundServiceConfig(
+            enabled: true,
+            notificationTitle: 'TaxiBuffer actief',
+            notificationText: 'Locatiecontrole actief voor uw wachtrij.',
+            channelName: 'TaxiBuffer locatiecontrole',
+            notificationSmallIcon: 'ic_notification',
+            notificationOngoing: true,
+            showNotificationOnPauseOnly: false,
+            notificationPriority: tl.NotificationPriority.low,
+          ),
+          locationUpdateInterval: 30000,
+          fastestLocationUpdateInterval: 15000,
+        ),
+        motion: tl.MotionConfig(disableMotionActivityUpdates: true),
+        logger: tl.LoggerConfig(debug: false, logLevel: tl.LogLevel.off),
       ),
     );
 
@@ -175,7 +197,7 @@ class QueueLocationTracker extends ChangeNotifier {
     _isReporting = true;
 
     try {
-      final location = await bg.BackgroundGeolocation.getCurrentPosition(
+      final location = await tl.Tracelet.getCurrentPosition(
         samples: 1,
         persist: false,
         timeout: 30,
@@ -192,16 +214,15 @@ class QueueLocationTracker extends ChangeNotifier {
       if (requestId != _reportRequestId) return;
 
       _handleLocationReportResponse(data);
-    } catch (_) {
-      if (requestId != _reportRequestId) return;
-
-      final data = await _queueService.reportQueueLocationUnavailable(
-        entryUuid: _entryUuid!,
-      );
+    } catch (error, stackTrace) {
+      debugPrint('Queue current position failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
 
       if (requestId != _reportRequestId) return;
 
-      _handleLocationReportResponse(data);
+      _isReporting = false;
+      await _reportLocationUnavailable();
+      return;
     } finally {
       if (requestId == _reportRequestId) {
         _isReporting = false;
@@ -209,7 +230,7 @@ class QueueLocationTracker extends ChangeNotifier {
     }
   }
 
-  Future<void> _handleNativeLocation(bg.Location location) async {
+  Future<void> _handleNativeLocation(tl.Location location) async {
     if (!_isRunning || _entryUuid == null || _isReporting) return;
 
     final requestId = ++_reportRequestId;
@@ -240,7 +261,14 @@ class QueueLocationTracker extends ChangeNotifier {
   }
 
   Future<void> _reportLocationUnavailable({bool force = false}) async {
-    if (!_isRunning || _entryUuid == null || _isReporting) return;
+    if (!_isRunning || _entryUuid == null) return;
+
+    if (_isReporting) {
+      if (!force) return;
+
+      _reportRequestId++;
+      _isReporting = false;
+    }
 
     final now = DateTime.now();
 
@@ -288,7 +316,7 @@ class QueueLocationTracker extends ChangeNotifier {
     }
   }
 
-  void _handleLocationReportResponse(Map<String, dynamic> data) {
+  Future<void> _handleLocationReportResponse(Map<String, dynamic> data) async {
     debugPrint('Queue location result: $data');
 
     final action = data['action']?.toString();
@@ -303,6 +331,9 @@ class QueueLocationTracker extends ChangeNotifier {
     if (data['dequeued'] == true) {
       _clearLocationWarning();
 
+      _providerWatchdogTimer?.cancel();
+      _providerWatchdogTimer = null;
+
       _dequeued = true;
       _dequeueMessage =
           data['message']?.toString() ?? 'U bent uit de wachtrij verwijderd.';
@@ -312,7 +343,7 @@ class QueueLocationTracker extends ChangeNotifier {
       _isReporting = false;
 
       try {
-        bg.BackgroundGeolocation.stop();
+        await tl.Tracelet.stop();
       } catch (_) {}
 
       notifyListeners();
@@ -419,10 +450,11 @@ class QueueLocationTracker extends ChangeNotifier {
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _providerWatchdogTimer?.cancel();
 
     try {
-      bg.BackgroundGeolocation.stop();
-      bg.BackgroundGeolocation.removeListeners();
+      tl.Tracelet.stop();
+      tl.Tracelet.removeListeners();
     } catch (_) {}
 
     _queueService.dispose();
