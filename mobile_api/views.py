@@ -809,7 +809,9 @@ class MobileQueueListView(APIView):
             .order_by("pickup_zone__created_at")
         )
 
-        if not chauffeur.is_review_account:
+        if chauffeur.is_review_account:
+            queues = queues.filter(is_test_queue=True)
+        else:
             queues = queues.filter(is_test_queue=False)
 
         return Response(
