@@ -58,6 +58,12 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
+def is_review_test_queue(chauffeur, queue):
+    return bool(
+        chauffeur and queue and chauffeur.is_review_account and queue.is_test_queue
+    )
+
+
 def parse_lat_lng(data):
     lat = data.get("lat")
     lng = data.get("lng")
@@ -803,6 +809,9 @@ class MobileQueueListView(APIView):
             .order_by("pickup_zone__created_at")
         )
 
+        if not chauffeur.is_review_account:
+            queues = queues.filter(is_test_queue=False)
+
         return Response(
             {
                 "active_entry_uuid": str(active_entry.uuid) if active_entry else None,
@@ -832,6 +841,15 @@ class MobileValidateLocationView(APIView):
             raise NotFound("Deze wachtrij is momenteel gesloten.")
 
         lat, lng = parse_lat_lng(request.data)
+
+        if is_review_test_queue(get_current_chauffeur(request.user), queue):
+            return Response(
+                {
+                    "is_valid": True,
+                    "inside_buffer": True,
+                    "message": "Review testwachtrij: locatie goedgekeurd.",
+                }
+            )
 
         buffer_zone = getattr(queue, "buffer_zone", None)
         if not buffer_zone:
@@ -996,7 +1014,7 @@ class MobileJoinQueueView(APIView):
         signup_point = make_point_from_lat_lng(lat, lng, srid=4326)
 
         buffer_zone = getattr(queue, "buffer_zone", None)
-        if buffer_zone:
+        if buffer_zone and not is_review_test_queue(chauffeur, queue):
             inside = point_in_buffer(buffer_zone, lat, lng, inclusive=True)
             if not inside:
                 return Response(
@@ -1441,6 +1459,40 @@ class MobileQueueLocationReportView(APIView):
 
         if entry is None:
             raise NotFound("Wachtrij-item niet gevonden.")
+
+        if is_review_test_queue(chauffeur, entry.queue):
+            now = timezone.now()
+
+            lat = request.data.get("lat")
+            lng = request.data.get("lng")
+
+            if lat is not None and lng is not None:
+                try:
+                    entry.last_location_at = now
+                    entry.last_location_lat = float(lat)
+                    entry.last_location_lng = float(lng)
+                    entry.location_lost_at = None
+                    entry.location_warning_sent_at = None
+                    entry.save(
+                        update_fields=[
+                            "last_location_at",
+                            "last_location_lat",
+                            "last_location_lng",
+                            "location_lost_at",
+                            "location_warning_sent_at",
+                        ]
+                    )
+                except (TypeError, ValueError):
+                    pass
+
+            return Response(
+                {
+                    "success": True,
+                    "action": "inside_buffer",
+                    "dequeued": False,
+                    "message": "Review testwachtrij: locatie geaccepteerd.",
+                }
+            )
 
         if entry.status != QueueEntry.Status.WAITING:
             return Response(

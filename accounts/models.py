@@ -45,6 +45,7 @@ class Chauffeur(models.Model):
         max_length=30,
         blank=True,
     )
+    is_review_account = models.BooleanField(default=False)
 
     def get_current_vehicle(self):
         return self.vehicles.filter(is_active=True, is_current=True).first()
