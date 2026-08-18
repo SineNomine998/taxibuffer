@@ -44,7 +44,11 @@ def accept_active_privacy_policy(*, chauffeur, request):
         chauffeur=chauffeur,
         policy=policy,
         defaults={
-            "user_agent": request.META.get("HTTP_USER_AGENT", "")[:2000],
+            "user_agent": (
+                request.META.get("HTTP_USER_AGENT", "")[:2000]
+                if request is not None
+                else "management-command"
+            ),
         },
     )
 
@@ -81,7 +85,11 @@ def accept_active_terms_of_use(*, chauffeur, request):
         chauffeur=chauffeur,
         terms=terms,
         defaults={
-            "user_agent": request.META.get("HTTP_USER_AGENT", "")[:2000],
+            "user_agent": (
+                request.META.get("HTTP_USER_AGENT", "")[:2000]
+                if request is not None
+                else "management-command"
+            ),
         },
     )
 
