@@ -316,7 +316,7 @@ class QueueLocationTracker extends ChangeNotifier {
     }
   }
 
-  Future<void> _handleLocationReportResponse(Map<String, dynamic> data) async {
+  void _handleLocationReportResponse(Map<String, dynamic> data) {
     debugPrint('Queue location result: $data');
 
     final action = data['action']?.toString();
@@ -342,9 +342,7 @@ class QueueLocationTracker extends ChangeNotifier {
       _isRunning = false;
       _isReporting = false;
 
-      try {
-        await tl.Tracelet.stop();
-      } catch (_) {}
+      unawaited(_stopTraceletQuietly());
 
       notifyListeners();
       return;
@@ -384,6 +382,15 @@ class QueueLocationTracker extends ChangeNotifier {
 
       _startCountdown(seconds);
       notifyListeners();
+    }
+  }
+
+  Future<void> _stopTraceletQuietly() async {
+    try {
+      await tl.Tracelet.stop();
+    } catch (error, stackTrace) {
+      debugPrint('Tracelet stop failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 

@@ -105,6 +105,19 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
   Future<void> _showPermissionRequiredDialog() async {
     if (!mounted) return;
 
+    final acceptedDisclosure = await showAppConfirm(
+      context: context,
+      title: 'Locatiegebruik tijdens wachtrij',
+      message:
+          'TaxiBuffer gebruikt uw locatie terwijl u actief in een wachtrij staat. '
+          'Ook wanneer de app op de achtergrond staat of het scherm uit is, controleren we of u binnen de bufferzone blijft. '
+          'Dit is nodig voor een eerlijke wachtrij. Meldingen zijn nodig om u op tijd op te roepen.',
+      confirmLabel: 'Akkoord en doorgaan',
+      cancelLabel: 'Annuleren',
+    );
+
+    if (acceptedDisclosure != true || !mounted) return;
+
     var status = await _permissionGate.check();
 
     if (!mounted) return;
@@ -120,18 +133,6 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen>
         status.notificationPermanentlyDenied;
 
     if (!needsSettings) {
-      final accepted = await showAppConfirm(
-        context: context,
-        title: 'Toestemmingen vereist',
-        message:
-            'Voor een eerlijke wachtrij zijn locatie en meldingen verplicht. '
-            'We gebruiken uw locatie alleen om te controleren of u in de bufferzone bent. Meldingen zorgen dat u uw beurt niet mist.',
-        confirmLabel: 'Toestemmingen geven',
-        cancelLabel: 'Later',
-      );
-
-      if (accepted != true || !mounted) return;
-
       status = await _permissionGate.requestMissingPermissions();
 
       if (!mounted) return;
@@ -814,7 +815,7 @@ class _PermissionRequiredCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           const Text(
-            'U kunt zich pas aanmelden wanneer locatie en meldingen zijn ingeschakeld.',
+            'Locatie en meldingen zijn nodig om deel te nemen. Tijdens actieve wachtrijdeelname controleren we ook op de achtergrond of u binnen de bufferzone blijft.',
             style: TextStyle(
               fontFamily: 'DM Sans',
               fontSize: 14,
