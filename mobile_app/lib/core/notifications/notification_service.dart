@@ -45,7 +45,16 @@ class NotificationService {
       '@drawable/ic_notification',
     );
 
-    const initSettings = InitializationSettings(android: androidInit);
+    const iosInit = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+
+    const initSettings = InitializationSettings(
+      android: androidInit,
+      iOS: iosInit,
+    );
 
     await _localNotifications.initialize(
       settings: initSettings,
@@ -84,6 +93,12 @@ class NotificationService {
 
     await android?.createNotificationChannel(_queueChannel);
     await android?.createNotificationChannel(_generalChannel);
+
+    await _messaging.setForegroundNotificationPresentationOptions(
+      alert: false,
+      badge: false,
+      sound: false,
+    );
 
     FirebaseMessaging.onMessage.listen((message) async {
       final type = message.data['type']?.toString();
@@ -132,8 +147,13 @@ class NotificationService {
       await _handleNotificationData(initialMessage.data);
     }
 
-    _messaging.onTokenRefresh.listen((newToken) {
-      _registerToken(newToken);
+    _messaging.onTokenRefresh.listen((newToken) async {
+      if (Platform.isIOS) {
+        final apnsToken = await _messaging.getAPNSToken();
+        if (apnsToken == null || apnsToken.isEmpty) return;
+      }
+
+      await _registerToken(newToken);
     });
   }
 
@@ -151,7 +171,16 @@ class NotificationService {
       icon: '@drawable/ic_notification',
     );
 
-    final details = NotificationDetails(android: androidDetails);
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
 
     await _localNotifications.show(
       id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
@@ -176,6 +205,13 @@ class NotificationService {
     };
 
     if (!isAuthorized) return false;
+
+    if (Platform.isIOS) {
+      final apnsToken = await _messaging.getAPNSToken();
+      if (apnsToken == null || apnsToken.isEmpty) {
+        return false;
+      }
+    }
 
     final token = await _messaging.getToken();
     if (token?.isEmpty ?? true) return false;
@@ -226,6 +262,11 @@ class NotificationService {
           importance: Importance.high,
           priority: Priority.high,
           icon: '@drawable/ic_notification',
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
         ),
       ),
       payload: jsonEncode(message.data),

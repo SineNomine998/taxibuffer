@@ -176,6 +176,10 @@ class QueueLocationTracker extends ChangeNotifier {
           locationUpdateInterval: 30000,
           fastestLocationUpdateInterval: 15000,
         ),
+        ios: tl.IosConfig(
+          showsBackgroundLocationIndicator: true,
+          pausesLocationUpdatesAutomatically: false,
+        ),
         motion: tl.MotionConfig(disableMotionActivityUpdates: true),
         logger: tl.LoggerConfig(debug: false, logLevel: tl.LogLevel.off),
       ),
